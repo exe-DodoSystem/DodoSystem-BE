@@ -3,6 +3,34 @@
   "WorkspaceRootPath": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{02A3FD47-98B9-4E54-9C26-C2C794BBE07A}|SMEFLOWSystem.WebAPI\\SMEFLOWSystem.WebAPI.csproj|d:\\project\\projectmonhoc\\exe101\\smeflowsystem\\smeflowsystem.webapi\\controllers\\paymentcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{02A3FD47-98B9-4E54-9C26-C2C794BBE07A}|SMEFLOWSystem.WebAPI\\SMEFLOWSystem.WebAPI.csproj|solutionrelative:smeflowsystem.webapi\\controllers\\paymentcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|d:\\project\\projectmonhoc\\exe101\\smeflowsystem\\smeflowsystem.application\\interfaces\\iservices\\ibillingservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|solutionrelative:smeflowsystem.application\\interfaces\\iservices\\ibillingservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|d:\\project\\projectmonhoc\\exe101\\smeflowsystem\\smeflowsystem.application\\services\\authservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|solutionrelative:smeflowsystem.application\\services\\authservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|d:\\project\\projectmonhoc\\exe101\\smeflowsystem\\smeflowsystem.application\\services\\paymentservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|solutionrelative:smeflowsystem.application\\services\\paymentservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|d:\\project\\projectmonhoc\\exe101\\smeflowsystem\\smeflowsystem.application\\services\\billingservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|solutionrelative:smeflowsystem.application\\services\\billingservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|d:\\project\\projectmonhoc\\exe101\\smeflowsystem\\smeflowsystem.application\\helpers\\billingstatemachine.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|solutionrelative:smeflowsystem.application\\helpers\\billingstatemachine.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{02A3FD47-98B9-4E54-9C26-C2C794BBE07A}|SMEFLOWSystem.WebAPI\\SMEFLOWSystem.WebAPI.csproj|d:\\project\\projectmonhoc\\exe101\\smeflowsystem\\smeflowsystem.webapi\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
+      "RelativeMoniker": "D:0:0:{02A3FD47-98B9-4E54-9C26-C2C794BBE07A}|SMEFLOWSystem.WebAPI\\SMEFLOWSystem.WebAPI.csproj|solutionrelative:smeflowsystem.webapi\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{02A3FD47-98B9-4E54-9C26-C2C794BBE07A}|SMEFLOWSystem.WebAPI\\SMEFLOWSystem.WebAPI.csproj|d:\\project\\projectmonhoc\\exe101\\smeflowsystem\\smeflowsystem.webapi\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{02A3FD47-98B9-4E54-9C26-C2C794BBE07A}|SMEFLOWSystem.WebAPI\\SMEFLOWSystem.WebAPI.csproj|solutionrelative:smeflowsystem.webapi\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
@@ -13,10 +41,6 @@
     {
       "AbsoluteMoniker": "D:0:0:{02A3FD47-98B9-4E54-9C26-C2C794BBE07A}|SMEFLOWSystem.WebAPI\\SMEFLOWSystem.WebAPI.csproj|d:\\project\\projectmonhoc\\exe101\\smeflowsystem\\smeflowsystem.webapi\\extensions\\webapplicationextensions.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{02A3FD47-98B9-4E54-9C26-C2C794BBE07A}|SMEFLOWSystem.WebAPI\\SMEFLOWSystem.WebAPI.csproj|solutionrelative:smeflowsystem.webapi\\extensions\\webapplicationextensions.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{02A3FD47-98B9-4E54-9C26-C2C794BBE07A}|SMEFLOWSystem.WebAPI\\SMEFLOWSystem.WebAPI.csproj|d:\\project\\projectmonhoc\\exe101\\smeflowsystem\\smeflowsystem.webapi\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
-      "RelativeMoniker": "D:0:0:{02A3FD47-98B9-4E54-9C26-C2C794BBE07A}|SMEFLOWSystem.WebAPI\\SMEFLOWSystem.WebAPI.csproj|solutionrelative:smeflowsystem.webapi\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{02A3FD47-98B9-4E54-9C26-C2C794BBE07A}|SMEFLOWSystem.WebAPI\\SMEFLOWSystem.WebAPI.csproj|d:\\project\\projectmonhoc\\exe101\\smeflowsystem\\smeflowsystem.webapi\\validator\\startupconfigurationvalidator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -34,7 +58,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 20,
+          "SelectedChildIndex": 17,
           "Children": [
             {
               "$type": "Bookmark",
@@ -106,7 +130,85 @@
             },
             {
               "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "PaymentController.cs",
+              "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.WebAPI\\Controllers\\PaymentController.cs",
+              "RelativeDocumentMoniker": "SMEFLOWSystem.WebAPI\\Controllers\\PaymentController.cs",
+              "ToolTip": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.WebAPI\\Controllers\\PaymentController.cs",
+              "RelativeToolTip": "SMEFLOWSystem.WebAPI\\Controllers\\PaymentController.cs",
+              "ViewState": "AgIAABIAAAAAAAAAAAAWwB0AAAAsAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-09T10:28:42.892Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "IBillingService.cs",
+              "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\Interfaces\\IServices\\IBillingService.cs",
+              "RelativeDocumentMoniker": "SMEFLOWSystem.Application\\Interfaces\\IServices\\IBillingService.cs",
+              "ToolTip": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\Interfaces\\IServices\\IBillingService.cs",
+              "RelativeToolTip": "SMEFLOWSystem.Application\\Interfaces\\IServices\\IBillingService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-09T10:28:38.437Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "AuthService.cs",
+              "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\Services\\AuthService.cs",
+              "RelativeDocumentMoniker": "SMEFLOWSystem.Application\\Services\\AuthService.cs",
+              "ToolTip": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\Services\\AuthService.cs",
+              "RelativeToolTip": "SMEFLOWSystem.Application\\Services\\AuthService.cs",
+              "ViewState": "AgIAADUAAAAAAAAAAAAQwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-09T10:28:14.618Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
               "DocumentIndex": 3,
+              "Title": "PaymentService.cs",
+              "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\Services\\PaymentService.cs",
+              "RelativeDocumentMoniker": "SMEFLOWSystem.Application\\Services\\PaymentService.cs",
+              "ToolTip": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\Services\\PaymentService.cs",
+              "RelativeToolTip": "SMEFLOWSystem.Application\\Services\\PaymentService.cs",
+              "ViewState": "AgIAAPcAAAAAAAAAAAAcwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-09T10:27:53.413Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "BillingService.cs",
+              "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\Services\\BillingService.cs",
+              "RelativeDocumentMoniker": "SMEFLOWSystem.Application\\Services\\BillingService.cs",
+              "ToolTip": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\Services\\BillingService.cs",
+              "RelativeToolTip": "SMEFLOWSystem.Application\\Services\\BillingService.cs",
+              "ViewState": "AgIAAAYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-09T10:27:20.534Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "BillingStateMachine.cs",
+              "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\Helpers\\BillingStateMachine.cs",
+              "RelativeDocumentMoniker": "SMEFLOWSystem.Application\\Helpers\\BillingStateMachine.cs",
+              "ToolTip": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\Helpers\\BillingStateMachine.cs",
+              "RelativeToolTip": "SMEFLOWSystem.Application\\Helpers\\BillingStateMachine.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-09T10:27:06.061Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
               "Title": "appsettings.json",
               "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.WebAPI\\appsettings.json",
               "RelativeDocumentMoniker": "SMEFLOWSystem.WebAPI\\appsettings.json",
@@ -119,7 +221,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 8,
               "Title": "ServiceCollectionExtensions.cs",
               "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.WebAPI\\Extensions\\ServiceCollectionExtensions.cs",
               "RelativeDocumentMoniker": "SMEFLOWSystem.WebAPI\\Extensions\\ServiceCollectionExtensions.cs",
@@ -132,7 +234,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 9,
               "Title": "WebApplicationExtensions.cs",
               "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.WebAPI\\Extensions\\WebApplicationExtensions.cs",
               "RelativeDocumentMoniker": "SMEFLOWSystem.WebAPI\\Extensions\\WebApplicationExtensions.cs",
@@ -145,7 +247,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 7,
               "Title": "Program.cs",
               "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.WebAPI\\Program.cs",
               "RelativeDocumentMoniker": "SMEFLOWSystem.WebAPI\\Program.cs",
@@ -158,7 +260,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 5,
+              "DocumentIndex": 11,
               "Title": "ServiceCollectionExtensions.cs",
               "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Infrastructure\\Extensions\\ServiceCollectionExtensions.cs",
               "RelativeDocumentMoniker": "SMEFLOWSystem.Infrastructure\\Extensions\\ServiceCollectionExtensions.cs",
@@ -171,7 +273,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 10,
               "Title": "StartupConfigurationValidator.cs",
               "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.WebAPI\\Validator\\StartupConfigurationValidator.cs",
               "RelativeDocumentMoniker": "SMEFLOWSystem.WebAPI\\Validator\\StartupConfigurationValidator.cs",
