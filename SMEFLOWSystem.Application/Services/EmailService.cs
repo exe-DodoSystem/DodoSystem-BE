@@ -1,7 +1,6 @@
-﻿using MailKit.Net.Smtp;
-using MailKit.Security;
-using Microsoft.Extensions.Options;
-using MimeKit;
+﻿using Microsoft.Extensions.Options;
+using SendGrid;
+using SendGrid.Helpers.Mail;
 using SMEFLOWSystem.Application.Interfaces.IServices;
 using SMEFLOWSystem.Core.Config;
 using System.Threading.Tasks;
@@ -11,69 +10,68 @@ namespace SMEFLOWSystem.Application.Services
     public class EmailService : IEmailService
     {
         private readonly EmailSettings _settings;
+        private readonly ISendGridClient _sendGrid;
 
         public EmailService(IOptions<EmailSettings> emailSettings)
         {
             _settings = emailSettings.Value;
+
+            if (string.IsNullOrWhiteSpace(_settings.SendGridApiKey))
+                throw new InvalidOperationException("Missing config: EmailSettings:SendGridApiKey");
+
+            _sendGrid = new SendGridClient(_settings.SendGridApiKey);
         }
 
         public async Task SendEmailAsync(string toEmail, string subject, string body)
         {
-            var email = new MimeMessage();
             if (string.IsNullOrWhiteSpace(_settings.FromName))
                 throw new InvalidOperationException("Missing config: EmailSettings:FromName");
             if (string.IsNullOrWhiteSpace(_settings.FromEmail))
                 throw new InvalidOperationException("Missing config: EmailSettings:FromEmail");
-            if (string.IsNullOrWhiteSpace(_settings.SmtpServer))
-                throw new InvalidOperationException("Missing config: EmailSettings:SmtpServer");
-            if (_settings.SmtpPort <= 0)
-                throw new InvalidOperationException("Invalid config: EmailSettings:SmtpPort");
-            if (string.IsNullOrWhiteSpace(_settings.Username))
-                throw new InvalidOperationException("Missing config: EmailSettings:Username");
-            if (string.IsNullOrWhiteSpace(_settings.Password))
-                throw new InvalidOperationException("Missing config: EmailSettings:Password");
 
-            email.From.Add(new MailboxAddress(_settings.FromName, _settings.FromEmail));
-            email.To.Add(MailboxAddress.Parse(toEmail));
-            email.Subject = subject;
+            var from = new EmailAddress(_settings.FromEmail, _settings.FromName);
+            var to = new EmailAddress(toEmail);
+            var message = MailHelper.CreateSingleEmail(
+                from,
+                to,
+                subject,
+                plainTextContent: string.Empty,
+                htmlContent: body);
 
-            var builder = new BodyBuilder();
-            builder.HtmlBody = body; // Cho phép gửi HTML
-            email.Body = builder.ToMessageBody();
-
-            using var smtp = new SmtpClient();
-            try
+            var response = await _sendGrid.SendEmailAsync(message);
+            if ((int)response.StatusCode >= 400)
             {
-                await smtp.ConnectAsync(_settings.SmtpServer, _settings.SmtpPort, SecureSocketOptions.StartTls);
-                await smtp.AuthenticateAsync(_settings.Username, _settings.Password);
-                await smtp.SendAsync(email);
-            }
-            finally
-            {
-                await smtp.DisconnectAsync(true);
+                var details = await response.Body.ReadAsStringAsync();
+                throw new InvalidOperationException($"SendGrid send failed: {(int)response.StatusCode} {response.StatusCode}. {details}");
             }
         }
 
         public async Task SendOtpEmailAsync(string toEmail, string otp)
         {
-            var message = new MimeMessage();  // Sửa 'email' thành 'message' để nhất quán
-            message.From.Add(new MailboxAddress(_settings.FromName, _settings.FromEmail));
-            message.To.Add(new MailboxAddress("", toEmail));
-            message.Subject = "SMEFLOW System - Mã OTP của bạn";  // Sửa tiêu đề để phù hợp với hệ thống (thay ShopDemo)
+            if (string.IsNullOrWhiteSpace(_settings.FromName))
+                throw new InvalidOperationException("Missing config: EmailSettings:FromName");
+            if (string.IsNullOrWhiteSpace(_settings.FromEmail))
+                throw new InvalidOperationException("Missing config: EmailSettings:FromEmail");
 
-            var body = new TextPart("plain")
+            var subject = "SMEFLOW System - Mã OTP của bạn";
+            var textBody = $"Mã OTP của bạn là: {otp}\n" +
+                           "Mã này có hiệu lực trong 5 phút.\n" +
+                           "Nếu bạn không yêu cầu, vui lòng bỏ qua email này.";
+
+            var htmlBody = $@"<p>Mã OTP của bạn là: <strong>{otp}</strong></p>
+<p>Mã này có hiệu lực trong 5 phút.</p>
+<p>Nếu bạn không yêu cầu, vui lòng bỏ qua email này.</p>";
+
+            var from = new EmailAddress(_settings.FromEmail, _settings.FromName);
+            var to = new EmailAddress(toEmail);
+            var message = MailHelper.CreateSingleEmail(from, to, subject, textBody, htmlBody);
+
+            var response = await _sendGrid.SendEmailAsync(message);
+            if ((int)response.StatusCode >= 400)
             {
-                Text = $"Mã OTP của bạn là: {otp}\n" +
-                       "Mã này có hiệu lực trong 5 phút.\n" +
-                       "Nếu bạn không yêu cầu, vui lòng bỏ qua email này."
-            };
-            message.Body = body;
-
-            using var smtp = new SmtpClient();
-            await smtp.ConnectAsync(_settings.SmtpServer, _settings.SmtpPort, MailKit.Security.SecureSocketOptions.StartTls);
-            await smtp.AuthenticateAsync(_settings.Username, _settings.Password);
-            await smtp.SendAsync(message);
-            await smtp.DisconnectAsync(true);
+                var details = await response.Body.ReadAsStringAsync();
+                throw new InvalidOperationException($"SendGrid send failed: {(int)response.StatusCode} {response.StatusCode}. {details}");
+            }
         }
     }
 }

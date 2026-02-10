@@ -12,7 +12,7 @@ namespace SMEFLOWSystem.Core.Entities
         public Guid Id { get; set; }
         public Guid TenantId { get; set; }
 
-        public Guid OrderId { get; set; }
+        public Guid BillingOrderId { get; set; }
 
         public string Gateway { get; set; } = string.Empty;
         public string GatewayTransactionId { get; set; } = string.Empty;

@@ -1,6 +1,7 @@
 using SMEFLOWSystem.Application.Extensions;
 using SMEFLOWSystem.Infrastructure.Extensions;
 using SMEFLOWSystem.WebAPI.Extensions;
+using SMEFLOWSystem.WebAPI.Validator;
 
 var builder = WebApplication.CreateBuilder(args);
 

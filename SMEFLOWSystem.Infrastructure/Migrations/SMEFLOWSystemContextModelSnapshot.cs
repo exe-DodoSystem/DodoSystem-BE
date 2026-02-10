@@ -77,6 +77,82 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                     b.ToTable("Attendances");
                 });
 
+            modelBuilder.Entity("SMEFLOWSystem.Core.Entities.BillingOrder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("(newsequentialid())");
+
+                    b.Property<DateTime>("BillingDate")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("(getdate())");
+
+                    b.Property<string>("BillingOrderNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime?>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("(getdate())");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("DiscountAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("decimal(18, 2)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<decimal?>("FinalAmount")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("decimal(19, 2)")
+                        .HasComputedColumnSql("([TotalAmount]-[DiscountAmount])", true);
+
+                    b.Property<bool?>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("PaymentStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasDefaultValue("Pending");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasDefaultValue("Pending");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("decimal(18, 2)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id")
+                        .HasName("PK__BillingOrders__3214EC07");
+
+                    b.HasIndex(new[] { "TenantId", "BillingOrderNumber" }, "UQ_BillingOrderNumber_Tenant")
+                        .IsUnique();
+
+                    b.ToTable("BillingOrders");
+                });
+
             modelBuilder.Entity("SMEFLOWSystem.Core.Entities.Customer", b =>
                 {
                     b.Property<Guid>("Id")
@@ -449,6 +525,9 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                     b.Property<decimal>("Amount")
                         .HasColumnType("decimal(18, 2)");
 
+                    b.Property<Guid>("BillingOrderId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
@@ -468,9 +547,6 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
 
-                    b.Property<Guid>("OrderId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<DateTime?>("ProcessedAt")
                         .HasColumnType("datetime2");
 
@@ -488,7 +564,7 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OrderId");
+                    b.HasIndex("BillingOrderId");
 
                     b.HasIndex("Gateway", "GatewayTransactionId")
                         .IsUnique();
@@ -954,9 +1030,9 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
 
             modelBuilder.Entity("SMEFLOWSystem.Core.Entities.PaymentTransaction", b =>
                 {
-                    b.HasOne("SMEFLOWSystem.Core.Entities.Order", null)
+                    b.HasOne("SMEFLOWSystem.Core.Entities.BillingOrder", null)
                         .WithMany()
-                        .HasForeignKey("OrderId")
+                        .HasForeignKey("BillingOrderId")
                         .IsRequired();
                 });
 

@@ -25,7 +25,7 @@ namespace SMEFLOWSystem.Application.Services
         private readonly ICustomerRepository _customerRepo;
         private readonly ITransaction _transaction;
         private readonly IConfiguration _config;
-        private readonly IOrderService _orderService;
+        private readonly IBillingOrderService _billingOrderService;
         private readonly IBillingService _billingService;
 
         // Constructor Injection
@@ -37,7 +37,7 @@ namespace SMEFLOWSystem.Application.Services
             ICustomerRepository customerRepo,
             ITransaction transaction,
             IConfiguration config,
-            IOrderService orderService,
+            IBillingOrderService billingOrderService,
             IBillingService billingService)
         {
             _tenantRepo = tenantRepo;
@@ -47,7 +47,7 @@ namespace SMEFLOWSystem.Application.Services
             _customerRepo = customerRepo;
             _transaction = transaction;
             _config = config;
-            _orderService = orderService;
+            _billingOrderService = billingOrderService;
             _billingService = billingService;
         }
 
@@ -125,8 +125,8 @@ namespace SMEFLOWSystem.Application.Services
 
                 await _customerRepo.AddAsync(internalCustomer);
 
-                // TẠO ĐƠN HÀNG THANH TOÁN (ORDER)
-                var newOrder = await _orderService.CreateSubscriptionOrderAsync(
+                // TẠO ĐƠN THANH TOÁN DỊCH VỤ (BILLING ORDER)
+                var newOrder = await _billingOrderService.CreateSubscriptionBillingOrderAsync(
                     newTenant.Id,
                     internalCustomer.Id,
                     request.SubscriptionPlanId);

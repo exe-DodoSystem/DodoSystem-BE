@@ -22,6 +22,7 @@ public partial class SMEFLOWSystemContext : DbContext
     public virtual DbSet<Department> Departments { get; set; }
     public virtual DbSet<Employee> Employees { get; set; }
     public virtual DbSet<Invite> Invites { get; set; }  // Thêm DbSet cho Invite
+    public virtual DbSet<BillingOrder> BillingOrders { get; set; }
     public virtual DbSet<Order> Orders { get; set; }
     public virtual DbSet<OrderItem> OrderItems { get; set; }
     public virtual DbSet<PaymentTransaction> PaymentTransactions { get; set; }
@@ -166,6 +167,36 @@ public partial class SMEFLOWSystemContext : DbContext
                 .HasConstraintName("FK_Invites_Positions");
         });
 
+        modelBuilder.Entity<BillingOrder>(entity =>
+        {
+            entity.HasQueryFilter(e => e.TenantId == currentTenantId);
+            entity.HasKey(e => e.Id).HasName("PK__BillingOrders__3214EC07");
+            entity.HasIndex(e => new { e.TenantId, e.BillingOrderNumber }, "UQ_BillingOrderNumber_Tenant").IsUnique();
+            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.DiscountAmount)
+                .HasDefaultValue(0m)
+                .HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.FinalAmount)
+                .HasComputedColumnSql("([TotalAmount]-[DiscountAmount])", true)
+                .HasColumnType("decimal(19, 2)");
+            entity.Property(e => e.IsDeleted).HasDefaultValue(false);
+            entity.Property(e => e.Notes).HasMaxLength(500);
+            entity.Property(e => e.BillingDate).HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.BillingOrderNumber)
+                .IsRequired()
+                .HasMaxLength(50);
+            entity.Property(e => e.PaymentStatus)
+                .IsRequired()
+                .HasMaxLength(30)
+                .HasDefaultValue("Pending");
+            entity.Property(e => e.Status)
+                .IsRequired()
+                .HasMaxLength(30)
+                .HasDefaultValue("Pending");
+            entity.Property(e => e.TotalAmount).HasColumnType("decimal(18, 2)");
+        });
+
         modelBuilder.Entity<Order>(entity =>
         {
             entity.HasQueryFilter(e => e.TenantId == currentTenantId);
@@ -227,7 +258,7 @@ public partial class SMEFLOWSystemContext : DbContext
             entity.HasQueryFilter(e => e.TenantId == currentTenantId);
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => new { e.Gateway, e.GatewayTransactionId }).IsUnique();
-            entity.HasIndex(e => e.OrderId);
+            entity.HasIndex(e => e.BillingOrderId);
 
             entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
             entity.Property(e => e.Gateway)
@@ -244,9 +275,9 @@ public partial class SMEFLOWSystemContext : DbContext
             entity.Property(e => e.RawData).HasMaxLength(4000);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
 
-            entity.HasOne<Order>()
+            entity.HasOne<BillingOrder>()
                 .WithMany()
-                .HasForeignKey(e => e.OrderId)
+                .HasForeignKey(e => e.BillingOrderId)
                 .OnDelete(DeleteBehavior.ClientSetNull);
         });
 

@@ -19,7 +19,7 @@ namespace SMEFLOWSystem.Application.Services
 {
     public class PaymentService : IPaymentService
     {
-        private readonly IOrderRepository _orderRepo;
+        private readonly IBillingOrderRepository _billingOrderRepo;
         private readonly ITenantRepository _tenantRepo;
         private readonly IPaymentTransactionRepository _paymentTransactionRepo;
         private readonly ISubscriptionPlanRepository _planRepo;
@@ -30,7 +30,7 @@ namespace SMEFLOWSystem.Application.Services
         private readonly IConfiguration _config;
 
         public PaymentService(
-            IOrderRepository orderRepo,
+            IBillingOrderRepository billingOrderRepo,
             ITenantRepository tenantRepo,
             IPaymentTransactionRepository paymentTransactionRepo,
             ISubscriptionPlanRepository planRepo,
@@ -40,7 +40,7 @@ namespace SMEFLOWSystem.Application.Services
             IConfiguration configuration,
             IUserRepository userRepo)
         {
-            _orderRepo = orderRepo;
+            _billingOrderRepo = billingOrderRepo;
             _tenantRepo = tenantRepo;
             _paymentTransactionRepo = paymentTransactionRepo;
             _planRepo = planRepo;
@@ -54,8 +54,8 @@ namespace SMEFLOWSystem.Application.Services
         public async Task<string> CreatePaymentUrlAsync(Guid orderId, string? clientIp = null)
         {
             // Payment creation may happen without tenant context (e.g., after RegisterTenant) -> bypass tenant filters.
-            var order = await _orderRepo.GetByIdIgnoreTenantAsync(orderId);
-            if (order == null) throw new Exception("Không tìm thấy đơn hàng");
+            var billingOrder = await _billingOrderRepo.GetByIdIgnoreTenantAsync(orderId);
+            if (billingOrder == null) throw new Exception("Không tìm thấy đơn thanh toán");
 
             var mode = _config["Payment:Mode"] ?? throw new Exception("Missing config: Payment:Mode");
             if (mode == "Sandbox" || mode == "Production")
@@ -63,7 +63,7 @@ namespace SMEFLOWSystem.Application.Services
                 var gateway = _config["Payment:Gateway"] ?? throw new Exception("Missing config: Payment:Gateway");
                 if (gateway == "VNPay")
                 {
-                    return await CreateVNPayUrlAsync(order, clientIp);
+                    return await CreateVNPayUrlAsync(billingOrder, clientIp);
                 }
                 // Thêm Momo nếu cần sau
             }
@@ -108,8 +108,8 @@ namespace SMEFLOWSystem.Application.Services
             if (existingTx != null) return true;
 
             // Callback has no tenant context -> bypass tenant filters when loading order.
-            var orderForTenant = await _orderRepo.GetByIdIgnoreTenantAsync(orderId);
-            if (orderForTenant == null) throw new Exception("Không tìm thấy đơn hàng");
+            var orderForTenant = await _billingOrderRepo.GetByIdIgnoreTenantAsync(orderId);
+            if (orderForTenant == null) throw new Exception("Không tìm thấy đơn thanh toán");
 
             decimal amount = 0m;
             if (vnpayData.TryGetValue("vnp_Amount", out var amountRaw) && long.TryParse(amountRaw, out var amountMinor))
@@ -127,14 +127,14 @@ namespace SMEFLOWSystem.Application.Services
                     ignoreTenantFilter: true);
                 if (existingInside != null) return;
 
-                var order = await _orderRepo.GetByIdIgnoreTenantAsync(orderId);
-                if (order == null) throw new Exception("Không tìm thấy đơn hàng");
+                var order = await _billingOrderRepo.GetByIdIgnoreTenantAsync(orderId);
+                if (order == null) throw new Exception("Không tìm thấy đơn thanh toán");
 
                 var paymentTransaction = new PaymentTransaction
                 {
                     Id = Guid.NewGuid(),
                     TenantId = order.TenantId,
-                    OrderId = order.Id,
+                    BillingOrderId = order.Id,
                     Gateway = "VNPay",
                     GatewayTransactionId = gatewayTransactionId,
                     GatewayResponseCode = responseCode,
@@ -165,7 +165,7 @@ namespace SMEFLOWSystem.Application.Services
                         order.Status = StatusEnum.OrderCancelled;
                     }
                 }
-                await _orderRepo.UpdateIgnoreTenantAsync(order);
+                await _billingOrderRepo.UpdateIgnoreTenantAsync(order);
             });
 
             // Nếu thanh toán thành công, dùng Hangfire để active Tenant và Owner (background job để không block callback)
@@ -186,8 +186,8 @@ namespace SMEFLOWSystem.Application.Services
 
             await _transaction.ExecuteAsync(async () =>
             {
-                var order = await _orderRepo.GetByIdIgnoreTenantAsync(orderId);
-                if (order == null) throw new Exception("Không tìm thấy đơn hàng");
+                var order = await _billingOrderRepo.GetByIdIgnoreTenantAsync(orderId);
+                if (order == null) throw new Exception("Không tìm thấy đơn thanh toán");
 
                 // Double-activation guard: only proceed for paid orders
                 if (!string.Equals(order.PaymentStatus, StatusEnum.PaymentPaid, StringComparison.OrdinalIgnoreCase))
@@ -250,7 +250,7 @@ namespace SMEFLOWSystem.Application.Services
             return BitConverter.ToString(hashBytes).Replace("-", "").ToLower();
         }
 
-        private Task<string> CreateVNPayUrlAsync(Order order, string? clientIp)
+        private Task<string> CreateVNPayUrlAsync(BillingOrder order, string? clientIp)
         {
             // Logic tạo URL VNPay (dựa trên docs sandbox.vnpayment.vn)
             clientIp = string.IsNullOrWhiteSpace(clientIp) ? "127.0.0.1" : clientIp;
@@ -272,7 +272,7 @@ namespace SMEFLOWSystem.Application.Services
                 ["vnp_CurrCode"] = "VND",
                 ["vnp_IpAddr"] = clientIp,
                 ["vnp_Locale"] = "vn",
-                ["vnp_OrderInfo"] = $"Thanh toan don hang {order.OrderNumber}",
+                ["vnp_OrderInfo"] = $"Thanh toan don hang {order.BillingOrderNumber}",
                 ["vnp_OrderType"] = "billpayment",
                 ["vnp_ReturnUrl"] = returnUrl,
                 ["vnp_TxnRef"] = order.Id.ToString() // OrderId làm ref

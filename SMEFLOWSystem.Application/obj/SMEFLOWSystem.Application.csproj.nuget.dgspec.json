@@ -74,17 +74,13 @@
               "target": "Package",
               "version": "[1.8.23, )"
             },
-            "MailKit": {
-              "target": "Package",
-              "version": "[4.14.1, )"
-            },
             "Microsoft.AspNetCore.Http.Features": {
               "target": "Package",
               "version": "[2.3.0, )"
             },
-            "MimeKit": {
+            "SendGrid": {
               "target": "Package",
-              "version": "[4.14.0, )"
+              "version": "[9.29.3, )"
             }
           },
           "imports": [
