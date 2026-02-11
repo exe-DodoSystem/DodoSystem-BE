@@ -1,4 +1,5 @@
 ﻿using SMEFLOWSystem.Application.Interfaces.IRepositories;
+using Microsoft.EntityFrameworkCore;
 using SMEFLOWSystem.Infrastructure.Data;
 using System;
 using System.Collections.Generic;
@@ -19,6 +20,17 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
         {
             await _context.Customers.AddAsync(customer);
             await _context.SaveChangesAsync();
+        }
+
+        public Task<Core.Entities.Customer?> GetInternalCustomerIgnoreTenantAsync(Guid tenantId)
+        {
+            return _context.Customers
+                .IgnoreQueryFilters()
+                .Where(c => c.TenantId == tenantId
+                            && c.Type == "Internal"
+                            && (c.IsDeleted == null || c.IsDeleted == false))
+                .OrderBy(c => c.CreatedAt)
+                .FirstOrDefaultAsync();
         }
     }
 }

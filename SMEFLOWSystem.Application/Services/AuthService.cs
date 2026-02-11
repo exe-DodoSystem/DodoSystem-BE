@@ -1,7 +1,9 @@
-﻿using Hangfire;
+﻿using AutoMapper;
+using Hangfire;
 using Microsoft.Extensions.Configuration;
 using ShareKernel.Common.Enum;
 using SMEFLOWSystem.Application.DTOs.AuthDtos;
+using SMEFLOWSystem.Application.DTOs.UserDtos;
 using SMEFLOWSystem.Application.Helpers;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Application.Interfaces.IServices;
@@ -23,10 +25,13 @@ namespace SMEFLOWSystem.Application.Services
         private readonly IRoleRepository _roleRepo;
         private readonly IUserRoleRepository _userRoleRepo;
         private readonly ICustomerRepository _customerRepo;
+        private readonly IModuleRepository _moduleRepo;
+        private readonly IModuleSubscriptionRepository _moduleSubscriptionRepo;
         private readonly ITransaction _transaction;
         private readonly IConfiguration _config;
         private readonly IBillingOrderService _billingOrderService;
         private readonly IBillingService _billingService;
+        private readonly IMapper _mapper;
 
         // Constructor Injection
         public AuthService(
@@ -35,20 +40,26 @@ namespace SMEFLOWSystem.Application.Services
             IRoleRepository roleRepo,
             IUserRoleRepository userRoleRepo,
             ICustomerRepository customerRepo,
+            IModuleRepository moduleRepo,
+            IModuleSubscriptionRepository moduleSubscriptionRepo,
             ITransaction transaction,
             IConfiguration config,
             IBillingOrderService billingOrderService,
-            IBillingService billingService)
+            IBillingService billingService,
+            IMapper mapper)
         {
             _tenantRepo = tenantRepo;
             _userRepo = userRepo;
             _roleRepo = roleRepo;
             _userRoleRepo = userRoleRepo;
             _customerRepo = customerRepo;
+            _moduleRepo = moduleRepo;
+            _moduleSubscriptionRepo = moduleSubscriptionRepo;
             _transaction = transaction;
             _config = config;
             _billingOrderService = billingOrderService;
             _billingService = billingService;
+            _mapper = mapper;
         }
 
         public async Task<bool> RegisterTenantAsync(RegisterRequestDto request)
@@ -57,19 +68,25 @@ namespace SMEFLOWSystem.Application.Services
             if (existingUser != null)
                 throw new Exception("Email này đã được sử dụng!");
 
+            if (request.ModuleIds == null || request.ModuleIds.Length == 0)
+                throw new Exception("Vui lòng chọn ít nhất 1 module!");
+
             Guid createdOrderId = Guid.Empty;
             string adminEmail = request.AdminEmail;
             string companyName = request.CompanyName;
             await _transaction.ExecuteAsync(async () =>
             {
+                var now = DateTime.UtcNow;
+                var trialEnd = now.AddDays(14);
+
                 // TẠO TENANT (CÔNG TY)
                 var newTenant = new Tenant
                 {
                     Id = Guid.NewGuid(),
                     Name = request.CompanyName,
-                    Status = StatusEnum.TenantPending,
-                    SubscriptionPlanId = request.SubscriptionPlanId,
-                    CreatedAt = DateTime.UtcNow,
+                    Status = StatusEnum.TenantTrial,
+                    SubscriptionEndDate = DateOnly.FromDateTime(trialEnd),
+                    CreatedAt = now,
                 };
 
                 await _tenantRepo.AddAsync(newTenant);
@@ -86,7 +103,7 @@ namespace SMEFLOWSystem.Application.Services
                     PasswordHash = AuthHelper.HashPassword(request.Password),
                     IsActive = true,
                     IsVerified = false,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = now
                 };
 
                 await _userRepo.AddAsync(adminUser);
@@ -120,16 +137,39 @@ namespace SMEFLOWSystem.Application.Services
                     Name = request.CompanyName,
                     Email = request.AdminEmail,
                     Type = "Internal",
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = now
                 };
 
                 await _customerRepo.AddAsync(internalCustomer);
 
-                // TẠO ĐƠN THANH TOÁN DỊCH VỤ (BILLING ORDER)
-                var newOrder = await _billingOrderService.CreateSubscriptionBillingOrderAsync(
+                // TẠO MODULE SUBSCRIPTIONS (TRIAL)
+                var modules = await _moduleRepo.GetByIdsAsync(request.ModuleIds);
+                if (modules.Count != request.ModuleIds.Distinct().Count())
+                    throw new Exception("Có module không tồn tại hoặc đang bị tắt!");
+
+                foreach (var module in modules)
+                {
+                    var sub = new ModuleSubscription
+                    {
+                        Id = Guid.NewGuid(),
+                        TenantId = newTenant.Id,
+                        ModuleId = module.Id,
+                        StartDate = now,
+                        EndDate = trialEnd,
+                        Status = StatusEnum.ModuleTrial,
+                        CreatedAt = now,
+                        IsDeleted = false
+                    };
+                    await _moduleSubscriptionRepo.AddAsync(sub);
+                }
+
+                // TẠO ĐƠN THANH TOÁN DỊCH VỤ (BILLING ORDER) - optional pay early
+                var newOrder = await _billingOrderService.CreateModuleBillingOrderAsync(
                     newTenant.Id,
                     internalCustomer.Id,
-                    request.SubscriptionPlanId);
+                    request.ModuleIds,
+                    isTrialOrder: false);
+
                 createdOrderId = newOrder.Id;
             });
 
@@ -141,7 +181,7 @@ namespace SMEFLOWSystem.Application.Services
             return true;
         }
 
-        public async Task<string> LoginAsync(LoginRequestDto request)
+        public async Task<LoginUserDto> LoginAsync(LoginRequestDto request)
         {
             var user = await _userRepo.GetUserByEmailAsync(request.Email);
 
@@ -154,14 +194,34 @@ namespace SMEFLOWSystem.Application.Services
             if (!user.IsActive)
                 throw new Exception("Tài khoản của bạn đã bị khóa.");
 
-            if (user.Tenant.Status == StatusEnum.TenantSuspended)
-                throw new Exception("Dịch vụ của công ty đã hết hạn/bị treo.");
+            var tenant = user.Tenant;
+            if (tenant == null) throw new Exception("Không tìm thấy tenant");
 
-            if (user.Tenant.Status == StatusEnum.TenantPending)
-                throw new Exception("Công ty chưa kích hoạt dịch vụ (Chưa thanh toán).");
+            // Expiry check: if tenant has end date and it's expired, suspend + block login
+            if (tenant.SubscriptionEndDate.HasValue)
+            {
+                var todayUtc = DateOnly.FromDateTime(DateTime.UtcNow);
+                if (tenant.SubscriptionEndDate.Value < todayUtc)
+                {
+                    tenant.Status = StatusEnum.TenantSuspended;
+                    await _tenantRepo.UpdateAsync(tenant);
+
+                    throw new Exception("Hết hạn trial, thanh toán để tiếp tục");
+                }
+            }
+
+            if (string.Equals(tenant.Status, StatusEnum.TenantSuspended, StringComparison.OrdinalIgnoreCase))
+                throw new Exception("Hết hạn trial, thanh toán để tiếp tục");
+
+            if (!string.Equals(tenant.Status, StatusEnum.TenantActive, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(tenant.Status, StatusEnum.TenantTrial, StringComparison.OrdinalIgnoreCase))
+                throw new Exception("Tài khoản công ty chưa sẵn sàng để đăng nhập.");
 
             var token = AuthHelper.GenerateJwtToken(user, _config);
-            return token;
+            var userDto =  _mapper.Map<LoginUserDto>(user);
+            userDto.Token = token;
+
+            return userDto;
         }
     }
 }

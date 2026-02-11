@@ -23,13 +23,15 @@ public partial class SMEFLOWSystemContext : DbContext
     public virtual DbSet<Employee> Employees { get; set; }
     public virtual DbSet<Invite> Invites { get; set; }  // Thêm DbSet cho Invite
     public virtual DbSet<BillingOrder> BillingOrders { get; set; }
+    public virtual DbSet<BillingOrderModule> BillingOrderModules { get; set; }
+    public virtual DbSet<Module> Modules { get; set; }
+    public virtual DbSet<ModuleSubscription> ModuleSubscriptions { get; set; }
     public virtual DbSet<Order> Orders { get; set; }
     public virtual DbSet<OrderItem> OrderItems { get; set; }
     public virtual DbSet<PaymentTransaction> PaymentTransactions { get; set; }
     public virtual DbSet<Payroll> Payrolls { get; set; }
     public virtual DbSet<Position> Positions { get; set; }
     public virtual DbSet<Role> Roles { get; set; }
-    public virtual DbSet<SubscriptionPlan> SubscriptionPlans { get; set; }
     public virtual DbSet<Tenant> Tenants { get; set; }
     public virtual DbSet<User> Users { get; set; }
     public virtual DbSet<UserRole> UserRoles { get; set; }
@@ -197,6 +199,63 @@ public partial class SMEFLOWSystemContext : DbContext
             entity.Property(e => e.TotalAmount).HasColumnType("decimal(18, 2)");
         });
 
+        modelBuilder.Entity<BillingOrderModule>(entity =>
+        {
+            entity.HasQueryFilter(e => e.TenantId == currentTenantId);
+            entity.HasKey(e => e.Id).HasName("PK__BillingOrderModules__3214EC07");
+            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.UnitPrice).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.LineTotal).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+
+            entity.HasOne(d => d.BillingOrder).WithMany(p => p.BillingOrderModules)
+                .HasForeignKey(d => d.BillingOrderId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_BillingOrderModules_BillingOrders");
+
+            entity.HasOne(d => d.Module).WithMany(p => p.BillingOrderModules)
+                .HasForeignKey(d => d.ModuleId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_BillingOrderModules_Modules");
+        });
+
+        modelBuilder.Entity<Module>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__Modules__3214EC07");
+            entity.Property(e => e.Code).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.ShortCode).IsRequired().HasMaxLength(20);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(255);
+            entity.Property(e => e.Description).HasMaxLength(500);
+            entity.Property(e => e.MonthlyPrice).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+
+            entity.HasIndex(e => e.Code).IsUnique();
+            entity.HasIndex(e => e.ShortCode).IsUnique();
+        });
+
+        modelBuilder.Entity<ModuleSubscription>(entity =>
+        {
+            entity.HasQueryFilter(e => e.TenantId == currentTenantId);
+            entity.HasKey(e => e.Id).HasName("PK__ModuleSubscriptions__3214EC07");
+            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Status).IsRequired().HasMaxLength(30);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.IsDeleted).HasDefaultValue(false);
+
+            entity.HasIndex(e => new { e.TenantId, e.ModuleId }).IsUnique();
+
+            entity.HasOne(d => d.Tenant).WithMany(p => p.ModuleSubscriptions)
+                .HasForeignKey(d => d.TenantId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ModuleSubscriptions_Tenants");
+
+            entity.HasOne(d => d.Module).WithMany(p => p.ModuleSubscriptions)
+                .HasForeignKey(d => d.ModuleId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ModuleSubscriptions_Modules");
+        });
+
         modelBuilder.Entity<Order>(entity =>
         {
             entity.HasQueryFilter(e => e.TenantId == currentTenantId);
@@ -214,7 +273,7 @@ public partial class SMEFLOWSystemContext : DbContext
             entity.Property(e => e.Notes).HasMaxLength(500);  // Nullable
             entity.Property(e => e.OrderDate).HasDefaultValueSql("(getdate())");
             entity.Property(e => e.OrderNumber)
-                .IsRequired()
+            // entity.Ignore(e => e.ModuleSubscriptions); // Removed incorrect ignore
                 .HasMaxLength(50);
             entity.Property(e => e.PaymentStatus)
                 .IsRequired()
@@ -237,6 +296,7 @@ public partial class SMEFLOWSystemContext : DbContext
 
         modelBuilder.Entity<OrderItem>(entity =>
         {
+            entity.HasQueryFilter(e => e.TenantId == currentTenantId);
             entity.HasKey(e => e.Id).HasName("PK__OrderIte__3214EC0756359D82");
             entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
@@ -342,44 +402,26 @@ public partial class SMEFLOWSystemContext : DbContext
                 .HasMaxLength(100);
         });
 
-        modelBuilder.Entity<SubscriptionPlan>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PK__Subscrip__3214EC07E7B58EBD");
-            entity.HasIndex(e => e.Name, "UQ__Subscrip__737584F612E0C4D0").IsUnique();
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.Description).HasMaxLength(500);
-            entity.Property(e => e.DisplayName)
-                .IsRequired()
-                .HasMaxLength(150);
-            entity.Property(e => e.DurationMonths).HasDefaultValue(1);
-            entity.Property(e => e.IsActive).HasDefaultValue(true);
-            entity.Property(e => e.Name)
-                .IsRequired()
-                .HasMaxLength(100);
-            entity.Property(e => e.Price).HasColumnType("decimal(18, 2)");
-        });
-
         modelBuilder.Entity<Tenant>(entity =>
         {
-            entity.HasQueryFilter(e => e.Id == currentTenantId);
             entity.HasKey(e => e.Id).HasName("PK__Tenants__3214EC0740A20BD5");
             entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.IsDeleted).HasDefaultValue(false);
+
             entity.Property(e => e.Name)
                 .IsRequired()
                 .HasMaxLength(255);
+
             entity.Property(e => e.Status)
                 .IsRequired()
                 .HasMaxLength(50)
                 .HasDefaultValue("Active");
+
             entity.HasOne(e => e.OwnerUser)
-                .WithMany() 
+                .WithMany()
                 .HasForeignKey(e => e.OwnerUserId)
                 .OnDelete(DeleteBehavior.NoAction);
-            entity.HasOne(d => d.SubscriptionPlan).WithMany(p => p.Tenants)
-                .HasForeignKey(d => d.SubscriptionPlanId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Tenants_SubscriptionPlans");
         });
 
         modelBuilder.Entity<User>(entity =>
@@ -409,6 +451,7 @@ public partial class SMEFLOWSystemContext : DbContext
 
         modelBuilder.Entity<UserRole>(entity =>
         {
+            entity.HasQueryFilter(e => e.TenantId == currentTenantId);
             entity.HasKey(e => new { e.UserId, e.RoleId });
             entity.HasOne(d => d.Role).WithMany(p => p.UserRoles)
                 .HasForeignKey(d => d.RoleId)

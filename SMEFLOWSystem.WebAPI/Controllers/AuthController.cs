@@ -36,8 +36,8 @@ namespace SMEFLOWSystem.WebAPI.Controllers
         {
             try
             {
-                var token = await _authService.LoginAsync(request);
-                return Ok(new { Token = token });
+                var user = await _authService.LoginAsync(request);
+                return Ok(user);
             }
             catch (Exception ex)
             {

@@ -1,4 +1,5 @@
 using SMEFLOWSystem.SharedKernel.Interfaces;
+using System.Collections.Generic;
 
 namespace SMEFLOWSystem.Core.Entities;
 
@@ -25,4 +26,6 @@ public class BillingOrder : ITenantEntity
     public DateTime? UpdatedAt { get; set; }
 
     public bool? IsDeleted { get; set; }
+
+    public virtual ICollection<BillingOrderModule> BillingOrderModules { get; set; } = new List<BillingOrderModule>();
 }

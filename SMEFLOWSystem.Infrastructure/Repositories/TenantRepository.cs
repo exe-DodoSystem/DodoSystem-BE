@@ -43,7 +43,6 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
             if (existingTenant != null)
             {
                 existingTenant.Name = tenant.Name;
-                existingTenant.SubscriptionPlanId = tenant.SubscriptionPlanId;
                 existingTenant.Status = tenant.Status;
                 existingTenant.SubscriptionEndDate = tenant.SubscriptionEndDate;
                 existingTenant.OwnerUserId = tenant.OwnerUserId;
@@ -61,7 +60,6 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
             if (existingTenant != null)
             {
                 existingTenant.Name = tenant.Name;
-                existingTenant.SubscriptionPlanId = tenant.SubscriptionPlanId;
                 existingTenant.Status = tenant.Status;
                 existingTenant.SubscriptionEndDate = tenant.SubscriptionEndDate;
                 existingTenant.OwnerUserId = tenant.OwnerUserId;
@@ -69,6 +67,16 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
                 _context.Tenants.Update(existingTenant);
                 await _context.SaveChangesAsync();
             }
+        }
+
+        public Task<List<Tenant>> GetExpiredTenantsIgnoreTenantAsync(DateOnly todayUtc)
+        {
+            return _context.Tenants
+                .IgnoreQueryFilters()
+                .Where(t => !t.IsDeleted
+                            && t.SubscriptionEndDate.HasValue
+                            && t.SubscriptionEndDate.Value < todayUtc)
+                .ToListAsync();
         }
     }
 }

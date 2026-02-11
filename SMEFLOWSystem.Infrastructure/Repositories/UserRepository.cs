@@ -62,10 +62,9 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
         public async Task<User?> GetUserByEmailAsync(string email)
         {
             return await _context.Users
+                .IgnoreQueryFilters()
                 .Include(x => x.Tenant)
                 .Include(x => x.UserRoles)
-                    .ThenInclude(ur => ur.Role)
-                .Where(x => !x.IsDeleted)
                 .FirstOrDefaultAsync(u => u.Email == email);
         }
 

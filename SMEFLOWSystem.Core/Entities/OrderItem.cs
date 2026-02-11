@@ -2,12 +2,15 @@
 #nullable disable
 using System;
 using System.Collections.Generic;
+using SMEFLOWSystem.SharedKernel.Interfaces;
 
 namespace SMEFLOWSystem.Core.Entities;
 
-public partial class OrderItem
+public partial class OrderItem : ITenantEntity
 {
     public Guid Id { get; set; }
+
+    public Guid TenantId { get; set; }
 
     public Guid OrderId { get; set; }
 

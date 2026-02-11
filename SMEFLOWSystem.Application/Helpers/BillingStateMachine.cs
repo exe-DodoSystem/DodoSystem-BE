@@ -29,7 +29,9 @@ namespace SMEFLOWSystem.Application.Helpers
 
         public static bool CanActivateTenant(string currentTenantStatus)
         {
-            return string.Equals(currentTenantStatus, StatusEnum.TenantPending, StringComparison.OrdinalIgnoreCase);
+            return string.Equals(currentTenantStatus, StatusEnum.TenantPending, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(currentTenantStatus, StatusEnum.TenantTrial, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(currentTenantStatus, StatusEnum.TenantSuspended, StringComparison.OrdinalIgnoreCase);
         }
     }
 }

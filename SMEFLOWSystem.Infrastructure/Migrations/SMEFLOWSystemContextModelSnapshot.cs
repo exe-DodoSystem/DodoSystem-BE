@@ -153,6 +153,49 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                     b.ToTable("BillingOrders");
                 });
 
+            modelBuilder.Entity("SMEFLOWSystem.Core.Entities.BillingOrderModule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("(newsequentialid())");
+
+                    b.Property<Guid>("BillingOrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("(getdate())");
+
+                    b.Property<decimal>("LineTotal")
+                        .HasColumnType("decimal(18, 2)");
+
+                    b.Property<int>("ModuleId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ProrationDays")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("decimal(18, 2)");
+
+                    b.HasKey("Id")
+                        .HasName("PK__BillingOrderModules__3214EC07");
+
+                    b.HasIndex("BillingOrderId");
+
+                    b.HasIndex("ModuleId");
+
+                    b.ToTable("BillingOrderModules");
+                });
+
             modelBuilder.Entity("SMEFLOWSystem.Core.Entities.Customer", b =>
                 {
                     b.Property<Guid>("Id")
@@ -398,6 +441,110 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                     b.ToTable("Invites");
                 });
 
+            modelBuilder.Entity("SMEFLOWSystem.Core.Entities.Module", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("(getdate())");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<decimal>("MonthlyPrice")
+                        .HasColumnType("decimal(18, 2)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("ShortCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id")
+                        .HasName("PK__Modules__3214EC07");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("ShortCode")
+                        .IsUnique();
+
+                    b.ToTable("Modules");
+                });
+
+            modelBuilder.Entity("SMEFLOWSystem.Core.Entities.ModuleSubscription", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("(newsequentialid())");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("(getdate())");
+
+                    b.Property<DateTime>("EndDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<int>("ModuleId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("StartDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id")
+                        .HasName("PK__ModuleSubscriptions__3214EC07");
+
+                    b.HasIndex("ModuleId");
+
+                    b.HasIndex("TenantId", "ModuleId")
+                        .IsUnique();
+
+                    b.ToTable("ModuleSubscriptions");
+                });
+
             modelBuilder.Entity("SMEFLOWSystem.Core.Entities.Order", b =>
                 {
                     b.Property<Guid>("Id")
@@ -438,7 +585,6 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                         .HasDefaultValueSql("(getdate())");
 
                     b.Property<string>("OrderNumber")
-                        .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
@@ -471,7 +617,8 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                     b.HasIndex("CustomerId");
 
                     b.HasIndex(new[] { "TenantId", "OrderNumber" }, "UQ_OrderNumber_Tenant")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[OrderNumber] IS NOT NULL");
 
                     b.ToTable("Orders");
                 });
@@ -498,6 +645,9 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
 
                     b.Property<int>("Quantity")
                         .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<decimal?>("TotalPrice")
                         .ValueGeneratedOnAddOrUpdate()
@@ -712,61 +862,6 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                     b.ToTable("Roles");
                 });
 
-            modelBuilder.Entity("SMEFLOWSystem.Core.Entities.SubscriptionPlan", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("(getdate())");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<int>("DurationMonths")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(1);
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(true);
-
-                    b.Property<int>("MaxUsers")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<decimal>("Price")
-                        .HasColumnType("decimal(18, 2)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id")
-                        .HasName("PK__Subscrip__3214EC07E7B58EBD");
-
-                    b.HasIndex(new[] { "Name" }, "UQ__Subscrip__737584F612E0C4D0")
-                        .IsUnique();
-
-                    b.ToTable("SubscriptionPlans");
-                });
-
             modelBuilder.Entity("SMEFLOWSystem.Core.Entities.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
@@ -780,7 +875,9 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                         .HasDefaultValueSql("(getdate())");
 
                     b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -800,9 +897,6 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                     b.Property<DateOnly?>("SubscriptionEndDate")
                         .HasColumnType("date");
 
-                    b.Property<int>("SubscriptionPlanId")
-                        .HasColumnType("int");
-
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
@@ -810,8 +904,6 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                         .HasName("PK__Tenants__3214EC0740A20BD5");
 
                     b.HasIndex("OwnerUserId");
-
-                    b.HasIndex("SubscriptionPlanId");
 
                     b.ToTable("Tenants");
                 });
@@ -883,6 +975,9 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                     b.Property<int>("RoleId")
                         .HasColumnType("int");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("UserId", "RoleId");
 
                     b.HasIndex("RoleId");
@@ -907,6 +1002,25 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                     b.Navigation("Employee");
 
                     b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("SMEFLOWSystem.Core.Entities.BillingOrderModule", b =>
+                {
+                    b.HasOne("SMEFLOWSystem.Core.Entities.BillingOrder", "BillingOrder")
+                        .WithMany("BillingOrderModules")
+                        .HasForeignKey("BillingOrderId")
+                        .IsRequired()
+                        .HasConstraintName("FK_BillingOrderModules_BillingOrders");
+
+                    b.HasOne("SMEFLOWSystem.Core.Entities.Module", "Module")
+                        .WithMany("BillingOrderModules")
+                        .HasForeignKey("ModuleId")
+                        .IsRequired()
+                        .HasConstraintName("FK_BillingOrderModules_Modules");
+
+                    b.Navigation("BillingOrder");
+
+                    b.Navigation("Module");
                 });
 
             modelBuilder.Entity("SMEFLOWSystem.Core.Entities.Customer", b =>
@@ -998,6 +1112,25 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("SMEFLOWSystem.Core.Entities.ModuleSubscription", b =>
+                {
+                    b.HasOne("SMEFLOWSystem.Core.Entities.Module", "Module")
+                        .WithMany("ModuleSubscriptions")
+                        .HasForeignKey("ModuleId")
+                        .IsRequired()
+                        .HasConstraintName("FK_ModuleSubscriptions_Modules");
+
+                    b.HasOne("SMEFLOWSystem.Core.Entities.Tenant", "Tenant")
+                        .WithMany("ModuleSubscriptions")
+                        .HasForeignKey("TenantId")
+                        .IsRequired()
+                        .HasConstraintName("FK_ModuleSubscriptions_Tenants");
+
+                    b.Navigation("Module");
+
+                    b.Navigation("Tenant");
+                });
+
             modelBuilder.Entity("SMEFLOWSystem.Core.Entities.Order", b =>
                 {
                     b.HasOne("SMEFLOWSystem.Core.Entities.Customer", "Customer")
@@ -1081,15 +1214,7 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                         .HasForeignKey("OwnerUserId")
                         .OnDelete(DeleteBehavior.NoAction);
 
-                    b.HasOne("SMEFLOWSystem.Core.Entities.SubscriptionPlan", "SubscriptionPlan")
-                        .WithMany("Tenants")
-                        .HasForeignKey("SubscriptionPlanId")
-                        .IsRequired()
-                        .HasConstraintName("FK_Tenants_SubscriptionPlans");
-
                     b.Navigation("OwnerUser");
-
-                    b.Navigation("SubscriptionPlan");
                 });
 
             modelBuilder.Entity("SMEFLOWSystem.Core.Entities.User", b =>
@@ -1122,6 +1247,11 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("SMEFLOWSystem.Core.Entities.BillingOrder", b =>
+                {
+                    b.Navigation("BillingOrderModules");
+                });
+
             modelBuilder.Entity("SMEFLOWSystem.Core.Entities.Customer", b =>
                 {
                     b.Navigation("Orders");
@@ -1143,6 +1273,13 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                     b.Navigation("Payrolls");
                 });
 
+            modelBuilder.Entity("SMEFLOWSystem.Core.Entities.Module", b =>
+                {
+                    b.Navigation("BillingOrderModules");
+
+                    b.Navigation("ModuleSubscriptions");
+                });
+
             modelBuilder.Entity("SMEFLOWSystem.Core.Entities.Order", b =>
                 {
                     b.Navigation("OrderItems");
@@ -1162,11 +1299,6 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                     b.Navigation("UserRoles");
                 });
 
-            modelBuilder.Entity("SMEFLOWSystem.Core.Entities.SubscriptionPlan", b =>
-                {
-                    b.Navigation("Tenants");
-                });
-
             modelBuilder.Entity("SMEFLOWSystem.Core.Entities.Tenant", b =>
                 {
                     b.Navigation("Attendances");
@@ -1178,6 +1310,8 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                     b.Navigation("Employees");
 
                     b.Navigation("Invites");
+
+                    b.Navigation("ModuleSubscriptions");
 
                     b.Navigation("Orders");
 

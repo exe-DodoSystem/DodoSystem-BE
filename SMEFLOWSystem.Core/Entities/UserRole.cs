@@ -2,12 +2,15 @@
 #nullable disable
 using System;
 using System.Collections.Generic;
+using SMEFLOWSystem.SharedKernel.Interfaces;
 
 namespace SMEFLOWSystem.Core.Entities;
 
-public partial class UserRole
+public partial class UserRole : ITenantEntity
 {
     public Guid UserId { get; set; }
+
+    public Guid TenantId { get; set; }
 
     public int RoleId { get; set; }
 

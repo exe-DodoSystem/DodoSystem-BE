@@ -1,5 +1,5 @@
 using Hangfire;
-using Hangfire.SqlServer;
+using Hangfire.Redis.StackExchange;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -53,9 +53,14 @@ public static class DependencyInjection
             cfg.SetDataCompatibilityLevel(CompatibilityLevel.Version_170);
             cfg.UseSimpleAssemblyNameTypeSerializer();
             cfg.UseRecommendedSerializerSettings();
-            cfg.UseSqlServerStorage(
-                configuration.GetConnectionString("DefaultConnection"),
-                new SqlServerStorageOptions());
+
+            var redisConnectionString = configuration.GetConnectionString("Redis");
+            if (string.IsNullOrWhiteSpace(redisConnectionString))
+            {
+                throw new InvalidOperationException("Missing config: ConnectionStrings:Redis");
+            }
+
+            cfg.UseRedisStorage(redisConnectionString);
         });
         services.AddHangfireServer();
 

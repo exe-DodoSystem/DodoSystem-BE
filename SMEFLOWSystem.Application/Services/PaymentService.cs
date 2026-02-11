@@ -22,7 +22,8 @@ namespace SMEFLOWSystem.Application.Services
         private readonly IBillingOrderRepository _billingOrderRepo;
         private readonly ITenantRepository _tenantRepo;
         private readonly IPaymentTransactionRepository _paymentTransactionRepo;
-        private readonly ISubscriptionPlanRepository _planRepo;
+        private readonly IBillingOrderModuleRepository _billingOrderModuleRepo;
+        private readonly IModuleSubscriptionRepository _moduleSubscriptionRepo;
         private readonly IEmailService _emailService;
         private readonly ITransaction _transaction;
         private readonly IBackgroundJobClient _backgroundJobClient;
@@ -33,7 +34,8 @@ namespace SMEFLOWSystem.Application.Services
             IBillingOrderRepository billingOrderRepo,
             ITenantRepository tenantRepo,
             IPaymentTransactionRepository paymentTransactionRepo,
-            ISubscriptionPlanRepository planRepo,
+            IBillingOrderModuleRepository billingOrderModuleRepo,
+            IModuleSubscriptionRepository moduleSubscriptionRepo,
             IEmailService emailService,
             ITransaction transaction,
             IBackgroundJobClient backgroundJobClient,
@@ -43,7 +45,8 @@ namespace SMEFLOWSystem.Application.Services
             _billingOrderRepo = billingOrderRepo;
             _tenantRepo = tenantRepo;
             _paymentTransactionRepo = paymentTransactionRepo;
-            _planRepo = planRepo;
+            _billingOrderModuleRepo = billingOrderModuleRepo;
+            _moduleSubscriptionRepo = moduleSubscriptionRepo;
             _emailService = emailService;
             _transaction = transaction;
             _config = configuration;
@@ -120,7 +123,6 @@ namespace SMEFLOWSystem.Application.Services
             // Process transactionally
             await _transaction.ExecuteAsync(async () =>
             {
-                // Double-check idempotency inside transaction to reduce race conditions
                 var existingInside = await _paymentTransactionRepo.GetByGatewayTransactionIdAsync(
                     gateway: "VNPay",
                     gatewayTransactionId: gatewayTransactionId,
@@ -198,29 +200,50 @@ namespace SMEFLOWSystem.Application.Services
 
                 tenantName = tenant.Name;
 
-                // Double-activation guard: if tenant already active and end date exists, skip
-                if (string.Equals(tenant.Status, StatusEnum.TenantActive, StringComparison.OrdinalIgnoreCase)
-                    && tenant.SubscriptionEndDate.HasValue)
-                {
-                    return;
-                }
-
-                // State machine: only activate from Pending (unless already active handled above)
                 if (!BillingStateMachine.CanActivateTenant(tenant.Status)
                     && !string.Equals(tenant.Status, StatusEnum.TenantActive, StringComparison.OrdinalIgnoreCase))
                 {
                     return;
                 }
 
-                var plan = await _planRepo.GetByIdAsync(tenant.SubscriptionPlanId);
-                var durationMonths = plan?.DurationMonths > 0 ? plan.DurationMonths : 1;
+                var orderModules = await _billingOrderModuleRepo.GetByBillingOrderIdIgnoreTenantAsync(order.Id);
+                if (orderModules.Count == 0)
+                    throw new Exception("Đơn thanh toán không có module nào");
+
+                var now = DateTime.UtcNow;
+                DateTime maxEndDate = now;
+                foreach (var line in orderModules)
+                {
+                    var existingSub = await _moduleSubscriptionRepo.GetByTenantAndModuleIgnoreTenantAsync(tenant.Id, line.ModuleId);
+                    if (existingSub == null)
+                    {
+                        existingSub = new ModuleSubscription
+                        {
+                            Id = Guid.NewGuid(),
+                            TenantId = tenant.Id,
+                            ModuleId = line.ModuleId,
+                            StartDate = now,
+                            EndDate = now,
+                            Status = StatusEnum.ModuleActive,
+                            CreatedAt = now,
+                            IsDeleted = false
+                        };
+                        await _moduleSubscriptionRepo.AddAsync(existingSub);
+                    }
+
+                    var baseDate = existingSub.EndDate > now ? existingSub.EndDate : now;
+                    existingSub.EndDate = baseDate.AddMonths(1);
+                    existingSub.Status = StatusEnum.ModuleActive;
+                    await _moduleSubscriptionRepo.UpdateIgnoreTenantAsync(existingSub);
+
+                    if (existingSub.EndDate > maxEndDate) 
+                        maxEndDate = existingSub.EndDate;
+                }
 
                 tenant.Status = StatusEnum.TenantActive;
-                tenant.SubscriptionEndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(durationMonths));
+                tenant.SubscriptionEndDate = DateOnly.FromDateTime(maxEndDate);
 
-                var ownerUser = tenant.OwnerUserId.HasValue
-                    ? await _userRepo.GetByIdIgnoreTenantAsync(tenant.OwnerUserId.Value)
-                    : null;
+                var ownerUser = tenant.OwnerUserId.HasValue ? await _userRepo.GetByIdIgnoreTenantAsync(tenant.OwnerUserId.Value) : null;
                 if (ownerUser != null)
                 {
                     ownerUser.IsActive = true;
@@ -232,7 +255,6 @@ namespace SMEFLOWSystem.Application.Services
                 shouldSendEmail = !string.IsNullOrWhiteSpace(ownerEmail);
             });
 
-            // Send email OUTSIDE transaction
             if (shouldSendEmail && ownerEmail != null && tenantName != null)
             {
                 await _emailService.SendEmailAsync(
@@ -260,7 +282,12 @@ namespace SMEFLOWSystem.Application.Services
             var hashSecret = _config["Payment:VNPay:HashSecret"] ?? throw new Exception("Missing config: Payment:VNPay:HashSecret");
             var paymentBaseUrl = _config["Payment:VNPay:PaymentUrl"] ?? throw new Exception("Missing config: Payment:VNPay:PaymentUrl");
 
-            var amountMinor = checked((long)decimal.Round(order.TotalAmount * 100m, 0, MidpointRounding.AwayFromZero));
+            var discount = order.DiscountAmount ?? 0m;
+            var payable = order.TotalAmount - discount;
+            if (payable <= 0m)
+                throw new Exception("Đơn thanh toán không hợp lệ (số tiền phải > 0)");
+
+            var amountMinor = checked((long)decimal.Round(payable * 100m, 0, MidpointRounding.AwayFromZero));
 
             var vnpayParams = new Dictionary<string, string>
             {

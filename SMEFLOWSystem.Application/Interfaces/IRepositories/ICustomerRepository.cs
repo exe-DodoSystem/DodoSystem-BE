@@ -10,5 +10,6 @@ namespace SMEFLOWSystem.Application.Interfaces.IRepositories
     public interface ICustomerRepository
     {
         Task AddAsync(Customer customer);
+        Task<Customer?> GetInternalCustomerIgnoreTenantAsync(Guid tenantId);
     }
 }

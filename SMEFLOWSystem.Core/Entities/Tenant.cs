@@ -11,8 +11,6 @@ public partial class Tenant
 
     public string Name { get; set; }
 
-    public int SubscriptionPlanId { get; set; }
-
     public string Status { get; set; }
 
     public DateOnly? SubscriptionEndDate { get; set; }
@@ -38,7 +36,7 @@ public partial class Tenant
 
     public virtual ICollection<Position> Positions { get; set; } = new List<Position>();
 
-    public virtual SubscriptionPlan SubscriptionPlan { get; set; }
+    public virtual ICollection<ModuleSubscription> ModuleSubscriptions { get; set; } = new List<ModuleSubscription>();
 
     public virtual ICollection<User> Users { get; set; } = new List<User>();
     public virtual ICollection<Invite> Invites { get; set; } = new List<Invite>();

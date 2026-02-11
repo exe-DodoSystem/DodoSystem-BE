@@ -1,4 +1,5 @@
 ﻿using SMEFLOWSystem.Application.DTOs.AuthDtos;
+using SMEFLOWSystem.Application.DTOs.UserDtos;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,6 +11,6 @@ namespace SMEFLOWSystem.Application.Interfaces.IServices
     public interface IAuthService
     {
         Task<bool> RegisterTenantAsync(RegisterRequestDto request);
-        Task<string> LoginAsync(LoginRequestDto request);
+        Task<LoginUserDto> LoginAsync(LoginRequestDto request);
     }
 }

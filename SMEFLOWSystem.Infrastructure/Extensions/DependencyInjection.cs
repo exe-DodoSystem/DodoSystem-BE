@@ -20,7 +20,9 @@ public static class DependencyInjection
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IUserRoleRepository, UserRoleRepository>();
         services.AddScoped<IInviteRepository, InviteRepository>();
-        services.AddScoped<ISubscriptionPlanRepository, SubscriptionPlanRepository>();
+        services.AddScoped<IModuleRepository, ModuleRepository>();
+        services.AddScoped<IModuleSubscriptionRepository, ModuleSubscriptionRepository>();
+        services.AddScoped<IBillingOrderModuleRepository, BillingOrderModuleRepository>();
         services.AddScoped<IOrderRepository, OrderRepository>();
         services.AddScoped<IBillingOrderRepository, BillingOrderRepository>();
         services.AddScoped<IPaymentTransactionRepository, PaymentTransactionRepository>();

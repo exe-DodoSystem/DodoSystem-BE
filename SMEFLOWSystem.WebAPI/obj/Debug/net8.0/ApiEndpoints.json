@@ -32,6 +32,196 @@
     "ReturnTypes": []
   },
   {
+    "ContainingType": "SMEFLOWSystem.WebAPI.Controllers.BillingOrderModulesController",
+    "Method": "GetMyByModuleCode",
+    "RelativePath": "api/BillingOrderModules/me/by-module-code/{code}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "code",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[SMEFLOWSystem.Application.DTOs.ModuleDtos.BillingOrderModuleDto, SMEFLOWSystem.Application, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "SMEFLOWSystem.WebAPI.Controllers.BillingOrderModulesController",
+    "Method": "GetMyByModuleId",
+    "RelativePath": "api/BillingOrderModules/me/by-module-id/{moduleId}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "moduleId",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[SMEFLOWSystem.Application.DTOs.ModuleDtos.BillingOrderModuleDto, SMEFLOWSystem.Application, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "SMEFLOWSystem.WebAPI.Controllers.ModulesController",
+    "Method": "Create",
+    "RelativePath": "api/Modules",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "dto",
+        "Type": "SMEFLOWSystem.Application.DTOs.ModuleDtos.ModuleCreateDto",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "SMEFLOWSystem.Application.DTOs.ModuleDtos.ModuleDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "SMEFLOWSystem.WebAPI.Controllers.ModulesController",
+    "Method": "GetActive",
+    "RelativePath": "api/Modules/active",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[SMEFLOWSystem.Application.DTOs.ModuleDtos.ModuleDto, SMEFLOWSystem.Application, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "SMEFLOWSystem.WebAPI.Controllers.ModulesController",
+    "Method": "GetAll",
+    "RelativePath": "api/Modules/all",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[SMEFLOWSystem.Application.DTOs.ModuleDtos.ModuleDto, SMEFLOWSystem.Application, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "SMEFLOWSystem.WebAPI.Controllers.ModuleSubscriptionsController",
+    "Method": "GetMyAll",
+    "RelativePath": "api/ModuleSubscriptions/me/all",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[SMEFLOWSystem.Application.DTOs.ModuleDtos.ModuleSubscriptionDto, SMEFLOWSystem.Application, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "SMEFLOWSystem.WebAPI.Controllers.ModuleSubscriptionsController",
+    "Method": "GetMyByModuleCode",
+    "RelativePath": "api/ModuleSubscriptions/me/by-module-code/{code}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "code",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "SMEFLOWSystem.Application.DTOs.ModuleDtos.ModuleSubscriptionDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "SMEFLOWSystem.WebAPI.Controllers.ModuleSubscriptionsController",
+    "Method": "GetMyByModuleId",
+    "RelativePath": "api/ModuleSubscriptions/me/by-module-id/{moduleId}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "moduleId",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "SMEFLOWSystem.Application.DTOs.ModuleDtos.ModuleSubscriptionDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
     "ContainingType": "SMEFLOWSystem.WebAPI.Controllers.PaymentController",
     "Method": "VNPayCallback",
     "RelativePath": "api/Payment/callback/vnpay",
@@ -139,69 +329,6 @@
         "IsRequired": false
       }
     ],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "SMEFLOWSystem.WebAPI.Controllers.SubscriptionPlanController",
-    "Method": "AddAsync",
-    "RelativePath": "api/SubscriptionPlan",
-    "HttpMethod": "POST",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "dto",
-        "Type": "SMEFLOWSystem.Application.DTOs.SubscriptionPlanDtos.SubscriptionPlanDto",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "SMEFLOWSystem.WebAPI.Controllers.SubscriptionPlanController",
-    "Method": "GetByIdAsync",
-    "RelativePath": "api/SubscriptionPlan/{id}",
-    "HttpMethod": "GET",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "id",
-        "Type": "System.Int32",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "SMEFLOWSystem.WebAPI.Controllers.SubscriptionPlanController",
-    "Method": "UpdateAsync",
-    "RelativePath": "api/SubscriptionPlan/{id}",
-    "HttpMethod": "PUT",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "id",
-        "Type": "System.Int32",
-        "IsRequired": true
-      },
-      {
-        "Name": "dto",
-        "Type": "SMEFLOWSystem.Application.DTOs.SubscriptionPlanDtos.SubscriptionPlanDto",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "SMEFLOWSystem.WebAPI.Controllers.SubscriptionPlanController",
-    "Method": "GetAllAsync",
-    "RelativePath": "api/SubscriptionPlan/all",
-    "HttpMethod": "GET",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [],
     "ReturnTypes": []
   }
 ]
