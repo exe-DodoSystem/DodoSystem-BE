@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "b7hIKi3BbHU=",
+  "dgSpecHash": "TAJQHSxtQjc=",
   "success": true,
-  "projectFilePath": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Core\\SMEFLOWSystem.Core.csproj",
+  "projectFilePath": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Core\\SMEFLOWSystem.Core.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\ASUS\\.nuget\\packages\\azure.core\\1.38.0\\azure.core.1.38.0.nupkg.sha512",
     "C:\\Users\\ASUS\\.nuget\\packages\\azure.identity\\1.11.4\\azure.identity.1.11.4.nupkg.sha512",

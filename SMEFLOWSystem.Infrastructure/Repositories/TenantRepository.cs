@@ -78,5 +78,12 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
                             && t.SubscriptionEndDate.Value < todayUtc)
                 .ToListAsync();
         }
+
+        public async Task<Tenant?> GetByOwnerUserIdIgnoreAsync(Guid ownerId)
+        {
+            return await _context.Tenants
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(x => x.OwnerUserId == ownerId && !x.IsDeleted);
+        }
     }
 }

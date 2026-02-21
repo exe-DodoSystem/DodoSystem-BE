@@ -11,10 +11,12 @@ namespace SMEFLOWSystem.Infrastructure.Data;
 public partial class SMEFLOWSystemContext : DbContext
 {
     private readonly ICurrentTenantService _currentTenantService;
+    private readonly Guid? _currentTenantId;
     public SMEFLOWSystemContext(DbContextOptions<SMEFLOWSystemContext> options, ICurrentTenantService currentTenantService)
         : base(options)
     {
         _currentTenantService = currentTenantService;
+        _currentTenantId = currentTenantService.TenantId;
     }
 
     public virtual DbSet<Attendance> Attendances { get; set; }
@@ -38,10 +40,9 @@ public partial class SMEFLOWSystemContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        var currentTenantId = _currentTenantService.TenantId;
         modelBuilder.Entity<Attendance>(entity =>
         {
-            entity.HasQueryFilter(e => e.TenantId == currentTenantId);
+            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
             entity.HasKey(e => e.Id).HasName("PK__Attendan__3214EC07446D18B6");
             entity.HasIndex(e => new { e.TenantId, e.EmployeeId, e.WorkDate }, "UQ_Attendance_Per_Day").IsUnique();
             entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
@@ -63,7 +64,7 @@ public partial class SMEFLOWSystemContext : DbContext
 
         modelBuilder.Entity<Customer>(entity =>
         {
-            entity.HasQueryFilter(e => e.TenantId == currentTenantId);
+            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
             entity.HasKey(e => e.Id).HasName("PK__Customer__3214EC07B17A5536");
             entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
             entity.Property(e => e.Address).HasMaxLength(500);
@@ -88,7 +89,7 @@ public partial class SMEFLOWSystemContext : DbContext
 
         modelBuilder.Entity<Department>(entity =>
         {
-            entity.HasQueryFilter(e => e.TenantId == currentTenantId);
+            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
             entity.HasKey(e => e.Id).HasName("PK__Departme__3214EC070252CA08");
             entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
@@ -104,7 +105,7 @@ public partial class SMEFLOWSystemContext : DbContext
 
         modelBuilder.Entity<Employee>(entity =>
         {
-            entity.HasQueryFilter(e => e.TenantId == currentTenantId);
+            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
             entity.HasKey(e => e.Id).HasName("PK__Employee__3214EC07C73E2C13");
             entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
             entity.Property(e => e.BaseSalary).HasColumnType("decimal(18, 2)");
@@ -138,7 +139,7 @@ public partial class SMEFLOWSystemContext : DbContext
 
         modelBuilder.Entity<Invite>(entity =>
         {
-            entity.HasQueryFilter(e => e.TenantId == currentTenantId);
+            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
             entity.HasKey(e => e.Id).HasName("PK__Invites__3214EC07ABCDEF12");  // Sửa từ e. sang e.Id
             entity.HasIndex(e => e.Token, "UQ_Invite_Token").IsUnique();
             entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
@@ -171,7 +172,7 @@ public partial class SMEFLOWSystemContext : DbContext
 
         modelBuilder.Entity<BillingOrder>(entity =>
         {
-            entity.HasQueryFilter(e => e.TenantId == currentTenantId);
+            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
             entity.HasKey(e => e.Id).HasName("PK__BillingOrders__3214EC07");
             entity.HasIndex(e => new { e.TenantId, e.BillingOrderNumber }, "UQ_BillingOrderNumber_Tenant").IsUnique();
             entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
@@ -201,7 +202,7 @@ public partial class SMEFLOWSystemContext : DbContext
 
         modelBuilder.Entity<BillingOrderModule>(entity =>
         {
-            entity.HasQueryFilter(e => e.TenantId == currentTenantId);
+            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
             entity.HasKey(e => e.Id).HasName("PK__BillingOrderModules__3214EC07");
             entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
             entity.Property(e => e.UnitPrice).HasColumnType("decimal(18, 2)");
@@ -236,7 +237,7 @@ public partial class SMEFLOWSystemContext : DbContext
 
         modelBuilder.Entity<ModuleSubscription>(entity =>
         {
-            entity.HasQueryFilter(e => e.TenantId == currentTenantId);
+            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
             entity.HasKey(e => e.Id).HasName("PK__ModuleSubscriptions__3214EC07");
             entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
             entity.Property(e => e.Status).IsRequired().HasMaxLength(30);
@@ -258,7 +259,7 @@ public partial class SMEFLOWSystemContext : DbContext
 
         modelBuilder.Entity<Order>(entity =>
         {
-            entity.HasQueryFilter(e => e.TenantId == currentTenantId);
+            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
             entity.HasKey(e => e.Id).HasName("PK__Orders__3214EC0734CC9CEB");
             entity.HasIndex(e => new { e.TenantId, e.OrderNumber }, "UQ_OrderNumber_Tenant").IsUnique();
             entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
@@ -296,7 +297,7 @@ public partial class SMEFLOWSystemContext : DbContext
 
         modelBuilder.Entity<OrderItem>(entity =>
         {
-            entity.HasQueryFilter(e => e.TenantId == currentTenantId);
+            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
             entity.HasKey(e => e.Id).HasName("PK__OrderIte__3214EC0756359D82");
             entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
@@ -315,7 +316,7 @@ public partial class SMEFLOWSystemContext : DbContext
 
         modelBuilder.Entity<PaymentTransaction>(entity =>
         {
-            entity.HasQueryFilter(e => e.TenantId == currentTenantId);
+            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => new { e.Gateway, e.GatewayTransactionId }).IsUnique();
             entity.HasIndex(e => e.BillingOrderId);
@@ -343,7 +344,7 @@ public partial class SMEFLOWSystemContext : DbContext
 
         modelBuilder.Entity<Payroll>(entity =>
         {
-            entity.HasQueryFilter(e => e.TenantId == currentTenantId);
+            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
             entity.HasKey(e => e.Id).HasName("PK__Payrolls__3214EC07E77CFA45");
             entity.HasIndex(e => new { e.TenantId, e.EmployeeId, e.Year, e.Month }, "UQ_Payroll_Month").IsUnique();
             entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
@@ -373,7 +374,7 @@ public partial class SMEFLOWSystemContext : DbContext
 
         modelBuilder.Entity<Position>(entity =>
         {
-            entity.HasQueryFilter(e => e.TenantId == currentTenantId);
+            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
             entity.HasKey(e => e.Id).HasName("PK__Position__3214EC07176C885B");
             entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
@@ -426,7 +427,7 @@ public partial class SMEFLOWSystemContext : DbContext
 
         modelBuilder.Entity<User>(entity =>
         {
-            entity.HasQueryFilter(e => e.TenantId == currentTenantId);
+            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
             entity.HasKey(e => e.Id).HasName("PK__Users__3214EC07D3CEC114");
             entity.HasIndex(e => new { e.TenantId, e.Email }, "UQ_Users_Email_Tenant").IsUnique();
             entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
@@ -451,7 +452,7 @@ public partial class SMEFLOWSystemContext : DbContext
 
         modelBuilder.Entity<UserRole>(entity =>
         {
-            entity.HasQueryFilter(e => e.TenantId == currentTenantId);
+            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
             entity.HasKey(e => new { e.UserId, e.RoleId });
             entity.HasOne(d => d.Role).WithMany(p => p.UserRoles)
                 .HasForeignKey(d => d.RoleId)

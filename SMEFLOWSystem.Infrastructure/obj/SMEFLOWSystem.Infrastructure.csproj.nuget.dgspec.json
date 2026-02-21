@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Infrastructure\\SMEFLOWSystem.Infrastructure.csproj": {}
+    "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Infrastructure\\SMEFLOWSystem.Infrastructure.csproj": {}
   },
   "projects": {
-    "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj": {
+    "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj",
+        "projectUniqueName": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj",
         "projectName": "SMEFLOWSystem.Application",
-        "projectPath": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj",
+        "projectPath": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj",
         "packagesPath": "C:\\Users\\ASUS\\.nuget\\packages\\",
-        "outputPath": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\obj\\",
+        "outputPath": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Application\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -33,11 +33,11 @@
           "net8.0": {
             "targetAlias": "net8.0",
             "projectReferences": {
-              "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Core\\SMEFLOWSystem.Core.csproj": {
-                "projectPath": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Core\\SMEFLOWSystem.Core.csproj"
+              "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Core\\SMEFLOWSystem.Core.csproj": {
+                "projectPath": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Core\\SMEFLOWSystem.Core.csproj"
               },
-              "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.SharedKernel\\SMEFLOWSystem.SharedKernel.csproj": {
-                "projectPath": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.SharedKernel\\SMEFLOWSystem.SharedKernel.csproj"
+              "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.SharedKernel\\SMEFLOWSystem.SharedKernel.csproj": {
+                "projectPath": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.SharedKernel\\SMEFLOWSystem.SharedKernel.csproj"
               }
             }
           }
@@ -69,6 +69,10 @@
             "BCrypt.Net-Next": {
               "target": "Package",
               "version": "[4.0.3, )"
+            },
+            "FluentValidation.AspNetCore": {
+              "target": "Package",
+              "version": "[11.3.1, )"
             },
             "Hangfire.Core": {
               "target": "Package",
@@ -103,14 +107,14 @@
         }
       }
     },
-    "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Core\\SMEFLOWSystem.Core.csproj": {
+    "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Core\\SMEFLOWSystem.Core.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Core\\SMEFLOWSystem.Core.csproj",
+        "projectUniqueName": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Core\\SMEFLOWSystem.Core.csproj",
         "projectName": "SMEFLOWSystem.Core",
-        "projectPath": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Core\\SMEFLOWSystem.Core.csproj",
+        "projectPath": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Core\\SMEFLOWSystem.Core.csproj",
         "packagesPath": "C:\\Users\\ASUS\\.nuget\\packages\\",
-        "outputPath": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Core\\obj\\",
+        "outputPath": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Core\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -132,8 +136,8 @@
           "net8.0": {
             "targetAlias": "net8.0",
             "projectReferences": {
-              "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.SharedKernel\\SMEFLOWSystem.SharedKernel.csproj": {
-                "projectPath": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.SharedKernel\\SMEFLOWSystem.SharedKernel.csproj"
+              "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.SharedKernel\\SMEFLOWSystem.SharedKernel.csproj": {
+                "projectPath": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.SharedKernel\\SMEFLOWSystem.SharedKernel.csproj"
               }
             }
           }
@@ -179,14 +183,14 @@
         }
       }
     },
-    "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Infrastructure\\SMEFLOWSystem.Infrastructure.csproj": {
+    "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Infrastructure\\SMEFLOWSystem.Infrastructure.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Infrastructure\\SMEFLOWSystem.Infrastructure.csproj",
+        "projectUniqueName": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Infrastructure\\SMEFLOWSystem.Infrastructure.csproj",
         "projectName": "SMEFLOWSystem.Infrastructure",
-        "projectPath": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Infrastructure\\SMEFLOWSystem.Infrastructure.csproj",
+        "projectPath": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Infrastructure\\SMEFLOWSystem.Infrastructure.csproj",
         "packagesPath": "C:\\Users\\ASUS\\.nuget\\packages\\",
-        "outputPath": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Infrastructure\\obj\\",
+        "outputPath": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Infrastructure\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -208,11 +212,11 @@
           "net8.0": {
             "targetAlias": "net8.0",
             "projectReferences": {
-              "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj": {
-                "projectPath": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj"
+              "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj": {
+                "projectPath": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj"
               },
-              "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.SharedKernel\\SMEFLOWSystem.SharedKernel.csproj": {
-                "projectPath": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.SharedKernel\\SMEFLOWSystem.SharedKernel.csproj"
+              "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.SharedKernel\\SMEFLOWSystem.SharedKernel.csproj": {
+                "projectPath": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.SharedKernel\\SMEFLOWSystem.SharedKernel.csproj"
               }
             }
           }
@@ -294,14 +298,14 @@
         }
       }
     },
-    "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.SharedKernel\\SMEFLOWSystem.SharedKernel.csproj": {
+    "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.SharedKernel\\SMEFLOWSystem.SharedKernel.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.SharedKernel\\SMEFLOWSystem.SharedKernel.csproj",
+        "projectUniqueName": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.SharedKernel\\SMEFLOWSystem.SharedKernel.csproj",
         "projectName": "SMEFLOWSystem.SharedKernel",
-        "projectPath": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.SharedKernel\\SMEFLOWSystem.SharedKernel.csproj",
+        "projectPath": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.SharedKernel\\SMEFLOWSystem.SharedKernel.csproj",
         "packagesPath": "C:\\Users\\ASUS\\.nuget\\packages\\",
-        "outputPath": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.SharedKernel\\obj\\",
+        "outputPath": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.SharedKernel\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

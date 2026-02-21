@@ -1,0 +1,12 @@
+d:\Project\ProjectMonHoc\EXE101\DodoSystem-BE\SMEFLOWSystem.SharedKernel\bin\Release\net8.0\SMEFLOWSystem.SharedKernel.deps.json
+d:\Project\ProjectMonHoc\EXE101\DodoSystem-BE\SMEFLOWSystem.SharedKernel\bin\Release\net8.0\SMEFLOWSystem.SharedKernel.dll
+d:\Project\ProjectMonHoc\EXE101\DodoSystem-BE\SMEFLOWSystem.SharedKernel\bin\Release\net8.0\SMEFLOWSystem.SharedKernel.pdb
+d:\Project\ProjectMonHoc\EXE101\DodoSystem-BE\SMEFLOWSystem.SharedKernel\obj\Release\net8.0\SMEFLOWSystem.SharedKernel.GeneratedMSBuildEditorConfig.editorconfig
+d:\Project\ProjectMonHoc\EXE101\DodoSystem-BE\SMEFLOWSystem.SharedKernel\obj\Release\net8.0\SMEFLOWSystem.SharedKernel.AssemblyInfoInputs.cache
+d:\Project\ProjectMonHoc\EXE101\DodoSystem-BE\SMEFLOWSystem.SharedKernel\obj\Release\net8.0\SMEFLOWSystem.SharedKernel.AssemblyInfo.cs
+d:\Project\ProjectMonHoc\EXE101\DodoSystem-BE\SMEFLOWSystem.SharedKernel\obj\Release\net8.0\SMEFLOWSystem.SharedKernel.csproj.CoreCompileInputs.cache
+d:\Project\ProjectMonHoc\EXE101\DodoSystem-BE\SMEFLOWSystem.SharedKernel\obj\Release\net8.0\SMEFLOWSystem.SharedKernel.sourcelink.json
+d:\Project\ProjectMonHoc\EXE101\DodoSystem-BE\SMEFLOWSystem.SharedKernel\obj\Release\net8.0\SMEFLOWSystem.SharedKernel.dll
+d:\Project\ProjectMonHoc\EXE101\DodoSystem-BE\SMEFLOWSystem.SharedKernel\obj\Release\net8.0\refint\SMEFLOWSystem.SharedKernel.dll
+d:\Project\ProjectMonHoc\EXE101\DodoSystem-BE\SMEFLOWSystem.SharedKernel\obj\Release\net8.0\SMEFLOWSystem.SharedKernel.pdb
+d:\Project\ProjectMonHoc\EXE101\DodoSystem-BE\SMEFLOWSystem.SharedKernel\obj\Release\net8.0\ref\SMEFLOWSystem.SharedKernel.dll

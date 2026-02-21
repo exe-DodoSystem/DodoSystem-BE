@@ -19,6 +19,8 @@ namespace SMEFLOWSystem.Application.Services
 {
     public class PaymentService : IPaymentService
     {
+        private const string GatewayVNPay = "VNPay";
+
         private readonly IBillingOrderRepository _billingOrderRepo;
         private readonly ITenantRepository _tenantRepo;
         private readonly IPaymentTransactionRepository _paymentTransactionRepo;
@@ -29,6 +31,7 @@ namespace SMEFLOWSystem.Application.Services
         private readonly IBackgroundJobClient _backgroundJobClient;
         private readonly IUserRepository _userRepo;
         private readonly IConfiguration _config;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
         public PaymentService(
             IBillingOrderRepository billingOrderRepo,
@@ -40,7 +43,8 @@ namespace SMEFLOWSystem.Application.Services
             ITransaction transaction,
             IBackgroundJobClient backgroundJobClient,
             IConfiguration configuration,
-            IUserRepository userRepo)
+            IUserRepository userRepo,
+            IHttpContextAccessor httpContextAccessor)
         {
             _billingOrderRepo = billingOrderRepo;
             _tenantRepo = tenantRepo;
@@ -52,6 +56,18 @@ namespace SMEFLOWSystem.Application.Services
             _config = configuration;
             _backgroundJobClient = backgroundJobClient;
             _userRepo = userRepo;
+            _httpContextAccessor = httpContextAccessor;
+        }
+
+        private string? TryBuildPublicCallbackUrl(string callbackPath)
+        {
+            var request = _httpContextAccessor.HttpContext?.Request;
+            if (request == null) return null;
+
+            if (string.IsNullOrWhiteSpace(request.Scheme)) return null;
+            if (!request.Host.HasValue) return null;
+
+            return $"{request.Scheme}://{request.Host}{callbackPath}";
         }
 
         public async Task<string> CreatePaymentUrlAsync(Guid orderId, string? clientIp = null)
@@ -59,6 +75,13 @@ namespace SMEFLOWSystem.Application.Services
             // Payment creation may happen without tenant context (e.g., after RegisterTenant) -> bypass tenant filters.
             var billingOrder = await _billingOrderRepo.GetByIdIgnoreTenantAsync(orderId);
             if (billingOrder == null) throw new Exception("Không tìm thấy đơn thanh toán");
+
+            // Avoid generating payment URL for non-pending orders
+            if (!string.Equals(billingOrder.PaymentStatus, StatusEnum.PaymentPending, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(billingOrder.Status, StatusEnum.OrderPending, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new Exception("Đơn thanh toán không ở trạng thái chờ thanh toán");
+            }
 
             var mode = _config["Payment:Mode"] ?? throw new Exception("Missing config: Payment:Mode");
             if (mode == "Sandbox" || mode == "Production")
@@ -84,12 +107,12 @@ namespace SMEFLOWSystem.Application.Services
             vnpayData.Remove("vnp_SecureHashType");
 
             var sortedData = vnpayData.OrderBy(k => k.Key).ToDictionary(k => k.Key, v => v.Value);
-            var queryString = string.Join("&", sortedData.Select(kv => $"{kv.Key}={kv.Value}"));
+            var hashData = BuildVnPayHashData(sortedData);
             var hashSecret = _config["Payment:VNPay:HashSecret"] ?? throw new Exception("Missing config: Payment:VNPay:HashSecret");
-            var checkHash = HmacSha512(queryString, hashSecret);
+            var checkHash = HmacSha512(hashData, hashSecret);
 
             if (!string.Equals(checkHash, secureHash, StringComparison.OrdinalIgnoreCase))
-                throw new Exception("Invalid signature");
+                return false;
 
             if (!vnpayData.TryGetValue("vnp_TxnRef", out var txnRef) || string.IsNullOrWhiteSpace(txnRef))
                 throw new Exception("Missing vnp_TxnRef");
@@ -100,12 +123,20 @@ namespace SMEFLOWSystem.Application.Services
             if (!vnpayData.TryGetValue("vnp_TransactionNo", out var gatewayTransactionId) || string.IsNullOrWhiteSpace(gatewayTransactionId))
                 throw new Exception("Missing vnp_TransactionNo");
 
-            var orderId = Guid.Parse(txnRef);
-            var status = responseCode == "00" ? "Success" : "Failed";
+            if (!Guid.TryParse(txnRef, out var orderId))
+                return false;
+
+            // Some VNPay flows include vnp_TransactionStatus (00 = success)
+            var isSuccess = string.Equals(responseCode, "00", StringComparison.OrdinalIgnoreCase);
+            if (vnpayData.TryGetValue("vnp_TransactionStatus", out var txnStatus) && !string.IsNullOrWhiteSpace(txnStatus))
+            {
+                isSuccess = isSuccess && string.Equals(txnStatus, "00", StringComparison.OrdinalIgnoreCase);
+            }
+            var status = isSuccess ? "Success" : "Failed";
 
             // Idempotency: if this gateway transaction was already processed, return OK.
             var existingTx = await _paymentTransactionRepo.GetByGatewayTransactionIdAsync(
-                gateway: "VNPay",
+                gateway: GatewayVNPay,
                 gatewayTransactionId: gatewayTransactionId,
                 ignoreTenantFilter: true);
             if (existingTx != null) return true;
@@ -114,17 +145,35 @@ namespace SMEFLOWSystem.Application.Services
             var orderForTenant = await _billingOrderRepo.GetByIdIgnoreTenantAsync(orderId);
             if (orderForTenant == null) throw new Exception("Không tìm thấy đơn thanh toán");
 
+            // Validate merchant code if present
+            if (vnpayData.TryGetValue("vnp_TmnCode", out var tmn) && !string.IsNullOrWhiteSpace(tmn))
+            {
+                var expectedTmn = _config["Payment:VNPay:TmnCode"] ?? throw new Exception("Missing config: Payment:VNPay:TmnCode");
+                if (!string.Equals(tmn, expectedTmn, StringComparison.OrdinalIgnoreCase))
+                    return false;
+            }
+
             decimal amount = 0m;
-            if (vnpayData.TryGetValue("vnp_Amount", out var amountRaw) && long.TryParse(amountRaw, out var amountMinor))
+            long amountMinor = 0;
+            if (vnpayData.TryGetValue("vnp_Amount", out var amountRaw) && long.TryParse(amountRaw, out amountMinor))
             {
                 amount = amountMinor / 100m;
             }
+
+            // Validate amount matches order payable amount
+            var discount = orderForTenant.DiscountAmount ?? 0m;
+            var expectedPayable = orderForTenant.TotalAmount - discount;
+            if (expectedPayable <= 0m)
+                throw new Exception("Đơn thanh toán không hợp lệ (số tiền phải > 0)");
+            var expectedMinor = checked((long)decimal.Round(expectedPayable * 100m, 0, MidpointRounding.AwayFromZero));
+            if (amountMinor != 0 && amountMinor != expectedMinor)
+                throw new Exception("Số tiền thanh toán không khớp đơn hàng");
 
             // Process transactionally
             await _transaction.ExecuteAsync(async () =>
             {
                 var existingInside = await _paymentTransactionRepo.GetByGatewayTransactionIdAsync(
-                    gateway: "VNPay",
+                    gateway: GatewayVNPay,
                     gatewayTransactionId: gatewayTransactionId,
                     ignoreTenantFilter: true);
                 if (existingInside != null) return;
@@ -137,7 +186,7 @@ namespace SMEFLOWSystem.Application.Services
                     Id = Guid.NewGuid(),
                     TenantId = order.TenantId,
                     BillingOrderId = order.Id,
-                    Gateway = "VNPay",
+                    Gateway = GatewayVNPay,
                     GatewayTransactionId = gatewayTransactionId,
                     GatewayResponseCode = responseCode,
                     Amount = amount,
@@ -272,15 +321,38 @@ namespace SMEFLOWSystem.Application.Services
             return BitConverter.ToString(hashBytes).Replace("-", "").ToLower();
         }
 
+        private static string BuildVnPayHashData(IReadOnlyDictionary<string, string> sortedData)
+        {
+            // VNPay signature should be computed on URL-encoded key=value pairs joined by '&'
+            // Use Uri.EscapeDataString (spaces => %20) to avoid '+' vs '%20' inconsistencies.
+            return string.Join("&", sortedData.Select(kv => $"{kv.Key}={Uri.EscapeDataString(kv.Value ?? string.Empty)}"));
+        }
+
         private Task<string> CreateVNPayUrlAsync(BillingOrder order, string? clientIp)
         {
             // Logic tạo URL VNPay (dựa trên docs sandbox.vnpayment.vn)
             clientIp = string.IsNullOrWhiteSpace(clientIp) ? "127.0.0.1" : clientIp;
 
             var tmnCode = _config["Payment:VNPay:TmnCode"] ?? throw new Exception("Missing config: Payment:VNPay:TmnCode");
-            var returnUrl = _config["Payment:VNPay:ReturnUrl"] ?? throw new Exception("Missing config: Payment:VNPay:ReturnUrl");
+            var returnUrl = _config["Payment:VNPay:ReturnUrl"];
             var hashSecret = _config["Payment:VNPay:HashSecret"] ?? throw new Exception("Missing config: Payment:VNPay:HashSecret");
             var paymentBaseUrl = _config["Payment:VNPay:PaymentUrl"] ?? throw new Exception("Missing config: Payment:VNPay:PaymentUrl");
+
+            // If ReturnUrl is not configured or still placeholder, try building it from current request host.
+            // This avoids VNPay redirecting to Error.html (e.g. code=70) due to an invalid ReturnUrl.
+            if (string.IsNullOrWhiteSpace(returnUrl)
+                || returnUrl.Contains("your-ngrok-url", StringComparison.OrdinalIgnoreCase)
+                || returnUrl.Contains("your-domain.com", StringComparison.OrdinalIgnoreCase))
+            {
+                returnUrl = TryBuildPublicCallbackUrl("/api/payment/callback/vnpay");
+            }
+
+            if (string.IsNullOrWhiteSpace(returnUrl) || !Uri.TryCreate(returnUrl, UriKind.Absolute, out _))
+            {
+                throw new Exception(
+                    "Invalid VNPay ReturnUrl. Please set Payment:VNPay:ReturnUrl to a public absolute URL (e.g. https://<ngrok-or-domain>/api/payment/callback/vnpay)."
+                );
+            }
 
             var discount = order.DiscountAmount ?? 0m;
             var payable = order.TotalAmount - discount;
@@ -299,18 +371,26 @@ namespace SMEFLOWSystem.Application.Services
                 ["vnp_CurrCode"] = "VND",
                 ["vnp_IpAddr"] = clientIp,
                 ["vnp_Locale"] = "vn",
-                ["vnp_OrderInfo"] = $"Thanh toan don hang {order.BillingOrderNumber}",
+                ["vnp_OrderInfo"] = $"Thanh toan don {order.BillingOrderNumber}",
                 ["vnp_OrderType"] = "billpayment",
                 ["vnp_ReturnUrl"] = returnUrl,
                 ["vnp_TxnRef"] = order.Id.ToString() // OrderId làm ref
             };
             // Sort and hash params
             var sortedParams = vnpayParams.OrderBy(k => k.Key).ToDictionary(k => k.Key, v => v.Value);
-            var queryString = string.Join("&", sortedParams.Select(kv => $"{kv.Key}={kv.Value}"));
-            var hash = HmacSha512(queryString, hashSecret);
-            vnpayParams["vnp_SecureHash"] = hash;
-            // Build URL
-            var paymentUrl = paymentBaseUrl + "?" + string.Join("&", vnpayParams.Select(kv => $"{kv.Key}={Uri.EscapeDataString(kv.Value)}"));
+            var hashData = BuildVnPayHashData(sortedParams);
+            var hash = HmacSha512(hashData, hashSecret);
+            
+            // Build URL with proper encoding (hash should NOT be URI escaped)
+            var queryParts = new List<string>();
+            foreach (var kv in sortedParams)
+            {
+                queryParts.Add($"{kv.Key}={Uri.EscapeDataString(kv.Value)}");
+            }
+            // Add hash at the end WITHOUT escaping it
+            queryParts.Add($"vnp_SecureHash={hash}");
+            
+            var paymentUrl = paymentBaseUrl + "?" + string.Join("&", queryParts);
             return Task.FromResult(paymentUrl);
         }
     }

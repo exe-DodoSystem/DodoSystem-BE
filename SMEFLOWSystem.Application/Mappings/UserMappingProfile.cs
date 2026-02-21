@@ -27,6 +27,14 @@ namespace SMEFLOWSystem.Application.Mappings
                 // Token thường được sinh ra sau khi login, không lấy trực tiếp từ entity
                 .ForMember(dest => dest.Token, opt => opt.Ignore());
 
+            
+            CreateMap<User, UserCreatedDto>()
+                .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.Email))
+                .ForMember(dest => dest.PasswordHash, opt => opt.MapFrom(src => src.PasswordHash))
+                .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => src.FullName))
+                .ForMember(dest => dest.Phone, opt => opt.MapFrom(src => src.Phone))
+                .ForMember(dest => dest.IsActive, opt => opt.MapFrom(src => src.IsActive))
+                .ForMember(dest => dest.IsVerified, opt => opt.MapFrom(src => src.IsVerified));
 
 
             CreateMap<UserDto, User>()
@@ -59,6 +67,16 @@ namespace SMEFLOWSystem.Application.Mappings
                 .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())       
                 .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(_ => DateTime.UtcNow));
 
+            
+            CreateMap<UserCreatedDto, User>()
+                .ForMember(dest => dest.Id, opt => opt.Ignore())               
+                .ForMember(dest => dest.TenantId, opt => opt.Ignore())        
+                .ForMember(dest => dest.Tenant, opt => opt.Ignore())          
+                .ForMember(dest => dest.UserRoles, opt => opt.Ignore())       
+                .ForMember(dest => dest.Employees, opt => opt.Ignore())       
+                .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(_ => DateTime.UtcNow))
+                .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore())       
+                .ForMember(dest => dest.IsDeleted, opt => opt.MapFrom(_ => false)); 
 
         }
 
