@@ -106,6 +106,22 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
             return user;
         }
 
+        public async Task<User?> UpdatePasswordIgnoreTenantAsync(Guid id, string password)
+        {
+            var user = await _context.Users
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(u => u.Id == id);
+
+            if (user == null)
+            {
+                return null;
+            }
+
+            user.PasswordHash = password;
+            await _context.SaveChangesAsync();
+            return user;
+        }
+
         public async Task<User?> UpdateUserAsync(User user)
         {
             var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Id == user.Id);

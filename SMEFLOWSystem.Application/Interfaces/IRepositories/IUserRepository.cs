@@ -19,6 +19,7 @@ namespace SMEFLOWSystem.Application.Interfaces.IRepositories
         Task<User?> GetUserByIdAsync(Guid id);
         Task<User?> UpdateUserAsync(User user);
         Task<User?> UpdatePasswordAsync(Guid id, string password);
+        Task<User?> UpdatePasswordIgnoreTenantAsync(Guid id, string password);
         Task<PagedResultDto<User>> GetAllUserPagingAsync(PagingRequestDto request);
         Task<bool?> CheckUserIsDeleted(Guid id);
         Task<List<Role>> GetRolesByUserIdAsync(Guid userId);

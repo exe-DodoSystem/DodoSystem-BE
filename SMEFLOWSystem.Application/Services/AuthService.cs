@@ -79,7 +79,6 @@ namespace SMEFLOWSystem.Application.Services
                 var now = DateTime.UtcNow;
                 var trialEnd = now.AddDays(14);
 
-                // TẠO TENANT (CÔNG TY)
                 var newTenant = new Tenant
                 {
                     Id = Guid.NewGuid(),
@@ -91,8 +90,6 @@ namespace SMEFLOWSystem.Application.Services
 
                 await _tenantRepo.AddAsync(newTenant);
 
-
-                // TẠO USER ADMIN CHO TENANT ĐÓ
                 var adminUser = new User
                 {
                     Id = Guid.NewGuid(),
@@ -108,13 +105,10 @@ namespace SMEFLOWSystem.Application.Services
 
                 await _userRepo.AddAsync(adminUser);
 
-
-                // UPDATE OWNER CHO TENANT
                 newTenant.OwnerUserId = adminUser.Id;
                 await _tenantRepo.UpdateAsync(newTenant);
 
 
-                // GÁN QUYỀN (ROLE) ADMIN CHO USER
                 var adminRole = await _roleRepo.GetRoleByNameAsync("TenantAdmin");
 
                 if (adminRole == null)
@@ -123,13 +117,12 @@ namespace SMEFLOWSystem.Application.Services
                 var userRole = new UserRole
                 {
                     UserId = adminUser.Id,
-                    RoleId = adminRole.Id
+                    RoleId = adminRole.Id,
+                    TenantId = newTenant.Id
                 };
 
                 await _userRoleRepo.AddUserRoleAsync(userRole);
 
-
-                // TẠO KHÁCH HÀNG ĐẠI DIỆN (INTERNAL CUSTOMER)
                 var internalCustomer = new Customer
                 {
                     Id = Guid.NewGuid(),
@@ -142,7 +135,6 @@ namespace SMEFLOWSystem.Application.Services
 
                 await _customerRepo.AddAsync(internalCustomer);
 
-                // TẠO MODULE SUBSCRIPTIONS (TRIAL)
                 var modules = await _moduleRepo.GetByIdsAsync(request.ModuleIds);
                 if (modules.Count != request.ModuleIds.Distinct().Count())
                     throw new Exception("Có module không tồn tại hoặc đang bị tắt!");
@@ -163,7 +155,6 @@ namespace SMEFLOWSystem.Application.Services
                     await _moduleSubscriptionRepo.AddAsync(sub);
                 }
 
-                // TẠO ĐƠN THANH TOÁN DỊCH VỤ (BILLING ORDER) - optional pay early
                 var newOrder = await _billingOrderService.CreateModuleBillingOrderAsync(
                     newTenant.Id,
                     internalCustomer.Id,
@@ -197,7 +188,6 @@ namespace SMEFLOWSystem.Application.Services
             var tenant = user.Tenant;
             if (tenant == null) throw new Exception("Không tìm thấy tenant");
 
-            // Expiry check: if tenant has end date and it's expired, suspend + block login
             if (tenant.SubscriptionEndDate.HasValue)
             {
                 var todayUtc = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -222,6 +212,20 @@ namespace SMEFLOWSystem.Application.Services
             userDto.Token = token;
 
             return userDto;
+        }
+
+        public async Task<(bool, string)> ChangePasswordAsync(Guid id, ChangePasswordRequestDto request)
+        {
+            var user = await _userRepo.GetUserByIdAsync(id);
+
+            if(user == null) 
+                throw new ArgumentException("Không tìm thấy người dùng");
+            if(!AuthHelper.VerifyPassword(request.CurrentPassword, user.PasswordHash))
+                throw new ArgumentException("Mật khẩu hiện tại không đúng");
+
+            string newPassword = AuthHelper.HashPassword(request.NewPassword);
+            await _userRepo.UpdatePasswordAsync(user.Id, newPassword);
+            return (true, "Đổi mật khẩu thành công");
         }
     }
 }

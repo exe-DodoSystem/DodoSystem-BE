@@ -1,50 +1,53 @@
 {
   "Version": 1,
-  "WorkspaceRootPath": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\",
+  "WorkspaceRootPath": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{02A3FD47-98B9-4E54-9C26-C2C794BBE07A}|SMEFLOWSystem.WebAPI\\SMEFLOWSystem.WebAPI.csproj|d:\\project\\projectmonhoc\\exe101\\smeflowsystem\\smeflowsystem.webapi\\controllers\\authcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{02A3FD47-98B9-4E54-9C26-C2C794BBE07A}|SMEFLOWSystem.WebAPI\\SMEFLOWSystem.WebAPI.csproj|solutionrelative:smeflowsystem.webapi\\controllers\\authcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|d:\\project\\projectmonhoc\\exe101\\smeflowsystem\\smeflowsystem.application\\services\\roleservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|solutionrelative:smeflowsystem.application\\services\\roleservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{C99A4270-2B8C-4E44-A853-68DF9C7A7666}|SMEFLOWSystem.Core\\SMEFLOWSystem.Core.csproj|d:\\project\\projectmonhoc\\exe101\\smeflowsystem\\smeflowsystem.core\\entities\\user.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{C99A4270-2B8C-4E44-A853-68DF9C7A7666}|SMEFLOWSystem.Core\\SMEFLOWSystem.Core.csproj|solutionrelative:smeflowsystem.core\\entities\\user.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|d:\\project\\projectmonhoc\\exe101\\smeflowsystem\\smeflowsystem.application\\interfaces\\iservices\\iauthservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|solutionrelative:smeflowsystem.application\\interfaces\\iservices\\iauthservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|d:\\project\\projectmonhoc\\exe101\\smeflowsystem\\smeflowsystem.application\\services\\authservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|solutionrelative:smeflowsystem.application\\services\\authservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{9BC37C3E-4FD7-418F-BA24-2F45A1F7ABB3}|SMEFLOWSystem.Infrastructure\\SMEFLOWSystem.Infrastructure.csproj|d:\\project\\projectmonhoc\\exe101\\smeflowsystem\\smeflowsystem.infrastructure\\repositories\\userrepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{9BC37C3E-4FD7-418F-BA24-2F45A1F7ABB3}|SMEFLOWSystem.Infrastructure\\SMEFLOWSystem.Infrastructure.csproj|solutionrelative:smeflowsystem.infrastructure\\repositories\\userrepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|d:\\project\\projectmonhoc\\exe101\\smeflowsystem\\smeflowsystem.application\\dtos\\authdtos\\loginrequestdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|solutionrelative:smeflowsystem.application\\dtos\\authdtos\\loginrequestdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|d:\\project\\projectmonhoc\\exe101\\smeflowsystem\\smeflowsystem.application\\dtos\\userdtos\\userdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|solutionrelative:smeflowsystem.application\\dtos\\userdtos\\userdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|d:\\project\\projectmonhoc\\exe101\\smeflowsystem\\smeflowsystem.application\\dtos\\userdtos\\loginuserdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|solutionrelative:smeflowsystem.application\\dtos\\userdtos\\loginuserdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|d:\\project\\projectmonhoc\\exe101\\smeflowsystem\\smeflowsystem.application\\mappings\\usermappingprofile.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "AbsoluteMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|d:\\project\\projectmonhoc\\exe101\\dodosystem-be\\smeflowsystem.application\\mappings\\usermappingprofile.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|solutionrelative:smeflowsystem.application\\mappings\\usermappingprofile.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|d:\\project\\projectmonhoc\\exe101\\smeflowsystem\\smeflowsystem.application\\dtos\\userdtos\\userupdateddto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|solutionrelative:smeflowsystem.application\\dtos\\userdtos\\userupdateddto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|d:\\project\\projectmonhoc\\exe101\\dodosystem-be\\smeflowsystem.application\\dtos\\userdtos\\usercreateddto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|solutionrelative:smeflowsystem.application\\dtos\\userdtos\\usercreateddto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\ASUS\\AppData\\Local\\SourceServer\\ed52c3f56a71b60b3c449f7c0d587ab4ec71422c470647fd2317f23bf7d3484f\\src\\StackExchange.Redis\\ConnectionMultiplexer.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{02A3FD47-98B9-4E54-9C26-C2C794BBE07A}|SMEFLOWSystem.WebAPI\\SMEFLOWSystem.WebAPI.csproj|d:\\project\\projectmonhoc\\exe101\\dodosystem-be\\smeflowsystem.webapi\\controllers\\usercontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{02A3FD47-98B9-4E54-9C26-C2C794BBE07A}|SMEFLOWSystem.WebAPI\\SMEFLOWSystem.WebAPI.csproj|solutionrelative:smeflowsystem.webapi\\controllers\\usercontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{9BC37C3E-4FD7-418F-BA24-2F45A1F7ABB3}|SMEFLOWSystem.Infrastructure\\SMEFLOWSystem.Infrastructure.csproj|d:\\project\\projectmonhoc\\exe101\\dodosystem-be\\smeflowsystem.infrastructure\\repositories\\tenantrepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{9BC37C3E-4FD7-418F-BA24-2F45A1F7ABB3}|SMEFLOWSystem.Infrastructure\\SMEFLOWSystem.Infrastructure.csproj|solutionrelative:smeflowsystem.infrastructure\\repositories\\tenantrepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|d:\\project\\projectmonhoc\\exe101\\dodosystem-be\\smeflowsystem.application\\services\\userservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|solutionrelative:smeflowsystem.application\\services\\userservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|d:\\project\\projectmonhoc\\exe101\\dodosystem-be\\smeflowsystem.application\\services\\authservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|solutionrelative:smeflowsystem.application\\services\\authservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|d:\\project\\projectmonhoc\\exe101\\dodosystem-be\\smeflowsystem.application\\interfaces\\irepositories\\itenantrepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CBA16A19-793E-47BF-9FFF-FBADBFD30CE7}|SMEFLOWSystem.Application\\SMEFLOWSystem.Application.csproj|solutionrelative:smeflowsystem.application\\interfaces\\irepositories\\itenantrepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{C99A4270-2B8C-4E44-A853-68DF9C7A7666}|SMEFLOWSystem.Core\\SMEFLOWSystem.Core.csproj|d:\\project\\projectmonhoc\\exe101\\dodosystem-be\\smeflowsystem.core\\entities\\tenant.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{C99A4270-2B8C-4E44-A853-68DF9C7A7666}|SMEFLOWSystem.Core\\SMEFLOWSystem.Core.csproj|solutionrelative:smeflowsystem.core\\entities\\tenant.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{02A3FD47-98B9-4E54-9C26-C2C794BBE07A}|SMEFLOWSystem.WebAPI\\SMEFLOWSystem.WebAPI.csproj|d:\\project\\projectmonhoc\\exe101\\dodosystem-be\\smeflowsystem.webapi\\controllers\\authcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{02A3FD47-98B9-4E54-9C26-C2C794BBE07A}|SMEFLOWSystem.WebAPI\\SMEFLOWSystem.WebAPI.csproj|solutionrelative:smeflowsystem.webapi\\controllers\\authcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{02A3FD47-98B9-4E54-9C26-C2C794BBE07A}|SMEFLOWSystem.WebAPI\\SMEFLOWSystem.WebAPI.csproj|d:\\project\\projectmonhoc\\exe101\\dodosystem-be\\smeflowsystem.webapi\\controllers\\modulescontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{02A3FD47-98B9-4E54-9C26-C2C794BBE07A}|SMEFLOWSystem.WebAPI\\SMEFLOWSystem.WebAPI.csproj|solutionrelative:smeflowsystem.webapi\\controllers\\modulescontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{02A3FD47-98B9-4E54-9C26-C2C794BBE07A}|SMEFLOWSystem.WebAPI\\SMEFLOWSystem.WebAPI.csproj|d:\\project\\projectmonhoc\\exe101\\dodosystem-be\\smeflowsystem.webapi\\controllers\\billingordermodulescontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{02A3FD47-98B9-4E54-9C26-C2C794BBE07A}|SMEFLOWSystem.WebAPI\\SMEFLOWSystem.WebAPI.csproj|solutionrelative:smeflowsystem.webapi\\controllers\\billingordermodulescontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -53,8 +56,8 @@
       "VerticalTabListWidth": 256,
       "DocumentGroups": [
         {
-          "DockedWidth": 200,
-          "SelectedChildIndex": 23,
+          "DockedWidth": 210,
+          "SelectedChildIndex": 16,
           "Children": [
             {
               "$type": "Bookmark",
@@ -117,150 +120,153 @@
               "Name": "ST:128:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
             },
             {
+              "$type": "Bookmark",
+              "Name": "ST:54:0:{e8034f19-ab72-4f06-83fd-f6832b41aa63}"
+            },
+            {
               "$type": "Document",
-              "DocumentIndex": 3,
-              "Title": "IAuthService.cs",
-              "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\Interfaces\\IServices\\IAuthService.cs",
-              "RelativeDocumentMoniker": "SMEFLOWSystem.Application\\Interfaces\\IServices\\IAuthService.cs",
-              "ToolTip": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\Interfaces\\IServices\\IAuthService.cs*",
-              "RelativeToolTip": "SMEFLOWSystem.Application\\Interfaces\\IServices\\IAuthService.cs*",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAA==",
+              "DocumentIndex": 0,
+              "Title": "UserMappingProfile.cs",
+              "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Application\\Mappings\\UserMappingProfile.cs",
+              "RelativeDocumentMoniker": "SMEFLOWSystem.Application\\Mappings\\UserMappingProfile.cs",
+              "ToolTip": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Application\\Mappings\\UserMappingProfile.cs",
+              "RelativeToolTip": "SMEFLOWSystem.Application\\Mappings\\UserMappingProfile.cs",
+              "ViewState": "AgIAAA0AAAAAAAAAAAA1wB4AAAAtAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-02-11T15:04:01.963Z",
+              "WhenOpened": "2026-02-21T03:22:22.769Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
               "DocumentIndex": 1,
-              "Title": "RoleService.cs",
-              "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\Services\\RoleService.cs",
-              "RelativeDocumentMoniker": "SMEFLOWSystem.Application\\Services\\RoleService.cs",
-              "ToolTip": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\Services\\RoleService.cs",
-              "RelativeToolTip": "SMEFLOWSystem.Application\\Services\\RoleService.cs",
-              "ViewState": "AgIAAAkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Title": "UserCreatedDto.cs",
+              "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Application\\DTOs\\UserDtos\\UserCreatedDto.cs",
+              "RelativeDocumentMoniker": "SMEFLOWSystem.Application\\DTOs\\UserDtos\\UserCreatedDto.cs",
+              "ToolTip": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Application\\DTOs\\UserDtos\\UserCreatedDto.cs",
+              "RelativeToolTip": "SMEFLOWSystem.Application\\DTOs\\UserDtos\\UserCreatedDto.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABYAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-02-11T15:01:47.767Z",
+              "WhenOpened": "2026-02-21T03:21:16.651Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
               "DocumentIndex": 2,
-              "Title": "User.cs",
-              "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Core\\Entities\\User.cs",
-              "RelativeDocumentMoniker": "SMEFLOWSystem.Core\\Entities\\User.cs",
-              "ToolTip": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Core\\Entities\\User.cs",
-              "RelativeToolTip": "SMEFLOWSystem.Core\\Entities\\User.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAIwCQAAAABAAAAAAAAAA==",
+              "Title": "ConnectionMultiplexer.cs",
+              "DocumentMoniker": "C:\\Users\\ASUS\\AppData\\Local\\SourceServer\\ed52c3f56a71b60b3c449f7c0d587ab4ec71422c470647fd2317f23bf7d3484f\\src\\StackExchange.Redis\\ConnectionMultiplexer.cs",
+              "ToolTip": "C:\\Users\\ASUS\\AppData\\Local\\SourceServer\\ed52c3f56a71b60b3c449f7c0d587ab4ec71422c470647fd2317f23bf7d3484f\\src\\StackExchange.Redis\\ConnectionMultiplexer.cs",
+              "ViewState": "AgIAAMACAAAAAAAAAAAcwMsCAAAiAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-02-11T14:52:53.639Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 10,
-              "Title": "UserUpdatedDto.cs",
-              "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\DTOs\\UserDtos\\UserUpdatedDto.cs",
-              "RelativeDocumentMoniker": "SMEFLOWSystem.Application\\DTOs\\UserDtos\\UserUpdatedDto.cs",
-              "ToolTip": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\DTOs\\UserDtos\\UserUpdatedDto.cs",
-              "RelativeToolTip": "SMEFLOWSystem.Application\\DTOs\\UserDtos\\UserUpdatedDto.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-02-11T14:52:12.073Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 9,
-              "Title": "UserMappingProfile.cs",
-              "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\Mappings\\UserMappingProfile.cs",
-              "RelativeDocumentMoniker": "SMEFLOWSystem.Application\\Mappings\\UserMappingProfile.cs",
-              "ToolTip": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\Mappings\\UserMappingProfile.cs*",
-              "RelativeToolTip": "SMEFLOWSystem.Application\\Mappings\\UserMappingProfile.cs*",
-              "ViewState": "AgIAAA0AAAAAAAAAAAA1wDoAAABOAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-02-11T14:51:55.176Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 8,
-              "Title": "LoginUserDto.cs",
-              "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\DTOs\\UserDtos\\LoginUserDto.cs",
-              "RelativeDocumentMoniker": "SMEFLOWSystem.Application\\DTOs\\UserDtos\\LoginUserDto.cs",
-              "ToolTip": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\DTOs\\UserDtos\\LoginUserDto.cs*",
-              "RelativeToolTip": "SMEFLOWSystem.Application\\DTOs\\UserDtos\\LoginUserDto.cs*",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAoAAAAyAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-02-11T14:48:37.998Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Bookmark",
-              "Name": "ST:53:0:{e8034f19-ab72-4f06-83fd-f6832b41aa63}"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 7,
-              "Title": "UserDto.cs",
-              "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\DTOs\\UserDtos\\UserDto.cs",
-              "RelativeDocumentMoniker": "SMEFLOWSystem.Application\\DTOs\\UserDtos\\UserDto.cs",
-              "ToolTip": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\DTOs\\UserDtos\\UserDto.cs*",
-              "RelativeToolTip": "SMEFLOWSystem.Application\\DTOs\\UserDtos\\UserDto.cs*",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA8AAAA+AAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-02-11T14:45:48.636Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 0,
-              "Title": "AuthController.cs",
-              "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.WebAPI\\Controllers\\AuthController.cs",
-              "RelativeDocumentMoniker": "SMEFLOWSystem.WebAPI\\Controllers\\AuthController.cs",
-              "ToolTip": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.WebAPI\\Controllers\\AuthController.cs",
-              "RelativeToolTip": "SMEFLOWSystem.WebAPI\\Controllers\\AuthController.cs",
-              "ViewState": "AgIAAAsAAAAAAAAAAAAQwCUAAAANAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-02-11T14:44:51.973Z",
+              "WhenOpened": "2026-02-21T03:14:49.489Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
               "DocumentIndex": 6,
-              "Title": "LoginRequestDto.cs",
-              "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\DTOs\\AuthDtos\\LoginRequestDto.cs",
-              "RelativeDocumentMoniker": "SMEFLOWSystem.Application\\DTOs\\AuthDtos\\LoginRequestDto.cs",
-              "ToolTip": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\DTOs\\AuthDtos\\LoginRequestDto.cs",
-              "RelativeToolTip": "SMEFLOWSystem.Application\\DTOs\\AuthDtos\\LoginRequestDto.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Title": "AuthService.cs",
+              "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Application\\Services\\AuthService.cs",
+              "RelativeDocumentMoniker": "SMEFLOWSystem.Application\\Services\\AuthService.cs",
+              "ToolTip": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Application\\Services\\AuthService.cs",
+              "RelativeToolTip": "SMEFLOWSystem.Application\\Services\\AuthService.cs",
+              "ViewState": "AgIAAE4AAAAAAAAAAAAowAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-02-11T14:36:32.025Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 5,
-              "Title": "UserRepository.cs",
-              "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Infrastructure\\Repositories\\UserRepository.cs",
-              "RelativeDocumentMoniker": "SMEFLOWSystem.Infrastructure\\Repositories\\UserRepository.cs",
-              "ToolTip": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Infrastructure\\Repositories\\UserRepository.cs",
-              "RelativeToolTip": "SMEFLOWSystem.Infrastructure\\Repositories\\UserRepository.cs",
-              "ViewState": "AgIAAFIAAAAAAAAAAAAuwEAAAAAlAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-02-11T14:33:09.908Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-02-18T04:35:13.147Z"
             },
             {
               "$type": "Document",
               "DocumentIndex": 4,
-              "Title": "AuthService.cs",
-              "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\Services\\AuthService.cs",
-              "RelativeDocumentMoniker": "SMEFLOWSystem.Application\\Services\\AuthService.cs",
-              "ToolTip": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.Application\\Services\\AuthService.cs*",
-              "RelativeToolTip": "SMEFLOWSystem.Application\\Services\\AuthService.cs*",
-              "ViewState": "AgIAAMsAAAAAAAAAAAAQwN4AAAAAAAAAAAAAAA==",
+              "Title": "TenantRepository.cs",
+              "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Infrastructure\\Repositories\\TenantRepository.cs",
+              "RelativeDocumentMoniker": "SMEFLOWSystem.Infrastructure\\Repositories\\TenantRepository.cs",
+              "ToolTip": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Infrastructure\\Repositories\\TenantRepository.cs",
+              "RelativeToolTip": "SMEFLOWSystem.Infrastructure\\Repositories\\TenantRepository.cs",
+              "ViewState": "AgIAAAwAAAAAAAAAAAAtwFUAAABUAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-02-11T14:27:33.636Z",
+              "WhenOpened": "2026-02-18T04:13:25.219Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "Tenant.cs",
+              "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Core\\Entities\\Tenant.cs",
+              "RelativeDocumentMoniker": "SMEFLOWSystem.Core\\Entities\\Tenant.cs",
+              "ToolTip": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Core\\Entities\\Tenant.cs",
+              "RelativeToolTip": "SMEFLOWSystem.Core\\Entities\\Tenant.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABAAAAAcAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-18T03:59:33.612Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "ITenantRepository.cs",
+              "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Application\\Interfaces\\IRepositories\\ITenantRepository.cs",
+              "RelativeDocumentMoniker": "SMEFLOWSystem.Application\\Interfaces\\IRepositories\\ITenantRepository.cs",
+              "ToolTip": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Application\\Interfaces\\IRepositories\\ITenantRepository.cs",
+              "RelativeToolTip": "SMEFLOWSystem.Application\\Interfaces\\IRepositories\\ITenantRepository.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABIAAABAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-18T03:58:35.021Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "UserService.cs",
+              "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Application\\Services\\UserService.cs",
+              "RelativeDocumentMoniker": "SMEFLOWSystem.Application\\Services\\UserService.cs",
+              "ToolTip": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.Application\\Services\\UserService.cs",
+              "RelativeToolTip": "SMEFLOWSystem.Application\\Services\\UserService.cs",
+              "ViewState": "AgIAAFIAAAAAAAAAAAAmwGcAAAAmAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-18T03:57:33.973Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 10,
+              "Title": "ModulesController.cs",
+              "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.WebAPI\\Controllers\\ModulesController.cs",
+              "RelativeDocumentMoniker": "SMEFLOWSystem.WebAPI\\Controllers\\ModulesController.cs",
+              "ToolTip": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.WebAPI\\Controllers\\ModulesController.cs",
+              "RelativeToolTip": "SMEFLOWSystem.WebAPI\\Controllers\\ModulesController.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-18T03:56:48.545Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 11,
+              "Title": "BillingOrderModulesController.cs",
+              "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.WebAPI\\Controllers\\BillingOrderModulesController.cs",
+              "RelativeDocumentMoniker": "SMEFLOWSystem.WebAPI\\Controllers\\BillingOrderModulesController.cs",
+              "ToolTip": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.WebAPI\\Controllers\\BillingOrderModulesController.cs",
+              "RelativeToolTip": "SMEFLOWSystem.WebAPI\\Controllers\\BillingOrderModulesController.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-18T03:55:44.089Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "AuthController.cs",
+              "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.WebAPI\\Controllers\\AuthController.cs",
+              "RelativeDocumentMoniker": "SMEFLOWSystem.WebAPI\\Controllers\\AuthController.cs",
+              "ToolTip": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.WebAPI\\Controllers\\AuthController.cs",
+              "RelativeToolTip": "SMEFLOWSystem.WebAPI\\Controllers\\AuthController.cs",
+              "ViewState": "AgIAABkAAAAAAAAAAAAgwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-18T03:55:28.577Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "UserController.cs",
+              "DocumentMoniker": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.WebAPI\\Controllers\\UserController.cs",
+              "RelativeDocumentMoniker": "SMEFLOWSystem.WebAPI\\Controllers\\UserController.cs",
+              "ToolTip": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.WebAPI\\Controllers\\UserController.cs",
+              "RelativeToolTip": "SMEFLOWSystem.WebAPI\\Controllers\\UserController.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABEAAAAJAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-18T03:55:25.529Z",
               "EditorCaption": ""
             }
           ]

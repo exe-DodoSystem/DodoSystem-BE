@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using SMEFLOWSystem.Application.DTOs.Payment;
 using SMEFLOWSystem.Application.Interfaces.IServices;
-using System.Runtime.CompilerServices;
+using Microsoft.Extensions.Configuration;
 
 namespace SMEFLOWSystem.WebAPI.Controllers
 {
@@ -10,14 +10,16 @@ namespace SMEFLOWSystem.WebAPI.Controllers
     public class PaymentController : Controller
     {
         private readonly IBillingService _billingService;
+        private readonly IConfiguration _config;
 
-        public PaymentController(IBillingService billingService)
+        public PaymentController(IBillingService billingService, IConfiguration config)
         {
             _billingService = billingService;
+            _config = config;
         }
 
         [HttpPost("create")]
-        public async Task<IActionResult> CreatePayment(Guid orderId)
+        public async Task<IActionResult> CreatePayment([FromQuery] Guid orderId)
         {
             string? clientIp = null;
             if (Request.Headers.TryGetValue("X-Forwarded-For", out var forwardedFor) && !string.IsNullOrWhiteSpace(forwardedFor))
@@ -32,22 +34,32 @@ namespace SMEFLOWSystem.WebAPI.Controllers
         }
 
         [HttpGet("callback/vnpay")]  
-        public async Task<IActionResult> VNPayCallback()
+        public async Task<IActionResult> VNPayCallback([FromQuery] string? vnp_ResponseCode, [FromQuery] string? vnp_TxnRef)
         {
             try
             {
-                await _billingService.ProcessVNPayCallbackAsync(Request.Query);
+                var processed = await _billingService.ProcessVNPayCallbackAsync(Request.Query);
 
-                var isSuccess = Request.Query.TryGetValue("vnp_ResponseCode", out var responseCode)
-                    && responseCode.ToString() == "00";
+                // TODO: Thay đổi URL này thành frontend URL thực của bạn
+                var frontendUrl = _config["Payment:FrontendUrl"] ?? "http://localhost:3000";
 
+                if (!processed)
+                {
+                    return Redirect($"{frontendUrl}/payment/error");
+                }
+
+                var isSuccess = vnp_ResponseCode == "00";
+                var orderId = vnp_TxnRef;
+                
                 return Redirect(isSuccess
-                    ? "https://your-domain.com/success"
-                    : "https://your-domain.com/fail");
+                    ? $"{frontendUrl}/payment/success?orderId={orderId}"
+                    : $"{frontendUrl}/payment/failed?orderId={orderId}");
             }
-            catch
+            catch (Exception ex)
             {
-                return Redirect("https://your-domain.com/fail");
+                // Log error nếu cần: _logger.LogError(ex, "VNPay callback failed");
+                var frontendUrl = _config["Payment:FrontendUrl"] ?? "http://localhost:3000";
+                return Redirect($"{frontendUrl}/payment/error");
             }
         }
     }

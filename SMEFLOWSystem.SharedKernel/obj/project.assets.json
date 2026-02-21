@@ -14,11 +14,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.SharedKernel\\SMEFLOWSystem.SharedKernel.csproj",
+      "projectUniqueName": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.SharedKernel\\SMEFLOWSystem.SharedKernel.csproj",
       "projectName": "SMEFLOWSystem.SharedKernel",
-      "projectPath": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.SharedKernel\\SMEFLOWSystem.SharedKernel.csproj",
+      "projectPath": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.SharedKernel\\SMEFLOWSystem.SharedKernel.csproj",
       "packagesPath": "C:\\Users\\ASUS\\.nuget\\packages\\",
-      "outputPath": "D:\\Project\\ProjectMonHoc\\EXE101\\SMEFLOWSystem\\SMEFLOWSystem.SharedKernel\\obj\\",
+      "outputPath": "D:\\Project\\ProjectMonHoc\\EXE101\\DodoSystem-BE\\SMEFLOWSystem.SharedKernel\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
