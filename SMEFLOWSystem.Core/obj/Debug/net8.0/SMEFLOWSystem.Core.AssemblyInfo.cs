@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("SMEFLOWSystem.Core")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+352c44fdb3a12cd2869464fb4a4497d70022d5ea")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ebbcbe28dd314eab8703145ff7541482bc589c75")]
 [assembly: System.Reflection.AssemblyProductAttribute("SMEFLOWSystem.Core")]
 [assembly: System.Reflection.AssemblyTitleAttribute("SMEFLOWSystem.Core")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

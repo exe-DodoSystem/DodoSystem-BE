@@ -56,15 +56,11 @@ namespace VNPAY.NET
                 throw new ArgumentException("Không được để trống địa chỉ IP.");
             }
 
-            // VNPay requires vnp_Amount as an integer string (amount * 100, no decimals).
-            // Cast to long to avoid double precision artifacts like "5E+07" or "50000000.0000001".
-            var amountInMinorUnit = (long)(request.Money * 100);
-
             var helper = new PaymentHelper();
             helper.AddRequestData("vnp_Version", _version);
             helper.AddRequestData("vnp_Command", "pay");
             helper.AddRequestData("vnp_TmnCode", _tmnCode);
-            helper.AddRequestData("vnp_Amount", amountInMinorUnit.ToString());
+            helper.AddRequestData("vnp_Amount", (request.Money * 100).ToString());
             helper.AddRequestData("vnp_CreateDate", request.CreatedDate.ToString("yyyyMMddHHmmss"));
             helper.AddRequestData("vnp_CurrCode", request.Currency.ToString().ToUpper());
             helper.AddRequestData("vnp_IpAddr", request.IpAddress);
@@ -73,13 +69,7 @@ namespace VNPAY.NET
             helper.AddRequestData("vnp_OrderInfo", request.Description.Trim());
             helper.AddRequestData("vnp_OrderType", _orderType);
             helper.AddRequestData("vnp_ReturnUrl", _callbackUrl);
-            helper.AddRequestData("vnp_TxnRef", request.PaymentId);
-
-            // Set vnp_ExpireDate if provided (important for email-based payment links)
-            if (request.ExpireDate.HasValue)
-            {
-                helper.AddRequestData("vnp_ExpireDate", request.ExpireDate.Value.ToString("yyyyMMddHHmmss"));
-            }
+            helper.AddRequestData("vnp_TxnRef", request.PaymentId.ToString());
 
             return helper.GetPaymentUrl(_baseUrl, _hashSecret);
         }
