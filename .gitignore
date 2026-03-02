@@ -1,1 +1,66 @@
+# Visual Studio / VS Code
 .vs/
+.vscode/
+
+# Build results
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Tt]emp/
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Backup & Cache
+*.bak
+*.cache
+*.cache.json
+*.log
+*.pdb
+*.ldb
+AssemblyInfoInputs.cache
+
+# Test results
+[Tt]est[Rr]esult*/
+*.trx
+*.coverage
+*.coveragexml
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+project.assets.json
+project.nuget.cache
+*.nuget.g.props
+*.nuget.g.targets
+*.nuget.dgspec.json
+
+# Resharper
+_ReSharper*/
+*.DotSettings.user
+
+# Rider
+.idea/
+
+# Mac & Linux
+.DS_Store
+*.swp
+*.swo
+*.tmp
+
+# Publish
+publish/
+wwwroot/dist/
+node_modules/
+
+# Appsettings (nếu không muốn commit config)
+appsettings.Development.json
+appsettings.json
+
+# Dumps
+*.stackdump
+*.dmp

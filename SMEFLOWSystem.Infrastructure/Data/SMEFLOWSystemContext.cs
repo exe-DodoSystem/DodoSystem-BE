@@ -40,6 +40,7 @@ public partial class SMEFLOWSystemContext : DbContext
     public virtual DbSet<Tenant> Tenants { get; set; }
     public virtual DbSet<User> Users { get; set; }
     public virtual DbSet<UserRole> UserRoles { get; set; }
+    public virtual DbSet<TenantAttendanceSetting> TenantAttendanceSettings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -50,11 +51,27 @@ public partial class SMEFLOWSystemContext : DbContext
             entity.HasIndex(e => new { e.TenantId, e.EmployeeId, e.WorkDate }, "UQ_Attendance_Per_Day").IsUnique();
             entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.Notes).HasMaxLength(255);  // Nullable
+            entity.Property(e => e.Notes).HasMaxLength(255);
             entity.Property(e => e.Status)
                 .IsRequired()
-                .HasMaxLength(20)
+                .HasMaxLength(30)
                 .HasDefaultValue("Present");
+            // GPS
+            entity.Property(e => e.CheckInLatitude);
+            entity.Property(e => e.CheckInLongitude);
+            entity.Property(e => e.CheckOutLatitude);
+            entity.Property(e => e.CheckOutLongitude);
+            // Selfie URLs
+            entity.Property(e => e.CheckInSelfieUrl).HasMaxLength(1000);
+            entity.Property(e => e.CheckOutSelfieUrl).HasMaxLength(1000);
+            // Late / Early
+            entity.Property(e => e.LateMinutes);
+            entity.Property(e => e.EarlyLeaveMinutes);
+            // Approval workflow
+            entity.Property(e => e.ApprovalStatus).HasMaxLength(30);
+            entity.Property(e => e.ApprovalNotes).HasMaxLength(500);
+            entity.Property(e => e.ApprovedAt);
+            entity.Property(e => e.ApprovedByUserId);
             entity.HasOne(d => d.Employee).WithMany(p => p.Attendances)
                 .HasForeignKey(d => d.EmployeeId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
@@ -480,7 +497,8 @@ public partial class SMEFLOWSystemContext : DbContext
             entity.Property(e => e.PasswordHash)
                 .IsRequired()
                 .HasMaxLength(255);
-            entity.Property(e => e.Phone).HasMaxLength(50);  // Nullable
+            entity.Property(e => e.Phone).HasMaxLength(50);
+            entity.Property(e => e.AvatarUrl).HasMaxLength(1000);
             entity.HasOne(d => d.Tenant).WithMany(p => p.Users)
                 .HasForeignKey(d => d.TenantId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
@@ -499,6 +517,25 @@ public partial class SMEFLOWSystemContext : DbContext
                 .HasForeignKey(d => d.UserId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_UserRoles_Users");
+        });
+
+        modelBuilder.Entity<TenantAttendanceSetting>(entity =>
+        {
+            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
+            entity.HasKey(e => e.Id).HasName("PK__TenantAttendanceSetting__3214EC07");
+            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.CheckInRadiusMeters).HasDefaultValue(100);
+            entity.Property(e => e.LateThresholdMinutes).HasDefaultValue(10);
+            entity.Property(e => e.EarlyLeaveThresholdMinutes).HasDefaultValue(10);
+            entity.Property(e => e.Latitude).HasColumnType("float");
+            entity.Property(e => e.Longitude).HasColumnType("float");
+            // 1:1 — mỗi Tenant chỉ có 1 setting, optional (HasOne WithOne)
+            entity.HasOne(d => d.Tenant)
+                .WithOne(t => t.AttendanceSetting)
+                .HasForeignKey<TenantAttendanceSetting>(d => d.TenantId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_TenantAttendanceSettings_Tenants");
         });
 
         ApplySoftDeleteQueryFilters(modelBuilder);

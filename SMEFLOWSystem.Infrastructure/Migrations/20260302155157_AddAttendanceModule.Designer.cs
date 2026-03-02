@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SMEFLOWSystem.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using SMEFLOWSystem.Infrastructure.Data;
 namespace SMEFLOWSystem.Infrastructure.Migrations
 {
     [DbContext(typeof(SMEFLOWSystemContext))]
-    partial class SMEFLOWSystemContextModelSnapshot : ModelSnapshot
+    [Migration("20260302155157_AddAttendanceModule")]
+    partial class AddAttendanceModule
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

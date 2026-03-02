@@ -11,6 +11,8 @@ public partial class User : ITenantEntity
     public Guid Id { get; set; }
 
     public Guid TenantId { get; set; }
+    public string? AvatarUrl { get; set; } = null;
+
 
     public string Email { get; set; }
 
