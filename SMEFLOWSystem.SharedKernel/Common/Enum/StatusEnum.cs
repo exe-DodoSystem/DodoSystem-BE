@@ -24,9 +24,6 @@ namespace ShareKernel.Common.Enum
         public const string OrderCancelled = "Cancelled";
         public const string OrderFailed = "Failed";
         public const string OrderCompleted = "Completed";
-        // --- Attendance Status ---
-        public const string AttendancePresent = "Present";
-        public const string AttendanceAbsent = "Absent";
 
         // --- Payment Status ---
         public const string PaymentPending = "Pending";
@@ -38,5 +35,17 @@ namespace ShareKernel.Common.Enum
         public const string EmployeeResigned = "Resigned";
         public const string EmployeeOnLeave = "OnLeave";
         public const string EmployeeProbation = "Probation";
+
+        // Attendance status
+        public const string AttendancePresent = "Present";
+        public const string AttendanceLate = "Late";
+        public const string AttendanceEarlyLeave = "EarlyLeave";
+        public const string AttendanceAbsent = "Absent";
+
+        // Approval status
+        public const string ApprovalPending = "PendingApproval";
+        public const string ApprovalApproved = "Approved";
+        public const string ApprovalRejected = "Rejected";
+
     }
 }

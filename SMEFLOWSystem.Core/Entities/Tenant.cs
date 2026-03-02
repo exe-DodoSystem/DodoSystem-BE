@@ -40,4 +40,6 @@ public partial class Tenant
 
     public virtual ICollection<User> Users { get; set; } = new List<User>();
     public virtual ICollection<Invite> Invites { get; set; } = new List<Invite>();
+
+    public virtual TenantAttendanceSetting AttendanceSetting { get; set; }
 }
