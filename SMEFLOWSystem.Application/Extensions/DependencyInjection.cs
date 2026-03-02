@@ -36,15 +36,13 @@ public static class DependencyInjection
         services.AddScoped<IModuleSubscriptionService, ModuleSubscriptionService>();
         services.AddScoped<IBillingOrderModuleService, BillingOrderModuleService>();
         services.AddScoped<IBillingOrderService, BillingOrderService>();
+        services.AddSingleton<IVnpay, Vnpay>();
         services.AddScoped<IPaymentService, PaymentService>();
         services.AddScoped<IBillingService, BillingService>();
         services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<TenantExpirationRecurringJob>();
         services.AddScoped<IOTPService, OTPService>();
         services.AddScoped<IRefreshTokenService, RefreshTokenService>();
-
-        // VNPay gateway client
-        services.AddTransient<IVnpay, Vnpay>();
 
         services.AddScoped<IHrDepartmentService, HrDepartmentService>();
         services.AddScoped<IHrPositionService, HrPositionService>();

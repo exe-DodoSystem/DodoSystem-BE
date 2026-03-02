@@ -39,12 +39,6 @@ namespace VNPAY.NET.Models
         public DateTime CreatedDate { get; set; } = DateTime.Now;
 
         /// <summary>
-        /// Thời điểm hết hạn thanh toán (vnp_ExpireDate). Nếu null thì VNPay sẽ dùng mặc định (~15 phút).
-        /// Nên set khi gửi link qua email để tránh URL hết hạn quá sớm.
-        /// </summary>
-        public DateTime? ExpireDate { get; set; }
-
-        /// <summary>
         /// Đơn vị tiền tệ sử dụng thanh toán. Hiện tại chỉ hỗ trợ VND
         /// </summary>
         public Currency Currency { get; set; } = Currency.VND;

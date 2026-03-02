@@ -3,20 +3,20 @@ using System.Text;
 
 namespace VNPAY.NET.Utilities
 {
-    internal class PaymentHelper
+    public class PaymentHelper
     {
         private readonly SortedList<string, string> _requestData = new(new Comparer());
         private readonly SortedList<string, string> _responseData = new(new Comparer());
 
         #region Request for the payment
-        internal void AddRequestData(string key, string value)
+        public void AddRequestData(string key, string value)
         {
             if (!string.IsNullOrEmpty(value))
             {
                 _requestData.Add(key, value);
             }
         }
-        internal string GetPaymentUrl(string baseUrl, string hashSecret)
+        public string GetPaymentUrl(string baseUrl, string hashSecret)
         {
             var queryBuilder = new StringBuilder();
 
@@ -39,14 +39,14 @@ namespace VNPAY.NET.Utilities
         #endregion
 
         #region Validate the payment response
-        internal void AddResponseData(string key, string value)
+        public void AddResponseData(string key, string value)
         {
             if (!string.IsNullOrEmpty(value))
             {
                 _responseData.Add(key, value);
             }
         }
-        internal bool IsSignatureCorrect(string? inputHash, string secretKey)
+        public bool IsSignatureCorrect(string? inputHash, string secretKey)
         {
             if (string.IsNullOrEmpty(inputHash))
             {
@@ -57,7 +57,7 @@ namespace VNPAY.NET.Utilities
             var checksum = Encoder.AsHmacSHA512(secretKey, rspRaw);
             return checksum.Equals(inputHash, StringComparison.InvariantCultureIgnoreCase);
         }
-        internal string GetResponseData()
+        public string GetResponseData()
         {
             _responseData.Remove("vnp_SecureHashType");
             _responseData.Remove("vnp_SecureHash");
@@ -68,7 +68,7 @@ namespace VNPAY.NET.Utilities
 
             return string.Join("&", validData);
         }
-        internal string GetResponseValue(string key)
+        public string GetResponseValue(string key)
         {
             return _responseData.TryGetValue(key, out var value) ? value : string.Empty;
         }

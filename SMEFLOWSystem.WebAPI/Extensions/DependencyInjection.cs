@@ -147,9 +147,9 @@ public static class DependencyInjection
         if ((paymentMode == "Sandbox" || paymentMode == "Production") && paymentGateway == "VNPay")
         {
             _ = GetRequiredConfig(configuration, "Payment:VNPay:TmnCode");
-            _ = GetRequiredConfig(configuration, "Payment:VNPay:ReturnUrl");
+            _ = GetRequiredConfig(configuration, "Payment:VNPay:CallbackUrl");
             _ = GetRequiredConfig(configuration, "Payment:VNPay:HashSecret");
-            _ = GetRequiredConfig(configuration, "Payment:VNPay:PaymentUrl");
+            _ = GetRequiredConfig(configuration, "Payment:VNPay:BaseUrl");
         }
     }
 

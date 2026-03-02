@@ -11,7 +11,7 @@ namespace VNPAY.NET.Utilities
             var inputBytes = Encoding.UTF8.GetBytes(inputData);
 
             using var hmac = new HMACSHA512(keyBytes);
-            return BitConverter.ToString(hmac.ComputeHash(inputBytes)).Replace("-", string.Empty).ToLowerInvariant();
+            return BitConverter.ToString(hmac.ComputeHash(inputBytes)).Replace("-", string.Empty);
         }
     }
 }

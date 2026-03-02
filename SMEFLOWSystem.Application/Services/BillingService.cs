@@ -5,7 +5,6 @@ using SMEFLOWSystem.Application.Interfaces.IServices;
 using System;
 using System.Globalization;
 using System.Linq;
-using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -90,8 +89,8 @@ namespace SMEFLOWSystem.Application.Services
                     <p>Cần thanh toán: <b>{payable.ToString("N0", vi)} VND</b></p>
                     <hr/>
                     <p>Nếu bạn muốn thanh toán ngay, vui lòng bấm vào link dưới đây:</p>
-                    <a href='{WebUtility.HtmlEncode(paymentUrl)}' style='padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none;'>THANH TOÁN (TUỲ CHỌN)</a>
-                    <p>Hoặc copy link: {WebUtility.HtmlEncode(paymentUrl)}</p>";
+                    <a href='{paymentUrl}' style='padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none;'>THANH TOÁN (TUỲ CHỌN)</a>
+                    <p>Hoặc copy link: {paymentUrl}</p>";
 
             _backgroundJobClient.Enqueue(() => _emailService.SendEmailAsync(adminEmail, "SMEFLOW - Link thanh toán (tuỳ chọn)", emailBody));
         }
