@@ -11,8 +11,8 @@ namespace SMEFLOWSystem.Application.Interfaces.IServices.System
     public interface IAttendanceService
     {
         Task<AttendanceStatusDto> GetMyStatusAsync(DateOnly date);
-        Task<AttendanceDto> CheckInAsync(CheckInRequestDto request);
-        Task<AttendanceDto> CheckOutAsync(CheckOutRequestDto request);
+        Task<CheckInResponseDto> CheckInAsync(CheckInRequestDto request);
+        Task<CheckOutResponseDto> CheckOutAsync(CheckOutRequestDto request);
         Task<PagedResultDto<AttendanceDto>> GetPagedAsync(AttendanceQueryDto query);
         Task<List<AttendanceDto>> GetMyHistoryAsync(DateOnly from, DateOnly to);
         Task<AttendanceDto> GetByIdAsync(Guid id);

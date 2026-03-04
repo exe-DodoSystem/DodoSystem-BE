@@ -21,7 +21,7 @@ public class AttendanceController : ControllerBase
 
     [HttpPost("checkin")]
     [Consumes("multipart/form-data")]
-    public async Task<ActionResult<AttendanceDto>> CheckIn(
+    public async Task<ActionResult<CheckInResponseDto>> CheckIn(
         [FromForm] double latitude,
         [FromForm] double longitude,
         IFormFile? selfie)
@@ -48,7 +48,7 @@ public class AttendanceController : ControllerBase
 
     [HttpPost("checkout")]
     [Consumes("multipart/form-data")]
-    public async Task<ActionResult<AttendanceDto>> CheckOut(
+    public async Task<ActionResult<CheckOutResponseDto>> CheckOut(
         [FromForm] double latitude,
         [FromForm] double longitude,
         IFormFile? selfie)

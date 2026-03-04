@@ -62,8 +62,8 @@ public static class DependencyInjection
 
         services.Configure<EmailSettings>(configuration.GetSection("EmailSettings"));
         services.Configure<CloudinarySettings>(configuration.GetSection("Cloudinary"));
-        services.Configure<AzureFaceSettings>(configuration.GetSection("AzureFace"));
-        services.AddHttpClient("AzureFace");
+        services.Configure<FacePlusPlusSettings>(configuration.GetSection("FacePlusPlus"));
+        services.AddHttpClient("FacePlusPlus");
         services.PostConfigure<EmailSettings>(options =>
         {
             if (string.IsNullOrWhiteSpace(options.FromName))

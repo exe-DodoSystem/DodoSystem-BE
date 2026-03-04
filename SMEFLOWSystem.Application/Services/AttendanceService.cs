@@ -43,7 +43,7 @@ public class AttendanceService : IAttendanceService
         _mapper = mapper;
     }
 
-    public async Task<AttendanceDto> CheckInAsync(CheckInRequestDto request)
+    public async Task<CheckInResponseDto> CheckInAsync(CheckInRequestDto request)
     {
         var userId = _currentUser.RequireUserId();
         var employee = await RequireEmployeeAsync(userId);
@@ -99,10 +99,10 @@ public class AttendanceService : IAttendanceService
         };
 
         await _attendanceRepo.AddAsync(attendance);
-        return _mapper.Map<AttendanceDto>(attendance);
+        return _mapper.Map<CheckInResponseDto>(attendance);
     }
 
-    public async Task<AttendanceDto> CheckOutAsync(CheckOutRequestDto request)
+    public async Task<CheckOutResponseDto> CheckOutAsync(CheckOutRequestDto request)
     {
         var userId = _currentUser.RequireUserId();
         var employee = await RequireEmployeeAsync(userId);
@@ -147,7 +147,7 @@ public class AttendanceService : IAttendanceService
         }
 
         await _attendanceRepo.UpdateAsync(attendance);
-        return _mapper.Map<AttendanceDto>(attendance);
+        return _mapper.Map<CheckOutResponseDto>(attendance);
     }
 
     public async Task<AttendanceStatusDto> GetMyStatusAsync(DateOnly date)
