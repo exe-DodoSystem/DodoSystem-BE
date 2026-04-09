@@ -11,6 +11,7 @@ namespace SMEFLOWSystem.Application.Interfaces.IServices.System
     public interface IAttendanceService
     {
         Task<AttendanceStatusDto> GetMyStatusAsync(DateOnly date);
+        Task<TodayAttendanceDto?> GetTodayStatusAsync();
         Task<CheckInResponseDto> CheckInAsync(CheckInRequestDto request);
         Task<CheckOutResponseDto> CheckOutAsync(CheckOutRequestDto request);
         Task<PagedResultDto<AttendanceDto>> GetPagedAsync(AttendanceQueryDto query);

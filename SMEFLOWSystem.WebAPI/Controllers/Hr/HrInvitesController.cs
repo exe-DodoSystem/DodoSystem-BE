@@ -27,8 +27,8 @@ public class HrInvitesController : ControllerBase
         if (!tenantId.HasValue)
             return StatusCode(403, new { error = "Thiếu TenantId" });
 
-        try
-        {
+        try {
+        
             await _inviteService.SendInviteAsync(tenantId.Value, request.Email, request.RoleId, request.DepartmentId, request.PositionId, request.Message);
             return Ok(new { success = true });
         }
@@ -39,6 +39,10 @@ public class HrInvitesController : ControllerBase
         catch (ArgumentException ex)
         {
             return BadRequest(new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return StatusCode(500, new { error = ex.Message });
         }
     }
 

@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <Folder Include="DTOs\AttendanceDtos\" />
+    <Folder Include="Interfaces\IServices\NewFolder\" />
   </ItemGroup>
 
 </Project>

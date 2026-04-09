@@ -71,11 +71,12 @@ public class AttendanceService : IAttendanceService
             if (currentTime > deadline)
             {
                 status = StatusEnum.AttendanceLate;
-                lateMinutes = (int)(currentTime - setting.WorkStartTime.Value).TotalMinutes;
+                // Dùng TimeSpan thay vì TimeOnly - TimeOnly để tránh wrap-around 24h
+                var diff = currentTime.ToTimeSpan() - setting.WorkStartTime.Value.ToTimeSpan();
+                lateMinutes = (int)Math.Max(0, diff.TotalMinutes);
             }
         }
 
-        // Upload selfie
         string? selfieUrl = !string.IsNullOrEmpty(request.SelfieBase64)
             ? await _cloudinary.UploadBase64Async(request.SelfieBase64, "attendance/checkin")
             : null;
@@ -141,7 +142,9 @@ public class AttendanceService : IAttendanceService
             var earlyDeadline = setting.WorkEndTime.Value.AddMinutes(-setting.EarlyLeaveThresholdMinutes);
             if (currentTime < earlyDeadline)
             {
-                attendance.EarlyLeaveMinutes = (int)(setting.WorkEndTime.Value - currentTime).TotalMinutes;
+                // Dùng TimeSpan thay vì TimeOnly - TimeOnly để tránh wrap-around 24h
+                var diff = setting.WorkEndTime.Value.ToTimeSpan() - currentTime.ToTimeSpan();
+                attendance.EarlyLeaveMinutes = (int)Math.Max(0, diff.TotalMinutes);
                 attendance.ApprovalStatus = StatusEnum.ApprovalPending;
             }
         }
@@ -167,6 +170,19 @@ public class AttendanceService : IAttendanceService
             WorkStartTime = setting?.WorkStartTime,
             WorkEndTime = setting?.WorkEndTime
         };
+    }
+
+    public async Task<TodayAttendanceDto?> GetTodayStatusAsync()
+    {
+        var userId = _currentUser.RequireUserId();
+        var employee = await RequireEmployeeAsync(userId);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        var record = await _attendanceRepo.GetTodayByEmployeeIdAsync(employee.Id, today);
+        if (record == null)
+            return null;
+
+        return _mapper.Map<TodayAttendanceDto>(record);
     }
 
     public async Task<List<AttendanceDto>> GetMyHistoryAsync(DateOnly from, DateOnly to)
@@ -339,15 +355,12 @@ public class AttendanceService : IAttendanceService
     private async Task VerifyFaceAsync(string? selfieUrl, Employee employee)
     {
         if (string.IsNullOrEmpty(selfieUrl)) return;
-
-        // Lấy avatar từ User
         var avatarUrl = employee.User?.AvatarUrl;
-        if (string.IsNullOrEmpty(avatarUrl)) return; // Chưa có avatar → skip verification
+        if (string.IsNullOrEmpty(avatarUrl)) return; 
 
         var result = await _faceService.VerifyAsync(selfieUrl, avatarUrl);
         if (!result.IsMatch)
         {
-            // Xóa selfie đã upload (không lưu ảnh fail)
             try { await _cloudinary.DeleteAsync(selfieUrl); } catch {}
 
             var message = !string.IsNullOrEmpty(result.ErrorMessage)

@@ -24,6 +24,10 @@ public class AttendanceMappingProfile : Profile
             .ForMember(d => d.EmployeeFullName,
                 opt => opt.MapFrom(s => s.Employee != null ? s.Employee.FullName : string.Empty));
 
+        CreateMap<Attendance, TodayAttendanceDto>()
+            .ForMember(d => d.HasCheckedIn, opt => opt.MapFrom(s => s.CheckInTime.HasValue))
+            .ForMember(d => d.HasCheckedOut, opt => opt.MapFrom(s => s.CheckOutTime.HasValue));
+
         CreateMap<TenantAttendanceSetting, AttendanceConfigResponseDto>();
 
         CreateMap<AttendanceConfigDto, TenantAttendanceSetting>()

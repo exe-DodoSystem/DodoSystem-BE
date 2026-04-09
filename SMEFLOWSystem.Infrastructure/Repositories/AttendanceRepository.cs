@@ -142,4 +142,6 @@ public class AttendanceRepository : IAttendanceRepository
                      && a.CheckInTime != null)
             .CountAsync();
     }
+
+    
 }

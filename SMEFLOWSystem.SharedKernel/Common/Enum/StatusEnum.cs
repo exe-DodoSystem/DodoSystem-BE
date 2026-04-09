@@ -13,24 +13,24 @@ namespace ShareKernel.Common.Enum
         public const string TenantActive = "Active";          // Đang hoạt động
         public const string TenantSuspended = "Suspended";    // Bị treo (hết hạn)
 
-        // --- Module Subscription Status ---
+        // Module Subscription Status 
         public const string ModuleTrial = "Trial";
         public const string ModuleActive = "Active";
         public const string ModuleSuspended = "Suspended";
 
-        // --- Order Status ---
+        // Order Status
         public const string OrderPending = "Pending";
         public const string OrderPaid = "Paid";
         public const string OrderCancelled = "Cancelled";
         public const string OrderFailed = "Failed";
         public const string OrderCompleted = "Completed";
 
-        // --- Payment Status ---
+        // Payment Status 
         public const string PaymentPending = "Pending";
         public const string PaymentPaid = "Paid";
         public const string PaymentFailed = "Failed";
 
-        // --- Employee Status ---
+        // Employee Status 
         public const string EmployeeWorking = "Working";
         public const string EmployeeResigned = "Resigned";
         public const string EmployeeOnLeave = "OnLeave";
@@ -46,6 +46,12 @@ namespace ShareKernel.Common.Enum
         public const string ApprovalPending = "PendingApproval";
         public const string ApprovalApproved = "Approved";
         public const string ApprovalRejected = "Rejected";
+
+        // Payroll Status
+        public const string PayrollDraft = "Draft";
+        public const string PayrollApproved = "Approved";
+        public const string PayrollPaid = "Paid";
+        public const string PayrollRejected = "Rejected";
 
     }
 }

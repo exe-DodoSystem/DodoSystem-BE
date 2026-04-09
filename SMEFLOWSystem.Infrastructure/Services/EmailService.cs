@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SendGrid;
 using SendGrid.Helpers.Mail;
@@ -10,10 +11,12 @@ public class EmailService : IEmailService
 {
     private readonly EmailSettings _settings;
     private readonly ISendGridClient _sendGrid;
+    private readonly ILogger<EmailService> _logger;
 
-    public EmailService(IOptions<EmailSettings> emailSettings)
+    public EmailService(IOptions<EmailSettings> emailSettings, ILogger<EmailService> logger)
     {
         _settings = emailSettings.Value;
+        _logger = logger;
 
         if (string.IsNullOrWhiteSpace(_settings.SendGridApiKey))
             throw new InvalidOperationException("Missing config: EmailSettings:SendGridApiKey");
@@ -30,13 +33,22 @@ public class EmailService : IEmailService
 
         var from = new EmailAddress(_settings.FromEmail, _settings.FromName);
         var to = new EmailAddress(toEmail);
-        var message = MailHelper.CreateSingleEmail(from, to, subject,
-            plainTextContent: string.Empty, htmlContent: body);
+
+        // Cần có plainText để tránh spam filter
+        var plainText = System.Text.RegularExpressions.Regex.Replace(body, "<[^>]+>", "").Trim();
+        var message = MailHelper.CreateSingleEmail(from, to, subject, plainText, body);
+
+        _logger.LogInformation("Sending email to {ToEmail}, subject: {Subject}, from: {FromEmail}",
+            toEmail, subject, _settings.FromEmail);
 
         var response = await _sendGrid.SendEmailAsync(message);
+        var details = await response.Body.ReadAsStringAsync();
+
+        _logger.LogInformation("SendGrid response: {StatusCode} — {Details}",
+            (int)response.StatusCode, details);
+
         if ((int)response.StatusCode >= 400)
         {
-            var details = await response.Body.ReadAsStringAsync();
             throw new InvalidOperationException(
                 $"SendGrid send failed: {(int)response.StatusCode} {response.StatusCode}. {details}");
         }
@@ -62,10 +74,16 @@ public class EmailService : IEmailService
         var to = new EmailAddress(toEmail);
         var message = MailHelper.CreateSingleEmail(from, to, subject, textBody, htmlBody);
 
+        _logger.LogInformation("Sending OTP email to {ToEmail}", toEmail);
+
         var response = await _sendGrid.SendEmailAsync(message);
+        var details = await response.Body.ReadAsStringAsync();
+
+        _logger.LogInformation("SendGrid OTP response: {StatusCode} — {Details}",
+            (int)response.StatusCode, details);
+
         if ((int)response.StatusCode >= 400)
         {
-            var details = await response.Body.ReadAsStringAsync();
             throw new InvalidOperationException(
                 $"SendGrid send failed: {(int)response.StatusCode} {response.StatusCode}. {details}");
         }

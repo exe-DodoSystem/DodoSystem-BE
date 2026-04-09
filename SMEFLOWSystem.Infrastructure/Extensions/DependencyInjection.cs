@@ -1,12 +1,15 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using SMEFLOWSystem.Application.Abstractions.Messaging;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Application.Interfaces.IServices;
 using SMEFLOWSystem.Infrastructure.Data;
+using SMEFLOWSystem.Infrastructure.Messaging.RabbitMQ;
 using SMEFLOWSystem.Infrastructure.Repositories;
 using SMEFLOWSystem.Infrastructure.Services;
 using SMEFLOWSystem.Infrastructure.Tenancy;
+using SMEFLOWSystem.Infrastructure.Options;
 using SMEFLOWSystem.SharedKernel.Interfaces;
 
 namespace SMEFLOWSystem.Infrastructure.Extensions;
@@ -15,6 +18,8 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
+        services.Configure<RabbitMqOptions>(configuration.GetSection("RabbitMQ"));
+
         services.AddDbContext<SMEFLOWSystemContext>(options =>
             options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
 
@@ -28,6 +33,7 @@ public static class DependencyInjection
         services.AddScoped<IOrderRepository, OrderRepository>();
         services.AddScoped<IBillingOrderRepository, BillingOrderRepository>();
         services.AddScoped<IPaymentTransactionRepository, PaymentTransactionRepository>();
+        services.AddScoped<IOutboxMessageRepository, OutboxMessageRepository>();
         services.AddScoped<ITenantRepository, TenantRepository>();
         services.AddScoped<ICustomerRepository, CustomerRepository>();
 
@@ -47,6 +53,7 @@ public static class DependencyInjection
         services.AddScoped<ICloudinaryService, CloudinaryService>();
         services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<IFaceVerificationService, FacePlusPlusVerificationService>();
+        services.AddScoped<IEventPublisher, RabbitMqEventPublisher>();
 
         return services;
     }

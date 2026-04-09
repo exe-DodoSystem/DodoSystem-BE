@@ -91,6 +91,20 @@ public class AttendanceController : ControllerBase
         }
     }
 
+        [HttpGet("today")]
+    public async Task<ActionResult<TodayAttendanceDto?>> GetTodayStatus()
+    {
+        try
+        {
+            var result = await _service.GetTodayStatusAsync();
+            return Ok(result); // null nếu chưa check-in là bình thường
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return StatusCode(403, new { error = "Bạn không có quyền truy cập" });
+        }
+    }
+
     [HttpGet("my-history")]
     public async Task<ActionResult<List<AttendanceDto>>> GetMyHistory(
         [FromQuery] DateOnly from, [FromQuery] DateOnly to)

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SMEFLOWSystem.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using SMEFLOWSystem.Infrastructure.Data;
 namespace SMEFLOWSystem.Infrastructure.Migrations
 {
     [DbContext(typeof(SMEFLOWSystemContext))]
-    partial class SMEFLOWSystemContextModelSnapshot : ModelSnapshot
+    [Migration("20260409094015_AddPayrollFieldsAndStatus")]
+    partial class AddPayrollFieldsAndStatus
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -702,96 +705,6 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                     b.ToTable("OrderItems");
                 });
 
-            modelBuilder.Entity("SMEFLOWSystem.Core.Entities.OutboxMessage", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
-
-                    b.Property<string>("CorrelationId")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("(getutcdate())");
-
-                    b.Property<Guid>("EventId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("EventType")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<string>("Exchange")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<string>("LastError")
-                        .HasMaxLength(4000)
-                        .HasColumnType("nvarchar(4000)");
-
-                    b.Property<DateTime?>("NextAttemptOnUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("OccurredOnUtc")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("(getutcdate())");
-
-                    b.Property<string>("Payload")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("ProcessedOnUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("RetryCount")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(0);
-
-                    b.Property<string>("RoutingKey")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)")
-                        .HasDefaultValue("Pending");
-
-                    b.Property<Guid?>("TenantId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id")
-                        .HasName("PK_OutboxMessages");
-
-                    b.HasIndex("EventId")
-                        .IsUnique()
-                        .HasDatabaseName("UX_OutboxMessages_EventId");
-
-                    b.HasIndex("OccurredOnUtc")
-                        .HasDatabaseName("IX_OutboxMessages_OccurredOnUtc");
-
-                    b.HasIndex("Status", "NextAttemptOnUtc")
-                        .HasDatabaseName("IX_OutboxMessages_Status_NextAttemptOnUtc");
-
-                    b.HasIndex("TenantId", "Status")
-                        .HasDatabaseName("IX_OutboxMessages_TenantId_Status");
-
-                    b.ToTable("OutboxMessages", (string)null);
-                });
-
             modelBuilder.Entity("SMEFLOWSystem.Core.Entities.PaymentTransaction", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1408,15 +1321,6 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                         .HasConstraintName("FK_OrderItems_Orders");
 
                     b.Navigation("Order");
-                });
-
-            modelBuilder.Entity("SMEFLOWSystem.Core.Entities.OutboxMessage", b =>
-                {
-                    b.HasOne("SMEFLOWSystem.Core.Entities.Tenant", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .HasConstraintName("FK_OutboxMessages_Tenants");
                 });
 
             modelBuilder.Entity("SMEFLOWSystem.Core.Entities.PaymentTransaction", b =>

@@ -49,6 +49,10 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             {
                 return BadRequest(new { error = ex.Message });
             }
+            catch (InvalidOperationException ex)
+            {
+                return StatusCode(500, new { error = ex.Message });
+            }
         }
 
         [Authorize(Roles = "TenantAdmin")]

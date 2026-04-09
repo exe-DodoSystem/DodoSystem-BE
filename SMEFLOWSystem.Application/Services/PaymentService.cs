@@ -13,6 +13,7 @@ using VNPAY.NET.Models;
 using VNPAY.NET.Utilities;
 using System.Globalization;
 using System.Security.Cryptography;
+using SMEFLOWSystem.Application.Events.Payments;
 
 namespace SMEFLOWSystem.Application.Services
 {
@@ -29,6 +30,7 @@ namespace SMEFLOWSystem.Application.Services
         private readonly ITransaction _transaction;
         private readonly IBackgroundJobClient _backgroundJobClient;
         private readonly IUserRepository _userRepo;
+        private readonly IOutboxMessageRepository _outboxMessageRepo;
         private readonly IConfiguration _config;
         private readonly IVnpay _vnpay;
 
@@ -43,6 +45,7 @@ namespace SMEFLOWSystem.Application.Services
             IBackgroundJobClient backgroundJobClient,
             IConfiguration configuration,
             IUserRepository userRepo,
+            IOutboxMessageRepository outboxMessageRepo,
             IVnpay vnpay)
         {
             _billingOrderRepo = billingOrderRepo;
@@ -55,6 +58,7 @@ namespace SMEFLOWSystem.Application.Services
             _config = configuration;
             _backgroundJobClient = backgroundJobClient;
             _userRepo = userRepo;
+            _outboxMessageRepo = outboxMessageRepo;
             _vnpay = vnpay;
         }
 
@@ -168,6 +172,39 @@ namespace SMEFLOWSystem.Application.Services
                         order.PaymentStatus = StatusEnum.PaymentPaid;
                         order.Status = StatusEnum.OrderCompleted;
                         shouldEnqueueActivation = true;
+
+                        var paymentSucceededEvent = new PaymentSucceededEvent
+                        {
+                            BillingOrderId = order.Id,
+                            TenantId = order.TenantId,
+                            Gateway = GatewayVNPay,
+                            GatewayTransactionId = gatewayTransactionId,
+                            Amount = amount,
+                            Currency = "VND",
+                            CorrelationId = order.Id.ToString()
+                        };
+
+                        var exchange = _config["RabbitMQ:Exchange"] ?? "smeflow.exchange";
+                        var routingKey = _config["RabbitMQ:RoutingKeys:PaymentSucceeded"] ?? "payment.succeeded";
+
+                        var outboxMessage = new OutboxMessage
+                        {
+                            Id = Guid.NewGuid(),
+                            TenantId = order.TenantId,
+                            EventId = paymentSucceededEvent.EventId,
+                            EventType = nameof(PaymentSucceededEvent),
+                            Exchange = exchange,
+                            RoutingKey = routingKey,
+                            Payload = JsonConvert.SerializeObject(paymentSucceededEvent),
+                            CorrelationId = paymentSucceededEvent.CorrelationId,
+                            Status = "Pending",
+                            RetryCount = 0,
+                            OccurredOnUtc = DateTime.UtcNow,
+                            NextAttemptOnUtc = DateTime.UtcNow,
+                            CreatedAt = DateTime.UtcNow
+                        };
+
+                        await _outboxMessageRepo.AddAsync(outboxMessage);
                     }
                 }
                 else
