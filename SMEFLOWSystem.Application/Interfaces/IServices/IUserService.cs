@@ -21,5 +21,6 @@ namespace SMEFLOWSystem.Application.Interfaces.IServices
         Task<UserDto> CreateAsync(UserCreatedDto user, Guid tenantId);
         Task<UserDto> InvitedUserAsync(UserCreatedDto user, Guid tenantId);
         Task SetUserRoleAsync(Guid userId, List<int> roleIds);
+        Task<UserDto> UpdateAvatarAsync(Guid userId, Stream imageStream, string fileName);
     }
 }

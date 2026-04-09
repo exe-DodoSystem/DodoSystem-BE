@@ -702,6 +702,96 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                     b.ToTable("OrderItems");
                 });
 
+            modelBuilder.Entity("SMEFLOWSystem.Core.Entities.OutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("(newsequentialid())");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("(getutcdate())");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("Exchange")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<DateTime?>("NextAttemptOnUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("OccurredOnUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("(getutcdate())");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ProcessedOnUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("RetryCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<string>("RoutingKey")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("Pending");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id")
+                        .HasName("PK_OutboxMessages");
+
+                    b.HasIndex("EventId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_OutboxMessages_EventId");
+
+                    b.HasIndex("OccurredOnUtc")
+                        .HasDatabaseName("IX_OutboxMessages_OccurredOnUtc");
+
+                    b.HasIndex("Status", "NextAttemptOnUtc")
+                        .HasDatabaseName("IX_OutboxMessages_Status_NextAttemptOnUtc");
+
+                    b.HasIndex("TenantId", "Status")
+                        .HasDatabaseName("IX_OutboxMessages_TenantId_Status");
+
+                    b.ToTable("OutboxMessages", (string)null);
+                });
+
             modelBuilder.Entity("SMEFLOWSystem.Core.Entities.PaymentTransaction", b =>
                 {
                     b.Property<Guid>("Id")
@@ -766,6 +856,15 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasDefaultValueSql("(newsequentialid())");
 
+                    b.Property<int>("AbsentDays")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ActualWorkingDays")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("BasePay")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<decimal>("BaseSalarySnapshot")
                         .HasColumnType("decimal(18, 2)");
 
@@ -779,7 +878,7 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                         .HasColumnType("datetime2")
                         .HasDefaultValueSql("(getdate())");
 
-                    b.Property<decimal?>("Deduction")
+                    b.Property<decimal>("Deduction")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("decimal(18, 2)")
                         .HasDefaultValue(0m);
@@ -794,6 +893,9 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
+                    b.Property<int>("StandardWorkingDays")
+                        .HasColumnType("int");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -804,14 +906,17 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<int>("TotalEarlyLeaveMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TotalLateMinutes")
+                        .HasColumnType("int");
+
                     b.Property<decimal>("TotalSalary")
                         .HasColumnType("decimal(18, 2)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<int>("WorkingDays")
-                        .HasColumnType("int");
 
                     b.Property<int>("Year")
                         .HasColumnType("int");
@@ -1303,6 +1408,15 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                         .HasConstraintName("FK_OrderItems_Orders");
 
                     b.Navigation("Order");
+                });
+
+            modelBuilder.Entity("SMEFLOWSystem.Core.Entities.OutboxMessage", b =>
+                {
+                    b.HasOne("SMEFLOWSystem.Core.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("FK_OutboxMessages_Tenants");
                 });
 
             modelBuilder.Entity("SMEFLOWSystem.Core.Entities.PaymentTransaction", b =>

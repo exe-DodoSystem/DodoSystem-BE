@@ -2,6 +2,7 @@ using AutoMapper;
 using ShareKernel.Common.Enum;
 using SharedKernel.DTOs;
 using SMEFLOWSystem.Application.DTOs.HRDtos;
+using SMEFLOWSystem.Application.Extensions;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Application.Interfaces.IServices;
 using SMEFLOWSystem.Core.Entities;
@@ -11,10 +12,6 @@ namespace SMEFLOWSystem.Application.Services;
 
 public class HrEmployeeService : IHrEmployeeService
 {
-    private const string RoleTenantAdmin = "TenantAdmin";
-    private const string RoleManager = "Manager";
-    private const string RoleHrManager = "HRManager";
-
     private readonly IEmployeeRepository _employeeRepo;
     private readonly IDepartmentRepository _departmentRepo;
     private readonly IPositionRepository _positionRepo;
@@ -37,7 +34,7 @@ public class HrEmployeeService : IHrEmployeeService
 
     public async Task<PagedResultDto<EmployeeDto>> GetPagedAsync(EmployeeQueryDto query)
     {
-        EnsureHrAccess();
+        _currentUser.EnsureHrAccess();
 
         Guid? departmentId = query.DepartmentId;
         if (IsManagerScoped())
@@ -70,7 +67,7 @@ public class HrEmployeeService : IHrEmployeeService
 
     public async Task<EmployeeDto> GetByIdAsync(Guid id)
     {
-        EnsureHrAccess();
+        _currentUser.EnsureHrAccess();
         var emp = await _employeeRepo.GetByIdAsync(id) ?? throw new KeyNotFoundException("Employee not found");
         await EnsureEmployeeAccessibleAsync(emp);
         return _mapper.Map<EmployeeDto>(emp);
@@ -78,7 +75,7 @@ public class HrEmployeeService : IHrEmployeeService
 
     public async Task<EmployeeDto> CreateAsync(EmployeeCreateDto request)
     {
-        EnsureHrAccess();
+        _currentUser.EnsureHrAccess();
 
         if (IsManagerScoped())
         {
@@ -107,7 +104,7 @@ public class HrEmployeeService : IHrEmployeeService
 
     public async Task<EmployeeDto> UpdateAsync(Guid id, EmployeeUpdateDto request)
     {
-        EnsureHrAccess();
+        _currentUser.EnsureHrAccess();
         var emp = await _employeeRepo.GetByIdAsync(id) ?? throw new KeyNotFoundException("Employee not found");
         await EnsureEmployeeAccessibleAsync(emp);
 
@@ -150,7 +147,7 @@ public class HrEmployeeService : IHrEmployeeService
 
     public async Task DeleteAsync(Guid id)
     {
-        EnsureHrAccess();
+        _currentUser.EnsureHrAccess();
         var emp = await _employeeRepo.GetByIdAsync(id) ?? throw new KeyNotFoundException("Employee not found");
         await EnsureEmployeeAccessibleAsync(emp);
 
@@ -161,21 +158,12 @@ public class HrEmployeeService : IHrEmployeeService
         await _employeeRepo.UpdateAsync(emp);
     }
 
-    private void EnsureHrAccess()
-    {
-        if (_currentUser.UserId == null) throw new UnauthorizedAccessException("Unauthenticated");
-        if (!IsTenantAdmin() && !IsHrManager() && !IsManager()) throw new UnauthorizedAccessException("Forbidden");
-    }
-
-    private bool IsTenantAdmin() => _currentUser.IsInRole(RoleTenantAdmin);
-    private bool IsHrManager() => _currentUser.IsInRole(RoleHrManager);
-    private bool IsManager() => _currentUser.IsInRole(RoleManager);
-
-    private bool IsManagerScoped() => IsManager() && !IsTenantAdmin() && !IsHrManager();
+    // Manager scoped = Manager role AND not Admin
+    private bool IsManagerScoped() => _currentUser.IsManager() && !_currentUser.IsAdmin();
 
     private async Task<Guid> GetManagerDepartmentIdOrThrowAsync()
     {
-        var userId = _currentUser.UserId ?? throw new UnauthorizedAccessException("Unauthenticated");
+        var userId = _currentUser.RequireUserId();
         var emp = await _employeeRepo.GetByUserIdAsync(userId);
         if (emp == null || !emp.DepartmentId.HasValue || !emp.PositionId.HasValue)
             throw new UnauthorizedAccessException("Bạn chưa được gán phòng ban/chức vụ");
@@ -184,7 +172,7 @@ public class HrEmployeeService : IHrEmployeeService
 
     private async Task EnsureEmployeeAccessibleAsync(Employee employee)
     {
-        if (IsTenantAdmin() || IsHrManager()) return;
+        if (_currentUser.IsAdmin()) return;
         if (IsManagerScoped())
         {
             var myDeptId = await GetManagerDepartmentIdOrThrowAsync();

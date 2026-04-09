@@ -21,20 +21,22 @@ namespace SMEFLOWSystem.Application.Services
         private readonly IUserRoleRepository _userRoleRepository;
         private readonly IMapper _mapper;
         private readonly IEmailService _emailService;
-            
+        private readonly ICloudinaryService _cloudinary;
 
         public UserService(
             IUserRepository userRepository,
             IRoleRepository roleRepository,
             IUserRoleRepository userRoleRepository,
             IMapper mapper,
-            IEmailService emailService)
+            IEmailService emailService,
+            ICloudinaryService cloudinary)
         {
             _userRepository = userRepository;
             _roleRepository = roleRepository;
             _userRoleRepository = userRoleRepository;
             _mapper = mapper;
             _emailService = emailService;
+            _cloudinary = cloudinary;
         }
 
         public async Task<UserDto> CreateAsync(UserCreatedDto user, Guid tenantId)
@@ -189,6 +191,27 @@ namespace SMEFLOWSystem.Application.Services
             {
                 throw new ArgumentException($"User with id {id} is not existed");
             }
+        }
+
+        public async Task<UserDto> UpdateAvatarAsync(Guid userId, Stream imageStream, string fileName)
+        {
+            var user = await _userRepository.GetUserByIdAsync(userId)
+                ?? throw new ArgumentException($"User with id {userId} is not existed");
+
+            // Xóa avatar cũ nếu có
+            if (!string.IsNullOrEmpty(user.AvatarUrl))
+            {
+                try { await _cloudinary.DeleteAsync(user.AvatarUrl); } catch { }
+            }
+
+            // Upload avatar mới
+            var avatarUrl = await _cloudinary.UploadFileAsync(imageStream, fileName, "avatars");
+
+            user.AvatarUrl = avatarUrl;
+            user.UpdatedAt = DateTime.UtcNow;
+            await _userRepository.UpdateUserAsync(user);
+
+            return _mapper.Map<UserDto>(user);
         }
     }
 }

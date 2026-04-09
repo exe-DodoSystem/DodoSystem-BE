@@ -25,11 +25,12 @@ public partial class SMEFLOWSystemContext : DbContext
     public virtual DbSet<Customer> Customers { get; set; }
     public virtual DbSet<Department> Departments { get; set; }
     public virtual DbSet<Employee> Employees { get; set; }
-    public virtual DbSet<Invite> Invites { get; set; }  // Thêm DbSet cho Invite
+    public virtual DbSet<Invite> Invites { get; set; }  
     public virtual DbSet<BillingOrder> BillingOrders { get; set; }
     public virtual DbSet<BillingOrderModule> BillingOrderModules { get; set; }
     public virtual DbSet<Module> Modules { get; set; }
     public virtual DbSet<ModuleSubscription> ModuleSubscriptions { get; set; }
+    public virtual DbSet<OutboxMessage> OutboxMessages { get; set; }
     public virtual DbSet<Order> Orders { get; set; }
     public virtual DbSet<OrderItem> OrderItems { get; set; }
     public virtual DbSet<PaymentTransaction> PaymentTransactions { get; set; }
@@ -88,15 +89,15 @@ public partial class SMEFLOWSystemContext : DbContext
             entity.HasKey(e => e.Id).HasName("PK__Customer__3214EC07B17A5536");
             entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
             entity.Property(e => e.Address).HasMaxLength(500);
-            entity.Property(e => e.CompanyName).HasMaxLength(255);  // Nullable
+            entity.Property(e => e.CompanyName).HasMaxLength(255); 
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.Email).HasMaxLength(100);  // Nullable
+            entity.Property(e => e.Email).HasMaxLength(100); 
             entity.Property(e => e.IsDeleted).HasDefaultValue(false);
             entity.Property(e => e.Name)
                 .IsRequired()
                 .HasMaxLength(255);
             entity.Property(e => e.Notes).HasMaxLength(500);
-            entity.Property(e => e.Phone).HasMaxLength(50);  // Nullable
+            entity.Property(e => e.Phone).HasMaxLength(50);  
             entity.Property(e => e.Type)
                 .IsRequired()
                 .HasMaxLength(20)
@@ -130,12 +131,12 @@ public partial class SMEFLOWSystemContext : DbContext
             entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
             entity.Property(e => e.BaseSalary).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.Email).HasMaxLength(100);  // Nullable
+            entity.Property(e => e.Email).HasMaxLength(100);  
             entity.Property(e => e.FullName)
                 .IsRequired()
                 .HasMaxLength(255);
             entity.Property(e => e.IsDeleted).HasDefaultValue(false);
-            entity.Property(e => e.Phone).HasMaxLength(50);  // Nullable
+            entity.Property(e => e.Phone).HasMaxLength(50);  
             entity.Property(e => e.Status)
                 .IsRequired()
                 .HasMaxLength(30)
@@ -444,6 +445,76 @@ public partial class SMEFLOWSystemContext : DbContext
                 .HasForeignKey(d => d.TenantId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_Positions_Tenants");
+        });
+
+        modelBuilder.Entity<OutboxMessage>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK_OutboxMessages");
+
+            entity.ToTable("OutboxMessages");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+
+            entity.Property(e => e.EventId).IsRequired();
+
+            entity.Property(e => e.EventType)
+                .IsRequired()
+                .HasMaxLength(255);
+
+            entity.Property(e => e.Exchange)
+                .IsRequired()
+                .HasMaxLength(150);
+
+            entity.Property(e => e.RoutingKey)
+                .IsRequired()
+                .HasMaxLength(150);
+
+            entity.Property(e => e.Payload)
+                .IsRequired();
+
+            entity.Property(e => e.CorrelationId)
+                .HasMaxLength(128);
+
+            entity.Property(e => e.Status)
+                .IsRequired()
+                .HasMaxLength(20)
+                .HasDefaultValue("Pending");
+
+            entity.Property(e => e.RetryCount)
+                .HasDefaultValue(0);
+
+            entity.Property(e => e.OccurredOnUtc)
+                .HasDefaultValueSql("(getutcdate())");
+
+            entity.Property(e => e.NextAttemptOnUtc);
+            entity.Property(e => e.ProcessedOnUtc);
+
+            entity.Property(e => e.LastError)
+                .HasMaxLength(4000);
+
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getutcdate())");
+
+            entity.Property(e => e.UpdatedAt);
+
+            entity.HasIndex(e => e.EventId)
+                .HasDatabaseName("UX_OutboxMessages_EventId")
+                .IsUnique();
+
+            entity.HasIndex(e => new { e.Status, e.NextAttemptOnUtc })
+                .HasDatabaseName("IX_OutboxMessages_Status_NextAttemptOnUtc");
+
+            entity.HasIndex(e => e.OccurredOnUtc)
+                .HasDatabaseName("IX_OutboxMessages_OccurredOnUtc");
+
+            entity.HasIndex(e => new { e.TenantId, e.Status })
+                .HasDatabaseName("IX_OutboxMessages_TenantId_Status");
+
+            entity.HasOne<Tenant>()
+                .WithMany()
+                .HasForeignKey(e => e.TenantId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("FK_OutboxMessages_Tenants");
         });
 
         modelBuilder.Entity<Role>(entity =>

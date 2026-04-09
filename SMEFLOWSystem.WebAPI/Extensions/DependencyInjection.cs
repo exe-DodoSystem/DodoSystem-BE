@@ -61,6 +61,9 @@ public static class DependencyInjection
         services.AddAuthorization();
 
         services.Configure<EmailSettings>(configuration.GetSection("EmailSettings"));
+        services.Configure<CloudinarySettings>(configuration.GetSection("Cloudinary"));
+        services.Configure<FacePlusPlusSettings>(configuration.GetSection("FacePlusPlus"));
+        services.AddHttpClient("FacePlusPlus");
         services.PostConfigure<EmailSettings>(options =>
         {
             if (string.IsNullOrWhiteSpace(options.FromName))

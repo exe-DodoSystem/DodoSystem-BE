@@ -1,5 +1,6 @@
 using AutoMapper;
 using SMEFLOWSystem.Application.DTOs.HRDtos;
+using SMEFLOWSystem.Application.Extensions;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Application.Interfaces.IServices;
 using SMEFLOWSystem.Core.Entities;
@@ -9,10 +10,6 @@ namespace SMEFLOWSystem.Application.Services;
 
 public class HrDepartmentService : IHrDepartmentService
 {
-    private const string RoleTenantAdmin = "TenantAdmin";
-    private const string RoleManager = "Manager";
-    private const string RoleHrManager = "HRManager";
-
     private readonly IDepartmentRepository _departmentRepo;
     private readonly IEmployeeRepository _employeeRepo;
     private readonly ICurrentUserService _currentUser;
@@ -32,9 +29,9 @@ public class HrDepartmentService : IHrDepartmentService
 
     public async Task<List<DepartmentDto>> GetAccessibleAsync()
     {
-        EnsureHrAccess();
+        _currentUser.EnsureHrAccess();
 
-        if (IsAdmin())
+        if (_currentUser.IsAdmin())
         {
             var all = await _departmentRepo.GetAllAsync();
             return _mapper.Map<List<DepartmentDto>>(all);
@@ -47,7 +44,7 @@ public class HrDepartmentService : IHrDepartmentService
 
     public async Task<DepartmentDto> CreateAsync(DepartmentCreateDto request)
     {
-        EnsureAdmin();
+        _currentUser.EnsureAdmin();
         var entity = _mapper.Map<Department>(request);
         entity.Id = Guid.NewGuid();
         entity.CreatedAt = DateTime.UtcNow;
@@ -59,7 +56,7 @@ public class HrDepartmentService : IHrDepartmentService
 
     public async Task<DepartmentDto> UpdateAsync(Guid id, DepartmentUpdateDto request)
     {
-        EnsureAdmin();
+        _currentUser.EnsureAdmin();
         var dept = await _departmentRepo.GetByIdAsync(id) ?? throw new KeyNotFoundException("Department not found");
         dept.Name = request.Name;
         dept.UpdatedAt = DateTime.UtcNow;
@@ -69,7 +66,7 @@ public class HrDepartmentService : IHrDepartmentService
 
     public async Task DeleteAsync(Guid id)
     {
-        EnsureAdmin();
+        _currentUser.EnsureAdmin();
         var dept = await _departmentRepo.GetByIdAsync(id) ?? throw new KeyNotFoundException("Department not found");
         var hasEmployees = await _departmentRepo.HasEmployeesAsync(id);
         if (hasEmployees)
@@ -78,24 +75,9 @@ public class HrDepartmentService : IHrDepartmentService
         await _departmentRepo.SoftDeleteAsync(dept);
     }
 
-    private void EnsureHrAccess()
-    {
-        if (_currentUser.UserId == null) throw new UnauthorizedAccessException("Unauthenticated");
-        if (!IsAdmin() && !IsManager()) throw new UnauthorizedAccessException("Forbidden");
-    }
-
-    private void EnsureAdmin()
-    {
-        EnsureHrAccess();
-        if (!IsAdmin()) throw new UnauthorizedAccessException("Forbidden");
-    }
-
-    private bool IsAdmin() => _currentUser.IsInRole(RoleTenantAdmin);
-    private bool IsManager() => _currentUser.IsInRole(RoleManager) || _currentUser.IsInRole(RoleHrManager);
-
     private async Task<Guid> GetManagerDepartmentIdOrThrowAsync()
     {
-        var userId = _currentUser.UserId ?? throw new UnauthorizedAccessException("Unauthenticated");
+        var userId = _currentUser.RequireUserId();
         var emp = await _employeeRepo.GetByUserIdAsync(userId);
         if (emp == null || !emp.DepartmentId.HasValue || !emp.PositionId.HasValue)
             throw new UnauthorizedAccessException("Bạn chưa được gán phòng ban/chức vụ");

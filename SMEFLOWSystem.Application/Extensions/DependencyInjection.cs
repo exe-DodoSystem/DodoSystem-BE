@@ -39,7 +39,7 @@ public static class DependencyInjection
         services.AddSingleton<IVnpay, Vnpay>();
         services.AddScoped<IPaymentService, PaymentService>();
         services.AddScoped<IBillingService, BillingService>();
-        services.AddScoped<IEmailService, EmailService>();
+
         services.AddScoped<TenantExpirationRecurringJob>();
         services.AddScoped<IOTPService, OTPService>();
         services.AddScoped<IRefreshTokenService, RefreshTokenService>();
@@ -48,9 +48,10 @@ public static class DependencyInjection
         services.AddScoped<IHrPositionService, HrPositionService>();
         services.AddScoped<IHrEmployeeService, HrEmployeeService>();
 
+        services.AddScoped<IAttendanceService, AttendanceService>();
+
         services.AddScoped<ISystemBootstrapService, SystemBootstrapService>();
         services.AddScoped<ISystemTenantService, SystemTenantService>();
-
         return services;
     }
 }

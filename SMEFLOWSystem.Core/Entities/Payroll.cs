@@ -18,22 +18,25 @@ public partial class Payroll : ITenantEntity
 
     public int Year { get; set; }
 
-    public decimal BaseSalarySnapshot { get; set; }
+    public int StandardWorkingDays { get; set; }      // Số ngày công chuẩn trong tháng
+    public int ActualWorkingDays { get; set; }        // Số ngày đi làm thực tế
+    public int TotalLateMinutes { get; set; }         // Tổng phút đi trễ
+    public int TotalEarlyLeaveMinutes { get; set; }   // Tổng phút về sớm
+    public int AbsentDays { get; set; }               // Số ngày vắng mặt
 
-    public int WorkingDays { get; set; }
+    public decimal BaseSalarySnapshot { get; set; }   // Lương cơ bản snapshot
+    public decimal BasePay { get; set; }              // Lương sau khi tính prorated (BaseSalary * tỷ lệ ngày làm)
 
-    public decimal? Bonus { get; set; }
+    public decimal? Bonus { get; set; }               // Thưởng (Admin nhập tay)
+    public decimal Deduction { get; set; }            // Tổng phạt (tự động tính từ late + early leave)
 
-    public decimal? Deduction { get; set; }
+    public decimal TotalSalary { get; set; }          // Lương thực nhận cuối cùng
 
-    public decimal TotalSalary { get; set; }
+    public string Status { get; set; } = "Draft";     // Draft, Approved, Paid, Rejected
 
-    public string Status { get; set; }
-
-    public string Notes { get; set; }
+    public string? Notes { get; set; }                // Ghi chú (ví dụ: lý do phạt, thưởng)
 
     public DateTime? CreatedAt { get; set; }
-
     public DateTime? UpdatedAt { get; set; }
 
     public virtual Employee Employee { get; set; }

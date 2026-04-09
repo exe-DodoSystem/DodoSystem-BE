@@ -26,6 +26,7 @@ public class EmployeeRepository : IEmployeeRepository
     public Task<Employee?> GetByUserIdAsync(Guid userId)
     {
         return _context.Employees
+            .Include(e => e.User)
             .FirstOrDefaultAsync(e => e.UserId == userId);
     }
 

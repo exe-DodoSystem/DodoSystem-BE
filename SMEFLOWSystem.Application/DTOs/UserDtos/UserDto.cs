@@ -10,6 +10,7 @@ namespace SMEFLOWSystem.Application.DTOs.UserDtos
     {
         public string FullName { get; set; } = string.Empty;
         public string Phone { get; set; } = string.Empty;
+        public string? AvatarUrl { get; set; }
         public bool IsActive { get; set; }
         public bool IsDeleted { get; set; }
 

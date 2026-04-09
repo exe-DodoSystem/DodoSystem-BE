@@ -58,8 +58,8 @@ wwwroot/dist/
 node_modules/
 
 # Appsettings (nếu không muốn commit config)
-appsettings.Development.json
-appsettings.json
+# appsettings.Development.json
+# appsettings.json
 
 # Dumps
 *.stackdump
