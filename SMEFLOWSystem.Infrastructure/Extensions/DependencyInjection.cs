@@ -5,6 +5,7 @@ using SMEFLOWSystem.Application.Abstractions.Messaging;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Application.Interfaces.IServices;
 using SMEFLOWSystem.Infrastructure.Data;
+using SMEFLOWSystem.Infrastructure.Messaging.Consumers;
 using SMEFLOWSystem.Infrastructure.Messaging.RabbitMQ;
 using SMEFLOWSystem.Infrastructure.Repositories;
 using SMEFLOWSystem.Infrastructure.Services;
@@ -33,6 +34,7 @@ public static class DependencyInjection
         services.AddScoped<IOrderRepository, OrderRepository>();
         services.AddScoped<IBillingOrderRepository, BillingOrderRepository>();
         services.AddScoped<IPaymentTransactionRepository, PaymentTransactionRepository>();
+        services.AddScoped<IProcessedEventRepository, ProcessedEventRepository>();
         services.AddScoped<IOutboxMessageRepository, OutboxMessageRepository>();
         services.AddScoped<ITenantRepository, TenantRepository>();
         services.AddScoped<ICustomerRepository, CustomerRepository>();
@@ -54,6 +56,8 @@ public static class DependencyInjection
         services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<IFaceVerificationService, FacePlusPlusVerificationService>();
         services.AddScoped<IEventPublisher, RabbitMqEventPublisher>();
+        services.AddScoped<IRabbitMessageHandler, PaymentSucceededConsumer>();
+        services.AddScoped<IRabbitMessageHandler, EmailSendConsumer>();
 
         return services;
     }

@@ -53,5 +53,11 @@ namespace ShareKernel.Common.Enum
         public const string PayrollPaid = "Paid";
         public const string PayrollRejected = "Rejected";
 
+        // Outbox Message Status
+        public const string OutboxPending = "Pending";
+        public const string OutboxProcessed = "Processed";
+        public const string OutboxFailed = "Failed";
+        public const string OutboxProcessing = "Processing";
+
     }
 }

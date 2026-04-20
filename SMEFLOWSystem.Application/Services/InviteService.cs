@@ -105,7 +105,9 @@ namespace SMEFLOWSystem.Application.Services
             await _emailService.SendEmailAsync(
                 email,
                 "Lời mời tham gia SMEFLOW System",
-                $"<p>Bạn được mời tham gia hệ thống.</p><p>Mã/Link onboarding: <strong>{tokenText}</strong></p><p>{message}</p>");
+                $"<p>Bạn được mời tham gia hệ thống.</p><p>Mã/Link onboarding: <strong>{tokenText}</strong></p><p>{message}</p>",
+                CancellationToken.None
+                );
         }
 
         private async Task<Invite> ValidateTokenInternalAsync(string token)

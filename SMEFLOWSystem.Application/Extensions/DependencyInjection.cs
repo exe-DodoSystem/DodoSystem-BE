@@ -18,6 +18,7 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
+        
         services.AddAutoMapper(typeof(RoleMappingProfile).Assembly);
 
         services.AddValidatorsFromAssemblyContaining<RegisterRequestDtoValidator>();
@@ -38,6 +39,7 @@ public static class DependencyInjection
         services.AddScoped<IBillingOrderService, BillingOrderService>();
         services.AddSingleton<IVnpay, Vnpay>();
         services.AddScoped<IPaymentService, PaymentService>();
+        services.AddScoped<IPostPaymentSubscriptionService, PostPaymentSubscriptionService>();
         services.AddScoped<IBillingService, BillingService>();
 
         services.AddScoped<TenantExpirationRecurringJob>();
