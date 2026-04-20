@@ -137,7 +137,8 @@ namespace SMEFLOWSystem.Application.Services
             await _emailService.SendEmailAsync(
                     newUser.Email,
                     "Lời mời kích hoạt tài khoản DodoSystem",
-                    $"<h3>Chúc mừng {newUser.FullName}!</h3><p>Tài khoản của bạn đã được đăng ký.</p><p>Bạn có thể đăng nhập ngay bây giờ.</p>"
+                    $"<h3>Chúc mừng {newUser.FullName}!</h3><p>Tài khoản của bạn đã được đăng ký.</p><p>Bạn có thể đăng nhập ngay bây giờ.</p>",
+                    CancellationToken.None
                 );
 
             return _mapper.Map<UserDto>(newUser);

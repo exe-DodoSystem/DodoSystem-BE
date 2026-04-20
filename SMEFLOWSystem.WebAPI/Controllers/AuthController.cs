@@ -75,7 +75,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
         }
 
         [HttpPost("forgot-password")]
-        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequestDto request)
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequestDto request, CancellationToken cancellationToken)
         {
             var user = await _userService.GetUserByEmailAsync(request.Email);
             if (user == null)
@@ -83,7 +83,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
 
             var otp = _otpService.GenerateOtp();
             await _otpService.StoreOtpAsync(request.Email, otp);
-            await _emailService.SendOtpEmailAsync(request.Email, otp);
+            await _emailService.SendOtpEmailAsync(request.Email, otp, cancellationToken);
 
             return Ok("OTP đã được gửi đến email của bạn");
         }

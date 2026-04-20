@@ -1,0 +1,29 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: smeflow-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: always
+
+  redis:
+    image: redis:7
+    container_name: smeflow-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: always
+
+volumes:
+  rabbitmq_data:
+  redis_data:

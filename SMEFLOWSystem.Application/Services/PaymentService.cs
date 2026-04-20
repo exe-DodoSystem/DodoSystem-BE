@@ -135,7 +135,6 @@ namespace SMEFLOWSystem.Application.Services
                 .ToDictionary(q => q.Key, q => q.Value.ToString());
 
             // Process transactionally
-            var shouldEnqueueActivation = false;
             await _transaction.ExecuteAsync(async () =>
             {
                 var existingInside = await _paymentTransactionRepo.GetByGatewayTransactionIdAsync(
@@ -171,8 +170,6 @@ namespace SMEFLOWSystem.Application.Services
                     {
                         order.PaymentStatus = StatusEnum.PaymentPaid;
                         order.Status = StatusEnum.OrderCompleted;
-                        shouldEnqueueActivation = true;
-
                         var paymentSucceededEvent = new PaymentSucceededEvent
                         {
                             BillingOrderId = order.Id,
@@ -197,7 +194,7 @@ namespace SMEFLOWSystem.Application.Services
                             RoutingKey = routingKey,
                             Payload = JsonConvert.SerializeObject(paymentSucceededEvent),
                             CorrelationId = paymentSucceededEvent.CorrelationId,
-                            Status = "Pending",
+                            Status = StatusEnum.OutboxPending,
                             RetryCount = 0,
                             OccurredOnUtc = DateTime.UtcNow,
                             NextAttemptOnUtc = DateTime.UtcNow,
@@ -219,11 +216,8 @@ namespace SMEFLOWSystem.Application.Services
                 await _billingOrderRepo.UpdateIgnoreTenantAsync(order);
             });
 
-            // Nếu thanh toán thành công, dùng Hangfire để active Tenant và Owner (background job để không block callback)
-            if (shouldEnqueueActivation)
-            {
-                _backgroundJobClient.Enqueue(() => ActivateTenantAfterPaymentAsync(orderId, gatewayTransactionId));
-            }
+            // Đã chuyển sang luồng RabbitMQ + Outbox (PaymentSucceededConsumer),
+            // không enqueue xử lý cũ qua Hangfire để tránh xử lý trùng.
 
             return status;
         }
@@ -349,7 +343,8 @@ namespace SMEFLOWSystem.Application.Services
                 await _emailService.SendEmailAsync(
                     ownerEmail,
                     "Thanh toán thành công - Kích hoạt tài khoản SMEFLOW",
-                    $"<h3>Chúc mừng {tenantName}!</h3><p>Tài khoản của bạn đã được kích hoạt.</p><p>Mã giao dịch: {transactionId}</p><p>Bạn có thể đăng nhập ngay bây giờ.</p>"
+                    $"<h3>Chúc mừng {tenantName}!</h3><p>Tài khoản của bạn đã được kích hoạt.</p><p>Mã giao dịch: {transactionId}</p><p>Bạn có thể đăng nhập ngay bây giờ.</p>",
+                    CancellationToken.None
                 );
             }
         }

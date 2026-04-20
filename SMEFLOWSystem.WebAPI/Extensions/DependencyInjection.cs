@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using SMEFLOWSystem.Core.Config;
+using SMEFLOWSystem.WebAPI.BackgroundServices;
 using System.Security.Claims;
 using System.Text;
 
@@ -19,7 +20,8 @@ public static class DependencyInjection
         ValidateConfiguration(configuration);
         services.AddDistributedMemoryCache();
         services.AddMemoryCache();
-
+        services.AddHostedService<OutboxPublisherHostedService>();
+        services.AddHostedService<RabbitMqSubscriberHostedService>();
         services.AddControllers();
         services.AddFluentValidationAutoValidation();
         services.AddEndpointsApiExplorer();

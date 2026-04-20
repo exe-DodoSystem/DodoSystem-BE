@@ -1,7 +1,13 @@
 using Hangfire;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
+using Newtonsoft.Json;
+using ShareKernel.Common.Enum;
+using SMEFLOWSystem.Application.Events.Notification;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Application.Interfaces.IServices;
+using SMEFLOWSystem.Core.Entities;
+using SMEFLOWSystem.SharedKernel.Interfaces;
 using System;
 using System.Globalization;
 using System.Linq;
@@ -18,14 +24,22 @@ namespace SMEFLOWSystem.Application.Services
         private readonly IBillingOrderModuleRepository _billingOrderModuleRepo;
         private readonly IModuleRepository _moduleRepo;
         private readonly IBackgroundJobClient _backgroundJobClient;
-
+        private readonly IOutboxMessageRepository _outboxMessageRepo;
+        private readonly IConfiguration _config;
+        private readonly ITenantRepository _tenantRepository;
+        private readonly IUserRepository _userRepository;
         public BillingService(
             IPaymentService paymentService,
             IEmailService emailService,
             IBillingOrderRepository billingOrderRepo,
             IBillingOrderModuleRepository billingOrderModuleRepo,
             IModuleRepository moduleRepo,
-            IBackgroundJobClient backgroundJobClient)
+            IBackgroundJobClient backgroundJobClient,
+            IOutboxMessageRepository outboxMessageRepo,
+            IConfiguration config,
+            ITenantRepository tenantRepository,
+            IUserRepository userRepository)
+
         {
             _paymentService = paymentService;
             _emailService = emailService;
@@ -33,6 +47,10 @@ namespace SMEFLOWSystem.Application.Services
             _billingOrderModuleRepo = billingOrderModuleRepo;
             _moduleRepo = moduleRepo;
             _backgroundJobClient = backgroundJobClient;
+            _outboxMessageRepo = outboxMessageRepo;
+            _config = config;
+            _tenantRepository = tenantRepository;
+            _userRepository = userRepository;
         }
 
         public Task<string> CreatePaymentUrlAsync(Guid orderId, string? clientIp = null)
@@ -92,7 +110,57 @@ namespace SMEFLOWSystem.Application.Services
                     <a href='{paymentUrl}' style='padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none;'>THANH TOÁN (TUỲ CHỌN)</a>
                     <p>Hoặc copy link: {paymentUrl}</p>";
 
-            _backgroundJobClient.Enqueue(() => _emailService.SendEmailAsync(adminEmail, "SMEFLOW - Link thanh toán (tuỳ chọn)", emailBody));
+            var currentTenant = await _tenantRepository.GetByIdIgnoreTenantAsync(order.TenantId);
+            var ownerEmail = string.Empty;
+            if(currentTenant == null)
+            {
+                return;           
+            }
+
+            if (currentTenant.OwnerUserId.HasValue)
+            {
+                var ownerUser = await _userRepository.GetByIdIgnoreTenantAsync(currentTenant.OwnerUserId.Value);
+                if (ownerUser != null)
+                {
+                    ownerEmail = ownerUser.Email ?? string.Empty;
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(ownerEmail))
+                return;
+
+            var emailEvent = new EmailNotificationRequestedEvent
+            {
+                EventId = Guid.NewGuid(),
+                OccurredAtUtc = DateTime.UtcNow,
+                TenantId = currentTenant.Id,
+                ToEmail = ownerEmail,
+                Subject = $"DodoSystem - Link thanh toán (tuỳ chọn)",
+                Body = emailBody,
+                CorrelationId = orderId.ToString()
+            };
+
+            var exchange = _config["RabbitMQ:Exchange"] ?? "smeflow.exchange";
+            var routingKey = _config["RabbitMQ:RoutingKeys:SendEmail"] ?? "email.send";
+
+            var outboxMessage = new OutboxMessage
+            {
+                Id = Guid.NewGuid(),
+                TenantId = currentTenant.Id,
+                EventId = emailEvent.EventId,
+                EventType = nameof(EmailNotificationRequestedEvent),
+                Exchange = exchange,
+                RoutingKey = routingKey,
+                Payload = JsonConvert.SerializeObject(emailEvent),
+                CorrelationId = emailEvent.CorrelationId,
+                Status = StatusEnum.OutboxPending,
+                OccurredOnUtc = DateTime.UtcNow,
+                NextAttemptOnUtc = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _outboxMessageRepo.AddAsync(outboxMessage);
+            //_backgroundJobClient.Enqueue(() => _emailService.SendEmailAsync(adminEmail, "SMEFLOW - Link thanh toán (tuỳ chọn)", emailBody, CancellationToken.None));
         }
     }
 }

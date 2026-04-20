@@ -20,13 +20,17 @@ public static class WebApplicationExtensions
             app.UseSwaggerUI();
         }
 
-        app.UseHttpsRedirection();
+        if (!app.Environment.IsDevelopment())
+        {
+            app.UseHttpsRedirection();
+        }
 
         app.UseAuthentication();
         app.UseAuthorization();
 
         app.UseMiddleware<ModuleAccessMiddleware>();
 
+        InitializeDatabase(app);
         SeedRoles(app);
 
         // Schedule recurring jobs (daily at 00:00 Vietnam time)
@@ -35,6 +39,31 @@ public static class WebApplicationExtensions
         app.MapControllers();
 
         return app;
+    }
+
+    private static void InitializeDatabase(WebApplication app)
+    {
+        const int maxRetries = 12;
+        var delay = TimeSpan.FromSeconds(5);
+
+        for (var attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            try
+            {
+                using var scope = app.Services.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<SMEFLOWSystemContext>();
+                db.Database.Migrate();
+                return;
+            }
+            catch when (attempt < maxRetries)
+            {
+                Thread.Sleep(delay);
+            }
+        }
+
+        using var finalScope = app.Services.CreateScope();
+        var finalDb = finalScope.ServiceProvider.GetRequiredService<SMEFLOWSystemContext>();
+        finalDb.Database.Migrate();
     }
 
     private static void SeedRoles(WebApplication app)

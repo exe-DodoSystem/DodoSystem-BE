@@ -24,7 +24,7 @@ public class EmailService : IEmailService
         _sendGrid = new SendGridClient(_settings.SendGridApiKey);
     }
 
-    public async Task SendEmailAsync(string toEmail, string subject, string body)
+    public async Task SendEmailAsync(string toEmail, string subject, string body, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(_settings.FromName))
             throw new InvalidOperationException("Missing config: EmailSettings:FromName");
@@ -41,7 +41,7 @@ public class EmailService : IEmailService
         _logger.LogInformation("Sending email to {ToEmail}, subject: {Subject}, from: {FromEmail}",
             toEmail, subject, _settings.FromEmail);
 
-        var response = await _sendGrid.SendEmailAsync(message);
+        var response = await _sendGrid.SendEmailAsync(message, cancellationToken);
         var details = await response.Body.ReadAsStringAsync();
 
         _logger.LogInformation("SendGrid response: {StatusCode} — {Details}",
@@ -54,7 +54,7 @@ public class EmailService : IEmailService
         }
     }
 
-    public async Task SendOtpEmailAsync(string toEmail, string otp)
+    public async Task SendOtpEmailAsync(string toEmail, string otp, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(_settings.FromName))
             throw new InvalidOperationException("Missing config: EmailSettings:FromName");
@@ -76,7 +76,7 @@ public class EmailService : IEmailService
 
         _logger.LogInformation("Sending OTP email to {ToEmail}", toEmail);
 
-        var response = await _sendGrid.SendEmailAsync(message);
+        var response = await _sendGrid.SendEmailAsync(message, cancellationToken);
         var details = await response.Body.ReadAsStringAsync();
 
         _logger.LogInformation("SendGrid OTP response: {StatusCode} — {Details}",

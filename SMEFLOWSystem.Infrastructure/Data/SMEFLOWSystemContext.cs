@@ -34,6 +34,7 @@ public partial class SMEFLOWSystemContext : DbContext
     public virtual DbSet<Order> Orders { get; set; }
     public virtual DbSet<OrderItem> OrderItems { get; set; }
     public virtual DbSet<PaymentTransaction> PaymentTransactions { get; set; }
+    public virtual DbSet<ProcessedEvent> ProcessedEvents { get; set; }
     public virtual DbSet<Payroll> Payrolls { get; set; }
     public virtual DbSet<Position> Positions { get; set; }
     public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
@@ -407,6 +408,7 @@ public partial class SMEFLOWSystemContext : DbContext
             entity.Property(e => e.Bonus)
                 .HasDefaultValue(0m)
                 .HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.BasePay).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
             entity.Property(e => e.Deduction)
                 .HasDefaultValue(0m)
@@ -515,6 +517,34 @@ public partial class SMEFLOWSystemContext : DbContext
                 .HasForeignKey(e => e.TenantId)
                 .OnDelete(DeleteBehavior.SetNull)
                 .HasConstraintName("FK_OutboxMessages_Tenants");
+        });
+
+        modelBuilder.Entity<ProcessedEvent>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK_ProcessedEvents");
+
+            entity.ToTable("ProcessedEvents");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+
+            entity.Property(e => e.EventId).IsRequired();
+
+            entity.Property(e => e.ConsumerName)
+                .IsRequired()
+                .HasMaxLength(200);
+
+            entity.Property(e => e.ProcessedAtUtc)
+                .HasDefaultValueSql("(getutcdate())");
+
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getutcdate())");
+
+            entity.HasIndex(e => new { e.EventId, e.ConsumerName })
+                .HasDatabaseName("UX_ProcessedEvents_EventId_Consumer")
+                .IsUnique();
+
+            entity.HasIndex(e => e.ProcessedAtUtc)
+                .HasDatabaseName("IX_ProcessedEvents_ProcessedAtUtc");
         });
 
         modelBuilder.Entity<Role>(entity =>
