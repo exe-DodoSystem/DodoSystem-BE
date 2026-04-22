@@ -1,14 +1,18 @@
-﻿using SMEFLOWSystem.Application.Interfaces.IRepositories;
-using SMEFLOWSystem.Application.Interfaces.IServices;
-using ShareKernel.Common.Enum;
-using SMEFLOWSystem.Core.Entities;
-using SMEFLOWSystem.Application.Helpers;
+﻿using Hangfire.Server;
 using Microsoft.Extensions.Configuration;
+using Newtonsoft.Json;
+using ShareKernel.Common.Enum;
+using SMEFLOWSystem.Application.Events.Notification;
+using SMEFLOWSystem.Application.Helpers;
+using SMEFLOWSystem.Application.Interfaces.IRepositories;
+using SMEFLOWSystem.Application.Interfaces.IServices;
+using SMEFLOWSystem.Core.Entities;
 using SMEFLOWSystem.SharedKernel.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace SMEFLOWSystem.Application.Services
@@ -24,6 +28,7 @@ namespace SMEFLOWSystem.Application.Services
         private readonly IModuleRepository _moduleRepository;
         private readonly IModuleSubscriptionRepository _moduleSubscriptionRepository;
         private readonly IConfiguration _configuration;
+        private readonly IOutboxMessageRepository _outboxMessageRepository;
 
         public InviteService(
             IInviteRepository inviteRepository,
@@ -34,7 +39,8 @@ namespace SMEFLOWSystem.Application.Services
             IEmailService emailService,
             IModuleRepository moduleRepository,
             IModuleSubscriptionRepository moduleSubscriptionRepository,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            IOutboxMessageRepository outboxMessageRepository)
         {
             _inviteRepository = inviteRepository;
             _userRepository = userRepository;
@@ -45,6 +51,7 @@ namespace SMEFLOWSystem.Application.Services
             _moduleRepository = moduleRepository;
             _moduleSubscriptionRepository = moduleSubscriptionRepository;
             _configuration = configuration;
+            _outboxMessageRepository = outboxMessageRepository;
         }
 
         public Task CompleteOnboardingAsync(string token, string fullName, string password, string? phone)
@@ -101,13 +108,37 @@ namespace SMEFLOWSystem.Application.Services
             var tokenText = string.IsNullOrWhiteSpace(onboardingUrl)
                 ? token
                 : $"{onboardingUrl.TrimEnd('/')}/{token}";
+            var emailEvent = new EmailNotificationRequestedEvent
+            {
+                EventId = Guid.NewGuid(),
+                OccurredAtUtc = DateTime.UtcNow,
+                TenantId = tenantId,
+                ToEmail = email,
+                Subject = $"Lời mời tham gia SMEFLOW System",
+                Body = $"<p>Bạn được mời tham gia hệ thống.</p><p>Mã/Link onboarding: <strong>{tokenText}</strong></p><p>{message}</p>",
+                CorrelationId = invite.Id.ToString()
+            };
 
-            await _emailService.SendEmailAsync(
-                email,
-                "Lời mời tham gia SMEFLOW System",
-                $"<p>Bạn được mời tham gia hệ thống.</p><p>Mã/Link onboarding: <strong>{tokenText}</strong></p><p>{message}</p>",
-                CancellationToken.None
-                );
+            var exchange = _configuration["RabbitMQ:Exchange"] ?? "smeflow.exchange";
+            var routingKey = _configuration["RabbitMQ:RoutingKeys:SendEmail"] ?? "email.send";
+
+            var outboxMessage = new OutboxMessage
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                EventId = emailEvent.EventId,
+                EventType = nameof(EmailNotificationRequestedEvent),
+                Exchange = exchange,
+                RoutingKey = routingKey,
+                Payload = JsonConvert.SerializeObject(emailEvent),
+                CorrelationId = emailEvent.CorrelationId,
+                Status = StatusEnum.OutboxPending,
+                OccurredOnUtc = DateTime.UtcNow,
+                NextAttemptOnUtc = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow
+            };
+            
+            await _outboxMessageRepository.AddAsync(outboxMessage);
         }
 
         private async Task<Invite> ValidateTokenInternalAsync(string token)

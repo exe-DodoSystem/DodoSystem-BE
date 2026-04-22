@@ -143,5 +143,25 @@ public class AttendanceRepository : IAttendanceRepository
             .CountAsync();
     }
 
-    
+    public async Task<List<Attendance>> GetByEmployeeMonthAsync(Guid employeeId, int month, int year)
+    {
+        return await _context.Attendances
+            .Where(a => a.EmployeeId == employeeId
+                     && a.WorkDate.Month == month
+                     && a.WorkDate.Year == year)
+            .OrderBy(a => a.WorkDate)
+            .ToListAsync();
+    }
+
+    public async Task<List<Attendance>> GetByTenantMonthAsync(Guid tenantId, int month, int year)
+    {
+        return await _context.Attendances
+            .Include(a => a.Employee).ThenInclude(e => e.Department)
+            .Where(a => a.TenantId == tenantId
+                     && a.WorkDate.Month == month
+                     && a.WorkDate.Year == year)
+            .OrderBy(a => a.Employee.FullName)
+            .ThenBy(a => a.WorkDate)
+            .ToListAsync();
+    }
 }

@@ -100,4 +100,11 @@ public class EmployeeRepository : IEmployeeRepository
         var items = await query.Skip(skip).Take(pageSize).ToListAsync();
         return (items, total);
     }
+
+    public async Task<List<Employee>> GetAllActiveEmployeeByTenantId(Guid tenantId)
+    {
+        return await _context.Employees
+            .Where(e => e.TenantId == tenantId && e.Status == StatusEnum.EmployeeWorking)
+            .ToListAsync(); 
+    }
 }

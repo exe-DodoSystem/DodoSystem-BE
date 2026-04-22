@@ -9,6 +9,7 @@ using SMEFLOWSystem.Application.Interfaces.IServices;
 using SMEFLOWSystem.Application.Interfaces.IServices.System;
 using SMEFLOWSystem.Core.Entities;
 using SMEFLOWSystem.SharedKernel.Interfaces;
+using Microsoft.Extensions.Configuration;
 
 namespace SMEFLOWSystem.Application.Services;
 
@@ -41,6 +42,7 @@ public class AttendanceService : IAttendanceService
         _cloudinary = cloudinary;
         _faceService = faceService;
         _mapper = mapper;
+        
     }
 
     public async Task<CheckInResponseDto> CheckInAsync(CheckInRequestDto request)
@@ -356,12 +358,12 @@ public class AttendanceService : IAttendanceService
     {
         if (string.IsNullOrEmpty(selfieUrl)) return;
         var avatarUrl = employee.User?.AvatarUrl;
-        if (string.IsNullOrEmpty(avatarUrl)) return; 
+        if (string.IsNullOrEmpty(avatarUrl)) return;
 
         var result = await _faceService.VerifyAsync(selfieUrl, avatarUrl);
         if (!result.IsMatch)
         {
-            try { await _cloudinary.DeleteAsync(selfieUrl); } catch {}
+            try { await _cloudinary.DeleteAsync(selfieUrl); } catch { }
 
             var message = !string.IsNullOrEmpty(result.ErrorMessage)
                 ? result.ErrorMessage

@@ -30,7 +30,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             try
             {
                 var result = await _authService.RegisterTenantAsync(request);
-                return Ok(result);
+                return Ok("Đăng ký công ty thành công");
             }
             catch (Exception ex)
             {

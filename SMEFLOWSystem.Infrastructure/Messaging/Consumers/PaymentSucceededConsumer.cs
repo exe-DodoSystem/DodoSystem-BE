@@ -28,9 +28,10 @@ public class PaymentSucceededConsumer : IRabbitMessageHandler
 
     public async Task HandleAsync(string payload, CancellationToken cancellationToken = default)
     {
-        var message = JsonSerializer.Deserialize<PaymentSucceededEvent>(payload);
+        var message = JsonSerializer.Deserialize<PaymentSucceededEvent>(payload, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         if (message == null)
             throw new InvalidOperationException("Invalid PaymentSucceededEvent payload.");
+
 
         var shouldProcess = await _processedEventRepository.TryMarkProcessedAsync(
             eventId: message.EventId,

@@ -16,5 +16,7 @@ namespace SMEFLOWSystem.Application.Interfaces.IRepositories
         Task UpdateAsync(Attendance attendance);
         Task<(List<Attendance> Items, int TotalCount)> GetPagedAsync(Guid? departmentId, Guid? employeeId, DateOnly? fromDate, DateOnly? toDate, string? status, string? approvalStatus, string? search, int pageNumber, int pageSize, string? sortBy, string? sortDir);
         Task<List<Attendance>> GetByEmployeeIdAsync(Guid employeeId, DateOnly fromDate, DateOnly toDate);
+        Task<List<Attendance>> GetByEmployeeMonthAsync(Guid employeeId, int month, int year);
+        Task<List<Attendance>> GetByTenantMonthAsync(Guid tenantId, int month, int year);
     }
 }

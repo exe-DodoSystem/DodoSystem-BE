@@ -62,8 +62,11 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
             return role;
         }
 
-        public async Task<PagedResultDto<Role>> GetAllRolesPagingAsync(PagingRequestDto request)
+        public async Task<(List<Role> Items, int TotalCount)> GetAllRolesPagingAsync(int pageNumber, int pageSize)
         {
+            if (pageNumber < 1) pageNumber = 1;
+            if (pageSize < 1) pageSize = 10;
+
             var query = _context.Roles
                 .AsNoTracking()
                 .Include(u => u.UserRoles)
@@ -71,18 +74,13 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
 
             var totalCount = await query.CountAsync();
 
+            var skip = (pageNumber - 1) * pageSize;
             var items = await query
-                .Skip(request.GetSkip())
-                .Take(request.PageSize)
+                .Skip(skip)
+                .Take(pageSize)
                 .ToListAsync();
 
-            return new PagedResultDto<Role>
-            {
-                Items = items,
-                TotalCount = totalCount,
-                PageNumber = request.PageNumber,
-                PageSize = request.PageSize
-            };
+            return (items, totalCount);
         }
 
         public async Task<List<User>> GetUsersByRoleIdAsync(int roleId)

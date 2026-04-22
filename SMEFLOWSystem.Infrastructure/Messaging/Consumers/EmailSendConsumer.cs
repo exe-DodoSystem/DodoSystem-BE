@@ -14,7 +14,7 @@ namespace SMEFLOWSystem.Infrastructure.Messaging.Consumers
 {
     public class EmailSendConsumer : IRabbitMessageHandler
     {
-        private readonly string ConsumerName = "EmailSendConsumer";
+        private const string ConsumerName = "EmailSendConsumer";
 
         private readonly ILogger<EmailSendConsumer> _logger;
         private readonly IProcessedEventRepository _processedEventRepository;
@@ -30,9 +30,15 @@ namespace SMEFLOWSystem.Infrastructure.Messaging.Consumers
 
         public async Task HandleAsync(string payload, CancellationToken cancellationToken = default)
         {
-            var message = JsonSerializer.Deserialize<EmailNotificationRequestedEvent>(payload);
+            var message = JsonSerializer.Deserialize<EmailNotificationRequestedEvent>(payload, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             if (message == null)
                 throw new InvalidOperationException("Invalid EmailNotificationRequestedEvent payload.");
+
+            if (string.IsNullOrWhiteSpace(message.ToEmail))
+                throw new InvalidOperationException("EmailNotificationRequestedEvent.ToEmail is required.");
+
+            if (string.IsNullOrWhiteSpace(message.Subject))
+                throw new InvalidOperationException("EmailNotificationRequestedEvent.Subject is required.");
 
             var shouldProcess = await _processedEventRepository.TryMarkProcessedAsync(
                 eventId: message.EventId,
@@ -53,6 +59,12 @@ namespace SMEFLOWSystem.Infrastructure.Messaging.Consumers
                 subject: message.Subject,
                 body: message.Body,
                 cancellationToken: cancellationToken);
+
+            _logger.LogInformation(
+                "Email event consumed successfully: EventId={EventId}, ToEmail={ToEmail}, CorrelationId={CorrelationId}",
+                message.EventId,
+                message.ToEmail,
+                message.CorrelationId);
         }
     }
 }

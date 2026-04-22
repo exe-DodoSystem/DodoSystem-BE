@@ -51,6 +51,7 @@ public static class DependencyInjection
         services.AddScoped<IHrEmployeeService, HrEmployeeService>();
 
         services.AddScoped<IAttendanceService, AttendanceService>();
+        services.AddScoped<IPayrollService, PayrollService>();
 
         services.AddScoped<ISystemBootstrapService, SystemBootstrapService>();
         services.AddScoped<ISystemTenantService, SystemTenantService>();

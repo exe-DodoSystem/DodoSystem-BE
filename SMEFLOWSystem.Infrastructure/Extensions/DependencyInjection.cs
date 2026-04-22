@@ -38,10 +38,10 @@ public static class DependencyInjection
         services.AddScoped<IOutboxMessageRepository, OutboxMessageRepository>();
         services.AddScoped<ITenantRepository, TenantRepository>();
         services.AddScoped<ICustomerRepository, CustomerRepository>();
-
         services.AddScoped<IDepartmentRepository, DepartmentRepository>();
         services.AddScoped<IPositionRepository, PositionRepository>();
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
+        services.AddScoped<IPayrollRepository, PayrollRepository>();
 
         services.AddScoped<IAttendanceRepository, AttendanceRepository>();
         services.AddScoped<IAttendanceSettingRepository, AttendanceSettingRepository>();

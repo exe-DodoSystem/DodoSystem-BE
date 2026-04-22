@@ -6,6 +6,7 @@ public interface IEmployeeRepository
 {
     Task<Employee?> GetByIdAsync(Guid id);
     Task<Employee?> GetByUserIdAsync(Guid userId);
+    Task<List<Employee>> GetAllActiveEmployeeByTenantId(Guid tenantId);
     Task AddAsync(Employee employee);
     Task<Employee> UpdateAsync(Employee employee);
     Task SoftDeleteResignedAsync(Employee employee);

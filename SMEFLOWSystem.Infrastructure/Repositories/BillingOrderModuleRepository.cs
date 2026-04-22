@@ -28,6 +28,7 @@ public class BillingOrderModuleRepository : IBillingOrderModuleRepository
 
     public Task<List<BillingOrderModule>> GetByTenantAndModuleAsync(Guid tenantId, int moduleId)
         => _context.BillingOrderModules
+            .IgnoreQueryFilters()
             .Include(x => x.BillingOrder)
             .Where(x => x.ModuleId == moduleId
                         && x.BillingOrder != null

@@ -71,18 +71,20 @@ public class PostPaymentSubscriptionService : IPostPaymentSubscriptionService
                         TenantId = tenant.Id,
                         ModuleId = line.ModuleId,
                         StartDate = now,
-                        EndDate = now,
+                        EndDate = now.AddMonths(1),
                         Status = StatusEnum.ModuleActive,
                         CreatedAt = now,
                         IsDeleted = false
                     };
                     await _moduleSubscriptionRepo.AddAsync(existingSub);
                 }
-
-                var baseDate = existingSub.EndDate > now ? existingSub.EndDate : now;
-                existingSub.EndDate = baseDate.AddMonths(1);
-                existingSub.Status = StatusEnum.ModuleActive;
-                await _moduleSubscriptionRepo.UpdateIgnoreTenantAsync(existingSub);
+                else
+                {
+                    var baseDate = existingSub.EndDate > now ? existingSub.EndDate : now;
+                    existingSub.EndDate = baseDate.AddMonths(1);
+                    existingSub.Status = StatusEnum.ModuleActive;
+                    await _moduleSubscriptionRepo.UpdateIgnoreTenantAsync(existingSub);
+                }
 
                 if (existingSub.EndDate > maxEndDate)
                     maxEndDate = existingSub.EndDate;
@@ -99,9 +101,11 @@ public class PostPaymentSubscriptionService : IPostPaymentSubscriptionService
                 if (ownerUser != null)
                 {
                     ownerUser.IsActive = true;
+                    ownerUser.IsVerified = true;
                     await _userRepo.UpdateUserIgnoreTenantAsync(ownerUser);
                     ownerEmail = ownerUser.Email ?? string.Empty;
                 }
+                
             }
 
             if (string.IsNullOrWhiteSpace(ownerEmail))

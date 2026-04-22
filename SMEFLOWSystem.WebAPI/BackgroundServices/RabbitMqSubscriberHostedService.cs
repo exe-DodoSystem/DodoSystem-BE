@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
@@ -33,6 +34,7 @@ public class RabbitMqSubscriberHostedService : BackgroundService
             UserName = _options.Username,
             Password = _options.Password,
             VirtualHost = _options.VirtualHost,
+            DispatchConsumersAsync = true,
             RequestedHeartbeat = TimeSpan.FromSeconds(_options.RequestedHeartbeat),
             AutomaticRecoveryEnabled = _options.AutomaticRecoveryEnabled,
             NetworkRecoveryInterval = TimeSpan.FromSeconds(_options.NetworkRecoveryIntervalSeconds)
@@ -94,10 +96,18 @@ public class RabbitMqSubscriberHostedService : BackgroundService
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogError(ex, "Error consuming message. Queue={Queue}, RoutingKey={RoutingKey}", queueName, messageRoutingKey);
+                            var requeue = ShouldRequeue(ex);
+
+                            _logger.LogError(
+                                ex,
+                                "Error consuming message. Queue={Queue}, RoutingKey={RoutingKey}, Requeue={Requeue}",
+                                queueName,
+                                messageRoutingKey,
+                                requeue);
+
                             lock (_channelLock)
                             {
-                                channel.BasicNack(ea.DeliveryTag, false, true);
+                                channel.BasicNack(ea.DeliveryTag, false, requeue);
                             }
                         }
                     };
@@ -128,5 +138,61 @@ public class RabbitMqSubscriberHostedService : BackgroundService
                 await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
             }
         }
+    }
+
+    private static bool ShouldRequeue(Exception ex)
+    {
+        Exception? current = ex;
+        
+        // Check for specific non-retryable exceptions explicitly across the chain
+        while (current != null)
+        {
+            if (current is KeyNotFoundException || 
+                current is JsonException || 
+                current is ArgumentException)
+            {
+                return false;
+            }
+
+            if (current is InvalidOperationException)
+            {
+                var msg = current.Message ?? string.Empty;
+                
+                if (msg.Contains("SMTP timeout", StringComparison.OrdinalIgnoreCase))
+                    return true;
+
+                // For anything else thrown as InvalidOperationException by our consumers
+                // (e.g. SMTP send failed, Missing config, Invalid payload), don't requeue.
+                return false;
+            }
+
+            current = current.InnerException;
+        }
+
+        // Retryable: temporary connectivity/timeouts.
+        if (ContainsException<TimeoutException>(ex)
+            || ContainsException<OperationCanceledException>(ex)
+            || ContainsException<HttpRequestException>(ex)
+            || ContainsException<System.Net.Sockets.SocketException>(ex)
+            || ContainsException<System.IO.IOException>(ex))
+            return true;
+
+        // Default to DROP poison messages for unknown/unhandled failures 
+        // to prevent an infinite loop where the consumer consumes maximum CPU.
+        return false;
+    }
+
+    private static bool ContainsException<TException>(Exception ex) where TException : Exception
+    {
+        Exception? current = ex;
+        while (current != null)
+        {
+            if (current is TException)
+                return true;
+
+            current = current.InnerException;
+        }
+
+        return false;
     }
 }

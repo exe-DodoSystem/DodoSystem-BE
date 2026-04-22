@@ -129,6 +129,8 @@ namespace SMEFLOWSystem.Application.Services
             if (string.IsNullOrWhiteSpace(ownerEmail))
                 return;
 
+            //await _emailService.SendEmailAsync(ownerEmail, $"DodoSystem - Link thanh toán (tuỳ chọn)", emailBody, CancellationToken.None);
+
             var emailEvent = new EmailNotificationRequestedEvent
             {
                 EventId = Guid.NewGuid(),
@@ -160,7 +162,6 @@ namespace SMEFLOWSystem.Application.Services
             };
 
             await _outboxMessageRepo.AddAsync(outboxMessage);
-            //_backgroundJobClient.Enqueue(() => _emailService.SendEmailAsync(adminEmail, "SMEFLOW - Link thanh toán (tuỳ chọn)", emailBody, CancellationToken.None));
         }
     }
 }

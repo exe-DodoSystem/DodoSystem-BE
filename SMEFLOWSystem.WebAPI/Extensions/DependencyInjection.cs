@@ -82,11 +82,27 @@ public static class DependencyInjection
                     ?? string.Empty;
             }
 
-            if (string.IsNullOrWhiteSpace(options.SendGridApiKey))
+            if (string.IsNullOrWhiteSpace(options.SmtpHost))
             {
-                options.SendGridApiKey = configuration["EmailSettings:SendGridApiKey"]
-                    ?? configuration["SendGrid:ApiKey"]
-                    ?? configuration["EmailSettings:ApiKey"]
+                options.SmtpHost = configuration["EmailSettings:SmtpHost"]
+                    ?? string.Empty;
+            }
+
+            if (options.SmtpPort <= 0)
+            {
+                var smtpPortConfig = configuration["EmailSettings:SmtpPort"];
+                options.SmtpPort = int.TryParse(smtpPortConfig, out var smtpPort) ? smtpPort : 587;
+            }
+
+            if (string.IsNullOrWhiteSpace(options.SmtpUsername))
+            {
+                options.SmtpUsername = configuration["EmailSettings:SmtpUsername"]
+                    ?? string.Empty;
+            }
+
+            if (string.IsNullOrWhiteSpace(options.SmtpPassword))
+            {
+                options.SmtpPassword = configuration["EmailSettings:SmtpPassword"]
                     ?? string.Empty;
             }
         });
@@ -137,10 +153,14 @@ public static class DependencyInjection
         _ = GetRequiredConfig(configuration, "Jwt:Issuer");
         _ = GetRequiredConfig(configuration, "Jwt:Audience");
 
-        _ = configuration["EmailSettings:SendGridApiKey"]
-            ?? configuration["SendGrid:ApiKey"]
-            ?? configuration["EmailSettings:ApiKey"]
-            ?? throw new InvalidOperationException("Missing config: EmailSettings:SendGridApiKey (or SendGrid:ApiKey)");
+        _ = configuration["EmailSettings:SmtpHost"]
+            ?? throw new InvalidOperationException("Missing config: EmailSettings:SmtpHost");
+        _ = configuration["EmailSettings:SmtpPort"]
+            ?? throw new InvalidOperationException("Missing config: EmailSettings:SmtpPort");
+        _ = configuration["EmailSettings:SmtpUsername"]
+            ?? throw new InvalidOperationException("Missing config: EmailSettings:SmtpUsername");
+        _ = configuration["EmailSettings:SmtpPassword"]
+            ?? throw new InvalidOperationException("Missing config: EmailSettings:SmtpPassword");
 
         _ = configuration["EmailSettings:FromName"] ?? configuration["EmailSettings:SenderName"]
             ?? throw new InvalidOperationException("Missing config: EmailSettings:FromName (or legacy EmailSettings:SenderName)");
