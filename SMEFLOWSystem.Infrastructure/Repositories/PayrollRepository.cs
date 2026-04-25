@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using ShareKernel.Common.Enum;
 
 namespace SMEFLOWSystem.Infrastructure.Repositories
 {
@@ -49,13 +50,14 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
         {
             return await _context.Payrolls
                 .Where(p => p.TenantId == tenantId && p.Month == month && p.Year == year)
+                .Where(p => p.Status == StatusEnum.PayrollDraft)
                 .ToListAsync();
         }
 
         public async Task<List<Payroll>> GetDraftsByTenantMonthAsync(Guid tenantId, int month, int year)
         {
             return await _context.Payrolls
-                .Where(p => p.TenantId == tenantId && p.Month == month && p.Year == year && p.Status == "Draft")
+                .Where(p => p.TenantId == tenantId && p.Month == month && p.Year == year && p.Status == StatusEnum.PayrollDraft)
                 .ToListAsync();
         }
 
@@ -134,6 +136,8 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
 
             var query = _context.Payrolls
                 .AsNoTracking()
+                .Include(p => p.Employee)
+                    .ThenInclude(e => e.Department)
                 .Where(p => p.EmployeeId == employeeId);
 
             if (month.HasValue)

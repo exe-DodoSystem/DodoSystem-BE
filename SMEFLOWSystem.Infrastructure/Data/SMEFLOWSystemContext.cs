@@ -43,6 +43,7 @@ public partial class SMEFLOWSystemContext : DbContext
     public virtual DbSet<User> Users { get; set; }
     public virtual DbSet<UserRole> UserRoles { get; set; }
     public virtual DbSet<TenantAttendanceSetting> TenantAttendanceSettings { get; set; }
+    public virtual DbSet<Notification> Notifications { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -637,6 +638,39 @@ public partial class SMEFLOWSystemContext : DbContext
                 .HasForeignKey<TenantAttendanceSetting>(d => d.TenantId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_TenantAttendanceSettings_Tenants");
+        });
+
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
+            entity.HasKey(e => e.Id).HasName("PK__Notifications__3214EC07");
+            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.Title)
+                .IsRequired()
+                .HasMaxLength(255);
+            entity.Property(e => e.Message)
+                .IsRequired()
+                .HasMaxLength(2000);
+            entity.Property(e => e.Type)
+                .IsRequired()
+                .HasMaxLength(50)
+                .HasDefaultValue("General");
+            entity.Property(e => e.IsRead).HasDefaultValue(false);
+
+            entity.HasIndex(e => new { e.RecipientUserId, e.IsRead })
+                .HasDatabaseName("IX_Notifications_RecipientUser_IsRead");
+            entity.HasIndex(e => e.CreatedAt)
+                .HasDatabaseName("IX_Notifications_CreatedAt");
+
+            entity.HasOne(d => d.RecipientUser).WithMany()
+                .HasForeignKey(d => d.RecipientUserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Notifications_Users");
+            entity.HasOne(d => d.Tenant).WithMany()
+                .HasForeignKey(d => d.TenantId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Notifications_Tenants");
         });
 
         ApplySoftDeleteQueryFilters(modelBuilder);

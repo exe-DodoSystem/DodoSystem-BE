@@ -29,6 +29,7 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
         public async Task AddAsync(PaymentTransaction transaction)
         {
             await _context.PaymentTransactions.AddAsync(transaction);
+            await _context.SaveChangesAsync();
         }
 
         public async Task<bool> TryAddAsync(PaymentTransaction transaction)

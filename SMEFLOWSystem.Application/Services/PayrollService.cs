@@ -21,6 +21,8 @@ namespace SMEFLOWSystem.Application.Services
         private readonly IEmployeeRepository _employeeRepo;
         private readonly ICurrentUserService _currentUser;
         private readonly ICurrentTenantService _currentTenant;
+        private readonly INotificationService _notificationService;
+        private readonly ITenantRepository _tenantRepo;
         private readonly IMapper _mapper;
         private readonly TimeProvider _timeProvider;
 
@@ -30,6 +32,8 @@ namespace SMEFLOWSystem.Application.Services
             IEmployeeRepository employeeRepo,
             ICurrentUserService currentUser,
             ICurrentTenantService currentTenant,
+            INotificationService notificationService,
+            ITenantRepository tenantRepo,
             IMapper mapper,
             TimeProvider timeProvider)
         {
@@ -38,12 +42,19 @@ namespace SMEFLOWSystem.Application.Services
             _employeeRepo = employeeRepo;
             _currentUser = currentUser;
             _currentTenant = currentTenant;
+            _notificationService = notificationService;
+            _tenantRepo = tenantRepo;
             _mapper = mapper;
             _timeProvider = timeProvider;
         }
         // 1. Generate Draft cho toàn bộ NV
         public async Task<bool> GenerateMonthlyPayrollAsync(Guid tenantId, int month, int year)
         {
+            _currentUser.EnsureAdmin();
+            var currentTenantId = RequireTenantId();
+            if (tenantId != currentTenantId)
+                throw new UnauthorizedAccessException("Bạn không có quyền tạo lương cho công ty khác.");
+
             if (month < 1 || month > 12)
                 throw new ArgumentException("Tháng phải nằm trong khoảng 1 - 12.");
 
@@ -116,6 +127,11 @@ namespace SMEFLOWSystem.Application.Services
         // 2. Tính lương 1 NV
         public async Task<PayrollDto> CalculatePayrollForEmployeeAsync(Guid tenantId, Guid employeeId, int month, int year)
         {
+            _currentUser.EnsureHrAccess();
+            var currentTenantId = RequireTenantId();
+            if (tenantId != currentTenantId)
+                throw new UnauthorizedAccessException("Bạn không có quyền tính lương cho công ty khác.");
+
             var employee = await _employeeRepo.GetByIdAsync(employeeId)
                 ?? throw new KeyNotFoundException("Không tìm thấy nhân viên.");
 
@@ -143,7 +159,8 @@ namespace SMEFLOWSystem.Application.Services
 
             var deduction = CalculateDeduction(totalLateMinutes, totalEarlyLeaveMinutes, absentDays);
 
-            if (payroll == null)
+            bool isNew = payroll == null;
+            if (isNew)
             {
                 payroll = new Payroll
                 {
@@ -168,14 +185,11 @@ namespace SMEFLOWSystem.Application.Services
             payroll.Status = StatusEnum.PayrollDraft;
             payroll.UpdatedAt = DateTime.UtcNow;
 
-            if (payroll.CreatedAt == null)
-            {
+            if (isNew)
                 await _payrollRepo.AddAsync(payroll);
-            }
             else
-            {
                 await _payrollRepo.UpdateAsync(payroll);
-            }
+
             var result = await _payrollRepo.GetByIdAsync(payroll.Id);
             return _mapper.Map<PayrollDto>(result);
         }
@@ -183,22 +197,16 @@ namespace SMEFLOWSystem.Application.Services
         // 3. GetPaged (Admin/Manager)
         public async Task<PagedResultDto<PayrollDto>> GetPagedAsync(PayrollQueryDto query)
         {
-            _currentUser.RequireUserId();
+            _currentUser.EnsureHrAccess();
             var tenantId = RequireTenantId();
-
-            Guid? departmentId = query.DepartmentId == Guid.Empty ? null : query.DepartmentId;
-            Guid? employeeId = query.EmployeeId == Guid.Empty ? null : query.EmployeeId;
-            int? month = query.Month == 0 ? null : query.Month;
-            int? year = query.Year == 0 ? null : query.Year;
-            string? status = string.IsNullOrWhiteSpace(query.Status) ? null : query.Status;
 
             var (items, total) = await _payrollRepo.GetPagedAsync(
                 tenantId,
-                departmentId,
-                employeeId,
-                month,
-                year,
-                status,
+                query.DepartmentId,
+                query.EmployeeId,
+                query.Month,
+                query.Year,
+                query.Status,
                 query.PageNumber,
                 query.PageSize,
                 query.SortBy,
@@ -321,7 +329,27 @@ namespace SMEFLOWSystem.Application.Services
             payroll.UpdatedAt = DateTime.UtcNow;
 
             await _payrollRepo.UpdateAsync(payroll);
+
+            await NotifyAdminPayrollUpdatedAsync(payroll);
+
             return _mapper.Map<PayrollDto>(payroll);
+        }
+
+        /// Gửi notification in-app cho TenantAdmin khi HR chỉnh sửa Bonus/Deduction
+        private async Task NotifyAdminPayrollUpdatedAsync(Payroll payroll)
+        {
+            var tenant = await _tenantRepo.GetByIdAsync(payroll.TenantId);
+            if (tenant?.OwnerUserId == null) return;
+
+            var employeeName = payroll.Employee?.FullName ?? "N/A";
+
+            await _notificationService.CreateAsync(
+                tenantId: payroll.TenantId,
+                recipientUserId: tenant.OwnerUserId.Value,
+                title: $"Phiếu lương T{payroll.Month}/{payroll.Year} của {employeeName} đã được chỉnh sửa",
+                message: $"Bonus: {payroll.Bonus:N0}đ | Deduction: {payroll.Deduction:N0}đ | Tổng: {payroll.TotalSalary:N0}đ. Vui lòng vào duyệt.",
+                type: "PayrollUpdated",
+                referenceId: payroll.Id);
         }
 
         // Private Helpers

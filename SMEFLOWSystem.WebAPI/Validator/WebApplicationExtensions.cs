@@ -103,6 +103,13 @@ public static class WebApplicationExtensions
             job: Job.FromExpression<TenantExpirationRecurringJob>(j => j.SuspendExpiredTenantsAndSendRenewalEmailsAsync()),
             cronExpression: "0 0 * * *",
             options: new RecurringJobOptions { TimeZone = timeZone });
+
+        recurringJobManager.AddOrUpdate(
+            recurringJobId: "monthly-payroll",
+            job: Job.FromExpression<PayrollRecurringJob>(j => j.GeneratePayrollForAllTenant()),
+            cronExpression: "0 1 1 * *",   // 01:00 AM ngày 1 hàng tháng (giờ VN)
+            options: new RecurringJobOptions { TimeZone = timeZone });
+
     }
 
     private static TimeZoneInfo TryGetVietNamTimeZone()

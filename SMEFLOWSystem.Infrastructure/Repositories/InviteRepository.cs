@@ -27,6 +27,7 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
         public async Task<Invite?> GetInviteByTokenAsync(string token)
         {
             return await _context.Invites
+                .IgnoreQueryFilters()
                 .Include(i => i.Role)
                 .Include(i => i.Department)
                 .Include(i => i.Position)

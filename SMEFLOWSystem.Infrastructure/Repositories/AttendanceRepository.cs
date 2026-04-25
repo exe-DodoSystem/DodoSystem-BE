@@ -61,6 +61,7 @@ public class AttendanceRepository : IAttendanceRepository
         if (pageSize < 1) pageSize = 10;
 
         var query = _context.Attendances
+            .AsNoTracking()
             .Include(a => a.Employee).ThenInclude(e => e.Department)
             .AsQueryable();
 
