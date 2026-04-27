@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SMEFLOWSystem.Application.DTOs.AttendanceDtos;
-using SMEFLOWSystem.Application.Interfaces.IServices.System;
+using SMEFLOWSystem.Application.Interfaces.IServices;
 
 namespace SMEFLOWSystem.WebAPI.Controllers;
 
@@ -17,33 +17,14 @@ public class AttendanceSettingController : ControllerBase
         _service = service;
     }
 
-    [HttpGet]
-    public async Task<ActionResult<AttendanceConfigResponseDto>> GetConfig()
-    {
-        try
-        {
-            return Ok(await _service.GetConfigAsync());
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return StatusCode(403, new { error = "Bạn không có quyền truy cập" });
-        }
-    }
+    // Uncomment and rewrite later
+    // [HttpGet]
+    // public async Task<IActionResult> GetConfig()
+    // {
+    // }
 
-    [HttpPut]
-    public async Task<ActionResult<AttendanceConfigResponseDto>> UpsertConfig([FromBody] AttendanceConfigDto dto)
-    {
-        try
-        {
-            return Ok(await _service.UpsertConfigAsync(dto));
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return StatusCode(403, new { error = "Bạn không có quyền truy cập" });
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
-    }
+    // [HttpPost]
+    // public async Task<IActionResult> UpsertConfig([FromBody] AttendanceConfigRequestDto dto)
+    // {
+    // }
 }

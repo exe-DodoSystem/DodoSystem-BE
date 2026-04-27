@@ -15,7 +15,28 @@ public class TenantAttendanceSetting : ITenantEntity
     public TimeOnly? WorkEndTime { get; set; }
     public int LateThresholdMinutes { get; set; } = 10;
     public int EarlyLeaveThresholdMinutes { get; set; } = 10;
+    
+    // --- BỔ SUNG NGHIỆP VỤ LÀM THÊM GIỜ (OVERTIME) ---
+    public int MinimumOTMinutes { get; set; } = 30; // Dưới 30p không tính OT
+    public int OTBlockMinutes { get; set; } = 30; // Block làm tròn (VD: 30p, 60p)
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
     public virtual Tenant Tenant { get; set; }
+
+    // --- DOMAIN LOGIC: Máy móc không được vòng do ---
+    // Hàm này giấu tiệt logic tính toán phức tạp vào trong Entity.
+    public decimal CalculateValidOTHours(int actualOTMinutes)
+    {
+        if (actualOTMinutes < MinimumOTMinutes) 
+            return 0m; // Không đủ số phút tối thiểu tối thiểu -> Bỏ.
+
+        if (OTBlockMinutes <= 0) 
+            return actualOTMinutes / 60m; // Fallback an toàn nếu chưa cấu hình Block
+
+        // Ví dụ: Làm 80 phút, chia 30p = 2 block (số nguyên). Lấy 2 * 30 = 60 phút hợp lệ.
+        int validOTMinutes = (actualOTMinutes / OTBlockMinutes) * OTBlockMinutes;
+        
+        return Math.Round((decimal)validOTMinutes / 60m, 2); // Trả về số Giờ OT thập phân làm tròn 2 chữ số
+    }
 }

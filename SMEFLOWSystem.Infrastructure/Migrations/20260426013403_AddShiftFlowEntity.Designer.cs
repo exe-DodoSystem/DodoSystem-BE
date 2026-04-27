@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SMEFLOWSystem.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using SMEFLOWSystem.Infrastructure.Data;
 namespace SMEFLOWSystem.Infrastructure.Migrations
 {
     [DbContext(typeof(SMEFLOWSystemContext))]
-    partial class SMEFLOWSystemContextModelSnapshot : ModelSnapshot
+    [Migration("20260426013403_AddShiftFlowEntity")]
+    partial class AddShiftFlowEntity
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -648,69 +651,6 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Invites");
-                });
-
-            modelBuilder.Entity("SMEFLOWSystem.Core.Entities.LeaveRequest", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime?>("ApprovedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid?>("ApprovedByUserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("EmployeeId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("LeaveType")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("LeaveRequests", (string)null);
-                });
-
-            modelBuilder.Entity("SMEFLOWSystem.Core.Entities.LeaveRequestSegment", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<decimal>("HoursRequested")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<DateOnly>("LeaveDate")
-                        .HasColumnType("date");
-
-                    b.Property<Guid>("LeaveRequestId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("TargetShiftSegmentId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("LeaveRequestId", "TargetShiftSegmentId")
-                        .IsUnique()
-                        .HasDatabaseName("IX_LeaveRequestSegments_UniqueSegment");
-
-                    b.ToTable("LeaveRequestSegments", (string)null);
                 });
 
             modelBuilder.Entity("SMEFLOWSystem.Core.Entities.Module", b =>
@@ -1614,12 +1554,6 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                     b.Property<double?>("Longitude")
                         .HasColumnType("float");
 
-                    b.Property<int>("MinimumOTMinutes")
-                        .HasColumnType("int");
-
-                    b.Property<int>("OTBlockMinutes")
-                        .HasColumnType("int");
-
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
 
@@ -1639,47 +1573,6 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("TenantAttendanceSettings");
-                });
-
-            modelBuilder.Entity("SMEFLOWSystem.Core.Entities.TimesheetPeriod", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateOnly>("EndDate")
-                        .HasColumnType("date");
-
-                    b.Property<bool>("IsLocked")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(false);
-
-                    b.Property<DateTime?>("LockedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid?>("LockedByUserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("Month")
-                        .HasColumnType("int");
-
-                    b.Property<DateOnly>("StartDate")
-                        .HasColumnType("date");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("Year")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId", "Year", "Month")
-                        .IsUnique()
-                        .HasDatabaseName("IX_TimesheetPeriods_Tenant_Year_Month");
-
-                    b.ToTable("TimesheetPeriods", (string)null);
                 });
 
             modelBuilder.Entity("SMEFLOWSystem.Core.Entities.User", b =>
@@ -1904,17 +1797,6 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                     b.Navigation("Role");
 
                     b.Navigation("Tenant");
-                });
-
-            modelBuilder.Entity("SMEFLOWSystem.Core.Entities.LeaveRequestSegment", b =>
-                {
-                    b.HasOne("SMEFLOWSystem.Core.Entities.LeaveRequest", "LeaveRequest")
-                        .WithMany("Segments")
-                        .HasForeignKey("LeaveRequestId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("LeaveRequest");
                 });
 
             modelBuilder.Entity("SMEFLOWSystem.Core.Entities.ModuleSubscription", b =>
@@ -2170,11 +2052,6 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                     b.Navigation("Attendances");
 
                     b.Navigation("Payrolls");
-                });
-
-            modelBuilder.Entity("SMEFLOWSystem.Core.Entities.LeaveRequest", b =>
-                {
-                    b.Navigation("Segments");
                 });
 
             modelBuilder.Entity("SMEFLOWSystem.Core.Entities.Module", b =>

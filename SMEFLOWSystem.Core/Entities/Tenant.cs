@@ -22,7 +22,7 @@ public partial class Tenant
 
     public bool IsDeleted { get; set; }
 
-    public virtual ICollection<Attendance> Attendances { get; set; } = new List<Attendance>();
+    // ĐÃ XÓA: public virtual ICollection<Attendance> Attendances { get; set; } = new List<Attendance>();
 
     public virtual ICollection<Customer> Customers { get; set; } = new List<Customer>();
 

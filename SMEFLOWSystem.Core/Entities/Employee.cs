@@ -38,7 +38,8 @@ public partial class Employee : ITenantEntity
 
     public bool? IsDeleted { get; set; }
 
-    public virtual ICollection<Attendance> Attendances { get; set; } = new List<Attendance>();
+    // ĐÃ XÓA BỎ QUAN HỆ ATTENDANCE CŨ - CHUẨN BỊ MAPPING VỚI RAWPUNCHLOG & DAILYTIMESHEET
+    // public virtual ICollection<Attendance> Attendances { get; set; } = new List<Attendance>();
 
     public virtual Department Department { get; set; }
 

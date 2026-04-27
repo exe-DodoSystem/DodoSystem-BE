@@ -50,7 +50,6 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
         {
             return await _context.Payrolls
                 .Where(p => p.TenantId == tenantId && p.Month == month && p.Year == year)
-                .Where(p => p.Status == StatusEnum.PayrollDraft)
                 .ToListAsync();
         }
 
@@ -66,6 +65,12 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
             _context.Payrolls.Update(payroll);
             await _context.SaveChangesAsync();
             return payroll;
+        }
+
+        public async Task UpdateRangeAsync(List<Payroll> payrolls)
+        {
+            _context.Payrolls.UpdateRange(payrolls);
+            await _context.SaveChangesAsync();
         }
 
         public async Task<(List<Payroll> Items, int TotalCount)> GetPagedAsync(

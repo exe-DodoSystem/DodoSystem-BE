@@ -14,6 +14,7 @@ namespace SMEFLOWSystem.Application.Interfaces.IRepositories
         Task AddAsync(Payroll payroll);
         Task AddRangeAsync(List<Payroll> payrolls);
         Task<Payroll> UpdateAsync(Payroll payroll);
+        Task UpdateRangeAsync(List<Payroll> payrolls);
 
         Task<(List<Payroll> Items, int TotalCount)> GetPagedAsync(
             Guid tenantId,

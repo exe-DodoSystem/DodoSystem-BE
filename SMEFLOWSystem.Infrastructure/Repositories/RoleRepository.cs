@@ -70,6 +70,7 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
             var query = _context.Roles
                 .AsNoTracking()
                 .Include(u => u.UserRoles)
+                .AsSplitQuery()
                 .OrderBy(u => u.Id);
 
             var totalCount = await query.CountAsync();

@@ -21,7 +21,7 @@ public partial class SMEFLOWSystemContext : DbContext
         _currentTenantId = currentTenantService.TenantId;
     }
 
-    public virtual DbSet<Attendance> Attendances { get; set; }
+    // ĐÃ BỊ TỬ HÌNH: public virtual DbSet<Attendance> Attendances { get; set; }
     public virtual DbSet<Customer> Customers { get; set; }
     public virtual DbSet<Department> Departments { get; set; }
     public virtual DbSet<Employee> Employees { get; set; }
@@ -44,637 +44,63 @@ public partial class SMEFLOWSystemContext : DbContext
     public virtual DbSet<UserRole> UserRoles { get; set; }
     public virtual DbSet<TenantAttendanceSetting> TenantAttendanceSettings { get; set; }
     public virtual DbSet<Notification> Notifications { get; set; }
+    
+    // Các bảng mới bổ sung cho Phase 1
+    public virtual DbSet<Shift> Shifts { get; set; }
+    public virtual DbSet<ShiftSegment> ShiftSegments { get; set; }
+    public virtual DbSet<ShiftPattern> ShiftPatterns { get; set; }
+    public virtual DbSet<ShiftPatternDay> ShiftPatternDays { get; set; }
+    public virtual DbSet<EmployeeShiftPattern> EmployeeShiftPatterns { get; set; }
+    public virtual DbSet<OvertimeRequest> OvertimeRequests { get; set; }
+    public virtual DbSet<DailyTimesheet> DailyTimesheets { get; set; }
+    public virtual DbSet<DailyTimesheetSegment> DailyTimesheetSegments { get; set; }
+    public virtual DbSet<DailyTimesheetAuditLog> DailyTimesheetAuditLogs { get; set; }
+    public virtual DbSet<TimesheetPeriod> TimesheetPeriods { get; set; }
+    public virtual DbSet<LeaveRequest> LeaveRequests { get; set; }
+    public virtual DbSet<LeaveRequestSegment> LeaveRequestSegments { get; set; }
+    
+    // Tầng 1 (Kế Hoạch Mới): Thu thập tín hiệu
+    public virtual DbSet<RawPunchLog> RawPunchLogs { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<Attendance>(entity =>
-        {
-            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
-            entity.HasKey(e => e.Id).HasName("PK__Attendan__3214EC07446D18B6");
-            entity.HasIndex(e => new { e.TenantId, e.EmployeeId, e.WorkDate }, "UQ_Attendance_Per_Day").IsUnique();
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.Notes).HasMaxLength(255);
-            entity.Property(e => e.Status)
-                .IsRequired()
-                .HasMaxLength(30)
-                .HasDefaultValue("Present");
-            // GPS
-            entity.Property(e => e.CheckInLatitude);
-            entity.Property(e => e.CheckInLongitude);
-            entity.Property(e => e.CheckOutLatitude);
-            entity.Property(e => e.CheckOutLongitude);
-            // Selfie URLs
-            entity.Property(e => e.CheckInSelfieUrl).HasMaxLength(1000);
-            entity.Property(e => e.CheckOutSelfieUrl).HasMaxLength(1000);
-            // Late / Early
-            entity.Property(e => e.LateMinutes);
-            entity.Property(e => e.EarlyLeaveMinutes);
-            // Approval workflow
-            entity.Property(e => e.ApprovalStatus).HasMaxLength(30);
-            entity.Property(e => e.ApprovalNotes).HasMaxLength(500);
-            entity.Property(e => e.ApprovedAt);
-            entity.Property(e => e.ApprovedByUserId);
-            entity.HasOne(d => d.Employee).WithMany(p => p.Attendances)
-                .HasForeignKey(d => d.EmployeeId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Attendances_Employees");
-            entity.HasOne(d => d.Tenant).WithMany(p => p.Attendances)
-                .HasForeignKey(d => d.TenantId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Attendances_Tenants");
-        });
-
-        modelBuilder.Entity<Customer>(entity =>
-        {
-            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
-            entity.HasKey(e => e.Id).HasName("PK__Customer__3214EC07B17A5536");
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-            entity.Property(e => e.Address).HasMaxLength(500);
-            entity.Property(e => e.CompanyName).HasMaxLength(255); 
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.Email).HasMaxLength(100); 
-            entity.Property(e => e.IsDeleted).HasDefaultValue(false);
-            entity.Property(e => e.Name)
-                .IsRequired()
-                .HasMaxLength(255);
-            entity.Property(e => e.Notes).HasMaxLength(500);
-            entity.Property(e => e.Phone).HasMaxLength(50);  
-            entity.Property(e => e.Type)
-                .IsRequired()
-                .HasMaxLength(20)
-                .HasDefaultValue("Individual");
-            entity.HasOne(d => d.Tenant).WithMany(p => p.Customers)
-                .HasForeignKey(d => d.TenantId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Customers_Tenants");
-        });
-
-        modelBuilder.Entity<Department>(entity =>
-        {
-            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
-            entity.HasKey(e => e.Id).HasName("PK__Departme__3214EC070252CA08");
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.IsDeleted).HasDefaultValue(false);
-            entity.Property(e => e.Name)
-                .IsRequired()
-                .HasMaxLength(100);
-            entity.HasOne(d => d.Tenant).WithMany(p => p.Departments)
-                .HasForeignKey(d => d.TenantId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Departments_Tenants");
-        });
-
-        modelBuilder.Entity<Employee>(entity =>
-        {
-            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
-            entity.HasKey(e => e.Id).HasName("PK__Employee__3214EC07C73E2C13");
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-            entity.Property(e => e.BaseSalary).HasColumnType("decimal(18, 2)");
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.Email).HasMaxLength(100);  
-            entity.Property(e => e.FullName)
-                .IsRequired()
-                .HasMaxLength(255);
-            entity.Property(e => e.IsDeleted).HasDefaultValue(false);
-            entity.Property(e => e.Phone).HasMaxLength(50);  
-            entity.Property(e => e.Status)
-                .IsRequired()
-                .HasMaxLength(30)
-                .HasDefaultValue("Working");
-            entity.HasOne(d => d.Department).WithMany(p => p.Employees)
-                .HasForeignKey(d => d.DepartmentId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Employees_Departments");
-            entity.HasOne(d => d.Position).WithMany(p => p.Employees)
-                .HasForeignKey(d => d.PositionId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Employees_Positions");
-            entity.HasOne(d => d.Tenant).WithMany(p => p.Employees)
-                .HasForeignKey(d => d.TenantId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Employees_Tenants");
-            entity.HasOne(d => d.User).WithMany(p => p.Employees)
-                .HasForeignKey(d => d.UserId)
-                .HasConstraintName("FK_Employees_Users");
-        });
-
-        modelBuilder.Entity<RefreshToken>(entity =>
-        {
-            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
-            entity.HasKey(e => e.Id).HasName("PK__RefreshToken__3214EC07");
-
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-
-            entity.Property(e => e.TokenHash)
-                .IsRequired()
-                .HasMaxLength(128);
-
-            entity.Property(e => e.RevokeReason)
-                .HasMaxLength(255);
-
-            entity.HasIndex(e => new { e.TenantId, e.UserId }, "IX_RefreshTokens_Tenant_User");
-            entity.HasIndex(e => new { e.TenantId, e.TokenHash }, "UQ_RefreshTokens_Tenant_TokenHash").IsUnique();
-
-            entity.HasOne(d => d.User).WithMany()
-                .HasForeignKey(d => d.UserId)
-                .OnDelete(DeleteBehavior.Cascade)
-                .HasConstraintName("FK_RefreshTokens_Users");
-
-            entity.HasOne(d => d.Tenant).WithMany()
-                .HasForeignKey(d => d.TenantId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_RefreshTokens_Tenants");
-
-            entity.HasOne(d => d.ReplacedByToken).WithMany()
-                .HasForeignKey(d => d.ReplacedByTokenId)
-                .OnDelete(DeleteBehavior.NoAction)
-                .HasConstraintName("FK_RefreshTokens_ReplacedBy");
-        });
-
-        modelBuilder.Entity<Invite>(entity =>
-        {
-            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
-            entity.HasKey(e => e.Id).HasName("PK__Invites__3214EC07ABCDEF12");  // Sửa từ e. sang e.Id
-            entity.HasIndex(e => e.Token, "UQ_Invite_Token").IsUnique();
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.Email)
-                .IsRequired()
-                .HasMaxLength(255);
-            entity.Property(e => e.Token)
-                .IsRequired()
-                .HasMaxLength(255);
-            entity.Property(e => e.ExpiryDate).IsRequired();
-            entity.Property(e => e.IsUsed).HasDefaultValue(false);
-            entity.Property(e => e.Message).HasMaxLength(500);  // Nullable
-            entity.Property(e => e.IsDeleted).HasDefaultValue(false);
-            entity.HasOne(d => d.Tenant).WithMany(p => p.Invites)
-                .HasForeignKey(d => d.TenantId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Invites_Tenants");
-            entity.HasOne(d => d.Role).WithMany(p => p.Invites)
-                .HasForeignKey(d => d.RoleId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Invites_Roles");
-            entity.HasOne(d => d.Department).WithMany(p => p.Invites)
-                .HasForeignKey(d => d.DepartmentId)
-                .HasConstraintName("FK_Invites_Departments");
-            entity.HasOne(d => d.Position).WithMany(p => p.Invites)
-                .HasForeignKey(d => d.PositionId)
-                .HasConstraintName("FK_Invites_Positions");
-        });
-
-        modelBuilder.Entity<BillingOrder>(entity =>
-        {
-            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
-            entity.HasKey(e => e.Id).HasName("PK__BillingOrders__3214EC07");
-            entity.HasIndex(e => new { e.TenantId, e.BillingOrderNumber }, "UQ_BillingOrderNumber_Tenant").IsUnique();
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.DiscountAmount)
-                .HasDefaultValue(0m)
-                .HasColumnType("decimal(18, 2)");
-            entity.Property(e => e.FinalAmount)
-                .HasComputedColumnSql("([TotalAmount]-[DiscountAmount])", true)
-                .HasColumnType("decimal(19, 2)");
-            entity.Property(e => e.IsDeleted).HasDefaultValue(false);
-            entity.Property(e => e.Notes).HasMaxLength(500);
-            entity.Property(e => e.BillingDate).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.BillingOrderNumber)
-                .IsRequired()
-                .HasMaxLength(50);
-            entity.Property(e => e.PaymentStatus)
-                .IsRequired()
-                .HasMaxLength(30)
-                .HasDefaultValue("Pending");
-            entity.Property(e => e.Status)
-                .IsRequired()
-                .HasMaxLength(30)
-                .HasDefaultValue("Pending");
-            entity.Property(e => e.TotalAmount).HasColumnType("decimal(18, 2)");
-        });
-
-        modelBuilder.Entity<BillingOrderModule>(entity =>
-        {
-            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
-            entity.HasKey(e => e.Id).HasName("PK__BillingOrderModules__3214EC07");
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-            entity.Property(e => e.UnitPrice).HasColumnType("decimal(18, 2)");
-            entity.Property(e => e.LineTotal).HasColumnType("decimal(18, 2)");
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-
-            entity.HasOne(d => d.BillingOrder).WithMany(p => p.BillingOrderModules)
-                .HasForeignKey(d => d.BillingOrderId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_BillingOrderModules_BillingOrders");
-
-            entity.HasOne(d => d.Module).WithMany(p => p.BillingOrderModules)
-                .HasForeignKey(d => d.ModuleId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_BillingOrderModules_Modules");
-        });
-
-        modelBuilder.Entity<Module>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PK__Modules__3214EC07");
-            entity.Property(e => e.Code).IsRequired().HasMaxLength(50);
-            entity.Property(e => e.ShortCode).IsRequired().HasMaxLength(20);
-            entity.Property(e => e.Name).IsRequired().HasMaxLength(255);
-            entity.Property(e => e.Description).HasMaxLength(500);
-            entity.Property(e => e.MonthlyPrice).HasColumnType("decimal(18, 2)");
-            entity.Property(e => e.IsActive).HasDefaultValue(true);
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-
-            entity.HasIndex(e => e.Code).IsUnique();
-            entity.HasIndex(e => e.ShortCode).IsUnique();
-        });
-
-        modelBuilder.Entity<ModuleSubscription>(entity =>
-        {
-            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
-            entity.HasKey(e => e.Id).HasName("PK__ModuleSubscriptions__3214EC07");
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-            entity.Property(e => e.Status).IsRequired().HasMaxLength(30);
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.IsDeleted).HasDefaultValue(false);
-
-            entity.HasIndex(e => new { e.TenantId, e.ModuleId }).IsUnique();
-
-            entity.HasOne(d => d.Tenant).WithMany(p => p.ModuleSubscriptions)
-                .HasForeignKey(d => d.TenantId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_ModuleSubscriptions_Tenants");
-
-            entity.HasOne(d => d.Module).WithMany(p => p.ModuleSubscriptions)
-                .HasForeignKey(d => d.ModuleId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_ModuleSubscriptions_Modules");
-        });
-
-        modelBuilder.Entity<Order>(entity =>
-        {
-            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
-            entity.HasKey(e => e.Id).HasName("PK__Orders__3214EC0734CC9CEB");
-            entity.HasIndex(e => new { e.TenantId, e.OrderNumber }, "UQ_OrderNumber_Tenant").IsUnique();
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.DiscountAmount)
-                .HasDefaultValue(0m)
-                .HasColumnType("decimal(18, 2)");
-            entity.Property(e => e.FinalAmount)
-                .HasComputedColumnSql("([TotalAmount]-[DiscountAmount])", true)
-                .HasColumnType("decimal(19, 2)");
-            entity.Property(e => e.IsDeleted).HasDefaultValue(false);
-            entity.Property(e => e.Notes).HasMaxLength(500);  // Nullable
-            entity.Property(e => e.OrderDate).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.OrderNumber)
-            // entity.Ignore(e => e.ModuleSubscriptions); // Removed incorrect ignore
-                .HasMaxLength(50);
-            entity.Property(e => e.PaymentStatus)
-                .IsRequired()
-                .HasMaxLength(30)
-                .HasDefaultValue("Pending");
-            entity.Property(e => e.Status)
-                .IsRequired()
-                .HasMaxLength(30)
-                .HasDefaultValue("New");
-            entity.Property(e => e.TotalAmount).HasColumnType("decimal(18, 2)");
-            entity.HasOne(d => d.Customer).WithMany(p => p.Orders)
-                .HasForeignKey(d => d.CustomerId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Orders_Customers");
-            entity.HasOne(d => d.Tenant).WithMany(p => p.Orders)
-                .HasForeignKey(d => d.TenantId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Orders_Tenants");
-        });
-
-        modelBuilder.Entity<OrderItem>(entity =>
-        {
-            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
-            entity.HasKey(e => e.Id).HasName("PK__OrderIte__3214EC0756359D82");
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.Description)
-                .IsRequired()
-                .HasMaxLength(255);
-            entity.Property(e => e.TotalPrice)
-                .HasComputedColumnSql("([Quantity]*[UnitPrice])", true)
-                .HasColumnType("decimal(29, 2)");
-            entity.Property(e => e.UnitPrice).HasColumnType("decimal(18, 2)");
-            entity.HasOne(d => d.Order).WithMany(p => p.OrderItems)
-                .HasForeignKey(d => d.OrderId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_OrderItems_Orders");
-        });
-
-        modelBuilder.Entity<PaymentTransaction>(entity =>
-        {
-            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
-            entity.HasKey(e => e.Id);
-            entity.HasIndex(e => new { e.Gateway, e.GatewayTransactionId }).IsUnique();
-            entity.HasIndex(e => e.BillingOrderId);
-
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-            entity.Property(e => e.Gateway)
-                .IsRequired()
-                .HasMaxLength(30);
-            entity.Property(e => e.GatewayTransactionId)
-                .IsRequired()
-                .HasMaxLength(64);
-            entity.Property(e => e.GatewayResponseCode).HasMaxLength(20);
-            entity.Property(e => e.Amount).HasColumnType("decimal(18, 2)");
-            entity.Property(e => e.Status)
-                .IsRequired()
-                .HasMaxLength(30);
-            entity.Property(e => e.RawData).HasMaxLength(4000);
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-
-            entity.HasOne<BillingOrder>()
-                .WithMany()
-                .HasForeignKey(e => e.BillingOrderId)
-                .OnDelete(DeleteBehavior.ClientSetNull);
-        });
-
-        modelBuilder.Entity<Payroll>(entity =>
-        {
-            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
-            entity.HasKey(e => e.Id).HasName("PK__Payrolls__3214EC07E77CFA45");
-            entity.HasIndex(e => new { e.TenantId, e.EmployeeId, e.Year, e.Month }, "UQ_Payroll_Month").IsUnique();
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-            entity.Property(e => e.BaseSalarySnapshot).HasColumnType("decimal(18, 2)");
-            entity.Property(e => e.Bonus)
-                .HasDefaultValue(0m)
-                .HasColumnType("decimal(18, 2)");
-            entity.Property(e => e.BasePay).HasColumnType("decimal(18, 2)");
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.Deduction)
-                .HasDefaultValue(0m)
-                .HasColumnType("decimal(18, 2)");
-            entity.Property(e => e.Notes).HasMaxLength(255);  // Nullable
-            entity.Property(e => e.Status)
-                .IsRequired()
-                .HasMaxLength(30)
-                .HasDefaultValue("Draft");
-            entity.Property(e => e.TotalSalary).HasColumnType("decimal(18, 2)");
-            entity.HasOne(d => d.Employee).WithMany(p => p.Payrolls)
-                .HasForeignKey(d => d.EmployeeId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Payrolls_Employees");
-            entity.HasOne(d => d.Tenant).WithMany(p => p.Payrolls)
-                .HasForeignKey(d => d.TenantId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Payrolls_Tenants");
-        });
-
-        modelBuilder.Entity<Position>(entity =>
-        {
-            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
-            entity.HasKey(e => e.Id).HasName("PK__Position__3214EC07176C885B");
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.IsDeleted).HasDefaultValue(false);
-            entity.Property(e => e.Name)
-                .IsRequired()
-                .HasMaxLength(100);
-            entity.HasOne(d => d.Department).WithMany(p => p.Positions)
-                .HasForeignKey(d => d.DepartmentId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Positions_Departments");
-            entity.HasOne(d => d.Tenant).WithMany(p => p.Positions)
-                .HasForeignKey(d => d.TenantId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Positions_Tenants");
-        });
-
-        modelBuilder.Entity<OutboxMessage>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PK_OutboxMessages");
-
-            entity.ToTable("OutboxMessages");
-
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-
-            entity.Property(e => e.EventId).IsRequired();
-
-            entity.Property(e => e.EventType)
-                .IsRequired()
-                .HasMaxLength(255);
-
-            entity.Property(e => e.Exchange)
-                .IsRequired()
-                .HasMaxLength(150);
-
-            entity.Property(e => e.RoutingKey)
-                .IsRequired()
-                .HasMaxLength(150);
-
-            entity.Property(e => e.Payload)
-                .IsRequired();
-
-            entity.Property(e => e.CorrelationId)
-                .HasMaxLength(128);
-
-            entity.Property(e => e.Status)
-                .IsRequired()
-                .HasMaxLength(20)
-                .HasDefaultValue("Pending");
-
-            entity.Property(e => e.RetryCount)
-                .HasDefaultValue(0);
-
-            entity.Property(e => e.OccurredOnUtc)
-                .HasDefaultValueSql("(getutcdate())");
-
-            entity.Property(e => e.NextAttemptOnUtc);
-            entity.Property(e => e.ProcessedOnUtc);
-
-            entity.Property(e => e.LastError)
-                .HasMaxLength(4000);
-
-            entity.Property(e => e.CreatedAt)
-                .HasDefaultValueSql("(getutcdate())");
-
-            entity.Property(e => e.UpdatedAt);
-
-            entity.HasIndex(e => e.EventId)
-                .HasDatabaseName("UX_OutboxMessages_EventId")
-                .IsUnique();
-
-            entity.HasIndex(e => new { e.Status, e.NextAttemptOnUtc })
-                .HasDatabaseName("IX_OutboxMessages_Status_NextAttemptOnUtc");
-
-            entity.HasIndex(e => e.OccurredOnUtc)
-                .HasDatabaseName("IX_OutboxMessages_OccurredOnUtc");
-
-            entity.HasIndex(e => new { e.TenantId, e.Status })
-                .HasDatabaseName("IX_OutboxMessages_TenantId_Status");
-
-            entity.HasOne<Tenant>()
-                .WithMany()
-                .HasForeignKey(e => e.TenantId)
-                .OnDelete(DeleteBehavior.SetNull)
-                .HasConstraintName("FK_OutboxMessages_Tenants");
-        });
-
-        modelBuilder.Entity<ProcessedEvent>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PK_ProcessedEvents");
-
-            entity.ToTable("ProcessedEvents");
-
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-
-            entity.Property(e => e.EventId).IsRequired();
-
-            entity.Property(e => e.ConsumerName)
-                .IsRequired()
-                .HasMaxLength(200);
-
-            entity.Property(e => e.ProcessedAtUtc)
-                .HasDefaultValueSql("(getutcdate())");
-
-            entity.Property(e => e.CreatedAt)
-                .HasDefaultValueSql("(getutcdate())");
-
-            entity.HasIndex(e => new { e.EventId, e.ConsumerName })
-                .HasDatabaseName("UX_ProcessedEvents_EventId_Consumer")
-                .IsUnique();
-
-            entity.HasIndex(e => e.ProcessedAtUtc)
-                .HasDatabaseName("IX_ProcessedEvents_ProcessedAtUtc");
-        });
-
-        modelBuilder.Entity<Role>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PK__Roles__3214EC07B3A63021");
-            entity.HasIndex(e => e.Name, "UQ__Roles__737584F671819C23").IsUnique();
-            entity.Property(e => e.Description).HasMaxLength(255);
-            entity.Property(e => e.IsSystemRole).HasDefaultValue(false);
-            entity.Property(e => e.Name)
-                .IsRequired()
-                .HasMaxLength(100);
-        });
-
-        modelBuilder.Entity<Tenant>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PK__Tenants__3214EC0740A20BD5");
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.IsDeleted).HasDefaultValue(false);
-
-            entity.Property(e => e.Name)
-                .IsRequired()
-                .HasMaxLength(255);
-
-            entity.Property(e => e.Status)
-                .IsRequired()
-                .HasMaxLength(50)
-                .HasDefaultValue("Active");
-
-            entity.HasOne(e => e.OwnerUser)
-                .WithMany()
-                .HasForeignKey(e => e.OwnerUserId)
-                .OnDelete(DeleteBehavior.NoAction);
-        });
-
-        modelBuilder.Entity<User>(entity =>
-        {
-            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
-            entity.HasKey(e => e.Id).HasName("PK__Users__3214EC07D3CEC114");
-            entity.HasIndex(e => new { e.TenantId, e.Email }, "UQ_Users_Email_Tenant").IsUnique();
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.Email)
-                .IsRequired()
-                .HasMaxLength(255);
-            entity.Property(e => e.FullName)
-                .IsRequired()
-                .HasMaxLength(255);
-            entity.Property(e => e.IsActive).HasDefaultValue(true);
-            entity.Property(e => e.IsVerified).HasDefaultValue(false);
-            entity.Property(e => e.PasswordHash)
-                .IsRequired()
-                .HasMaxLength(255);
-            entity.Property(e => e.Phone).HasMaxLength(50);
-            entity.Property(e => e.AvatarUrl).HasMaxLength(1000);
-            entity.HasOne(d => d.Tenant).WithMany(p => p.Users)
-                .HasForeignKey(d => d.TenantId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Users_Tenants");
-        });
-
-        modelBuilder.Entity<UserRole>(entity =>
-        {
-            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
-            entity.HasKey(e => new { e.UserId, e.RoleId });
-            entity.HasOne(d => d.Role).WithMany(p => p.UserRoles)
-                .HasForeignKey(d => d.RoleId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_UserRoles_Roles");
-            entity.HasOne(d => d.User).WithMany(p => p.UserRoles)
-                .HasForeignKey(d => d.UserId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_UserRoles_Users");
-        });
-
-        modelBuilder.Entity<TenantAttendanceSetting>(entity =>
-        {
-            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
-            entity.HasKey(e => e.Id).HasName("PK__TenantAttendanceSetting__3214EC07");
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.CheckInRadiusMeters).HasDefaultValue(100);
-            entity.Property(e => e.LateThresholdMinutes).HasDefaultValue(10);
-            entity.Property(e => e.EarlyLeaveThresholdMinutes).HasDefaultValue(10);
-            entity.Property(e => e.Latitude).HasColumnType("float");
-            entity.Property(e => e.Longitude).HasColumnType("float");
-            // 1:1 — mỗi Tenant chỉ có 1 setting, optional (HasOne WithOne)
-            entity.HasOne(d => d.Tenant)
-                .WithOne(t => t.AttendanceSetting)
-                .HasForeignKey<TenantAttendanceSetting>(d => d.TenantId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_TenantAttendanceSettings_Tenants");
-        });
-
-        modelBuilder.Entity<Notification>(entity =>
-        {
-            entity.HasQueryFilter(e => e.TenantId == _currentTenantId);
-            entity.HasKey(e => e.Id).HasName("PK__Notifications__3214EC07");
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.Title)
-                .IsRequired()
-                .HasMaxLength(255);
-            entity.Property(e => e.Message)
-                .IsRequired()
-                .HasMaxLength(2000);
-            entity.Property(e => e.Type)
-                .IsRequired()
-                .HasMaxLength(50)
-                .HasDefaultValue("General");
-            entity.Property(e => e.IsRead).HasDefaultValue(false);
-
-            entity.HasIndex(e => new { e.RecipientUserId, e.IsRead })
-                .HasDatabaseName("IX_Notifications_RecipientUser_IsRead");
-            entity.HasIndex(e => e.CreatedAt)
-                .HasDatabaseName("IX_Notifications_CreatedAt");
-
-            entity.HasOne(d => d.RecipientUser).WithMany()
-                .HasForeignKey(d => d.RecipientUserId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Notifications_Users");
-            entity.HasOne(d => d.Tenant).WithMany()
-                .HasForeignKey(d => d.TenantId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Notifications_Tenants");
-        });
+        // ĐÃ XÓA: modelBuilder.Entity<Attendance>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<Customer>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<Department>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<Employee>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<RefreshToken>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<Invite>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<BillingOrder>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<BillingOrderModule>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<ModuleSubscription>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<Order>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<OrderItem>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<PaymentTransaction>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<Payroll>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<Position>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<User>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<UserRole>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<TenantAttendanceSetting>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<Notification>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+
+        // Cập nhật Query Filter cho nhóm Shift & Timesheet mới
+        modelBuilder.Entity<Shift>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<ShiftSegment>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<ShiftPattern>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<ShiftPatternDay>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<EmployeeShiftPattern>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<OvertimeRequest>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<DailyTimesheet>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<DailyTimesheetSegment>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<DailyTimesheetAuditLog>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<TimesheetPeriod>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<LeaveRequest>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<LeaveRequestSegment>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        
+        // Quá trình chia Tenant an toàn cho Raw logs
+        modelBuilder.Entity<RawPunchLog>().HasQueryFilter(e => e.TenantId == _currentTenantId);
 
         ApplySoftDeleteQueryFilters(modelBuilder);
-
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(SMEFLOWSystemContext).Assembly);
         base.OnModelCreating(modelBuilder);
     }
@@ -692,21 +118,13 @@ public partial class SMEFLOWSystemContext : DbContext
             if (isDeletedProp.ClrType == typeof(bool))
             {
                 var efProperty = Expression.Call(
-                    typeof(EF),
-                    nameof(EF.Property),
-                    new[] { typeof(bool) },
-                    parameter,
-                    Expression.Constant("IsDeleted"));
+                    typeof(EF), nameof(EF.Property), new[] { typeof(bool) }, parameter, Expression.Constant("IsDeleted"));
                 isNotDeleted = Expression.Equal(efProperty, Expression.Constant(false));
             }
             else
             {
                 var efProperty = Expression.Call(
-                    typeof(EF),
-                    nameof(EF.Property),
-                    new[] { typeof(bool?) },
-                    parameter,
-                    Expression.Constant("IsDeleted"));
+                    typeof(EF), nameof(EF.Property), new[] { typeof(bool?) }, parameter, Expression.Constant("IsDeleted"));
                 isNotDeleted = Expression.NotEqual(efProperty, Expression.Constant(true, typeof(bool?)));
             }
 
@@ -717,8 +135,7 @@ public partial class SMEFLOWSystemContext : DbContext
                 continue;
             }
 
-            var existingBody = new ReplaceExpressionVisitor(existingFilter.Parameters.Single(), parameter)
-                .Visit(existingFilter.Body);
+            var existingBody = new ReplaceExpressionVisitor(existingFilter.Parameters.Single(), parameter).Visit(existingFilter.Body);
             var combinedBody = Expression.AndAlso(existingBody!, isNotDeleted);
             entityType.SetQueryFilter(Expression.Lambda(combinedBody, parameter));
         }
@@ -741,20 +158,16 @@ public partial class SMEFLOWSystemContext : DbContext
             return base.Visit(node);
         }
     }
+
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        // 1. Lấy TenantId hiện tại
         var currentTenantId = _currentTenantService.TenantId;
-
-        // 2. Nếu có TenantId (tức là User đã đăng nhập)
         if (currentTenantId.HasValue)
         {
-            // Quét tất cả các Entity đang được Add và có kế thừa ITenantEntity
             foreach (var entry in ChangeTracker.Entries<ITenantEntity>())
             {
                 if (entry.State == EntityState.Added)
                 {
-                    // Nếu Dev quên set TenantId (hoặc để mặc định), hệ thống tự điền
                     if (entry.Entity.TenantId == Guid.Empty)
                     {
                         entry.Entity.TenantId = currentTenantId.Value;
@@ -762,7 +175,6 @@ public partial class SMEFLOWSystemContext : DbContext
                 }
             }
         }
-
         return base.SaveChangesAsync(cancellationToken);
     }
 

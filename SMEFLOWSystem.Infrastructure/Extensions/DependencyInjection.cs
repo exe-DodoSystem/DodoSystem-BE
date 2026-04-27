@@ -44,7 +44,8 @@ public static class DependencyInjection
         services.AddScoped<IPayrollRepository, PayrollRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
 
-        services.AddScoped<IAttendanceRepository, AttendanceRepository>();
+        services.AddScoped<IRawPunchLogRepository, RawPunchLogRepository>();
+        // services.AddScoped<IAttendanceRepository, AttendanceRepository>();
         services.AddScoped<IAttendanceSettingRepository, AttendanceSettingRepository>();
 
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();

@@ -50,9 +50,11 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
         public async Task<List<User>> GetAllUsersAsync()
         {
             return await _context.Users
+                .AsNoTracking()
                 .Include(x => x.Tenant)
                 .Include(x => x.UserRoles)
                     .ThenInclude(ur => ur.Role)
+                .AsSplitQuery()
                 .OrderBy(x => x.CreatedAt)
                 .ToListAsync();
         }
@@ -86,16 +88,19 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
                 .Include(x => x.UserRoles)
                     .ThenInclude(ur => ur.Role)
                 .Include(x => x.Employees)
+                .AsSplitQuery()
                 .FirstOrDefaultAsync(u => u.Id == id);
         }
 
         public async Task<List<User>> GetUserByNameAsync(string name)
         {
             return await _context.Users
+                .AsNoTracking()
                 .Where(u => u.FullName.Contains(name))
                 .Include(x => x.Tenant)
                 .Include(x => x.UserRoles)
                     .ThenInclude(ur => ur.Role)
+                .AsSplitQuery()
                 .ToListAsync();
         }      
 
@@ -163,6 +168,7 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
                 .IgnoreQueryFilters()
                 .Include(x => x.Tenant)
                 .Include(x => x.Employees)
+                .AsSplitQuery()
                 .FirstOrDefaultAsync(u => u.Id == id);
 
             if (user != null)
@@ -205,8 +211,10 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
         public async Task<List<Role>> GetRolesByUserIdAsync(Guid userId)
         {
             var user = await _context.Users
+                .AsNoTracking()
                 .Include(u => u.UserRoles)
                     .ThenInclude(ur => ur.Role)
+                .AsSplitQuery()
                 .FirstOrDefaultAsync(u => u.Id == userId);
 
             return user?.UserRoles.Select(ur => ur.Role).ToList() ?? new List<Role>();
@@ -246,6 +254,7 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
                 .Include(x => x.UserRoles)
                     .ThenInclude(ur => ur.Role)
                 .Include(x => x.Employees)
+                .AsSplitQuery()
                 .FirstOrDefaultAsync(u => u.Id == ownerUserId);
 
             return user!;
