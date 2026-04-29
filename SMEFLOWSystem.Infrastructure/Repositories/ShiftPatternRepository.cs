@@ -60,4 +60,12 @@ public class ShiftPatternRepository : IShiftPatternRepository
             .Include(s => s.Segments)
             .FirstOrDefaultAsync(s => s.Id == shiftId);
     }
+
+    public async Task<ShiftPatternDay?> GetShiftPatternWithDaysAsync(Guid shiftPatternId, int dayIndex)
+    {
+        return await _context.ShiftPatternDays
+            .AsNoTracking()
+            .FirstOrDefaultAsync(spd => spd.ShiftPatternId == shiftPatternId
+                                        && spd.DayIndex == dayIndex);
+    }
 }

@@ -3,10 +3,10 @@ using System;
 
 namespace SMEFLOWSystem.Core.Entities;
 
-/// <summary>
-/// Domain Entity: Ghi nhận sự kiện chấm công thô (Raw log) từ Mobile App (GPS/FaceID) hoặc máy chấm công.
-/// Nguyên tắc: Bảng này là Append-Only (Chỉ thêm nối tiếp). Tuyệt đối không UPDATE/DELETE.
-/// </summary>
+
+// Domain Entity: Ghi nhận sự kiện chấm công thô (Raw log) từ Mobile App (GPS/FaceID) hoặc máy chấm công.
+// Nguyên tắc: Bảng này là Append-Only (Chỉ thêm nối tiếp). Tuyệt đối không UPDATE/DELETE.
+
 public partial class RawPunchLog : ITenantEntity
 {
     public Guid Id { get; set; }

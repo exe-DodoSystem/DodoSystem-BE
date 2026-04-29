@@ -121,22 +121,25 @@ public class AttendanceResolutionService : IAttendanceResolutionService
             }
 
             var dedupedLogs = DeduplicateLogs(rawLogs, dedupWindowMinutes);
-
+            var cutOffTime = attendanceSetting?.DayStartCutOffTime ?? new TimeSpan(12, 1, 0);
             var groupedByEmployeeDate = dedupedLogs
-                .GroupBy(x => new
+                .Select(log =>
                 {
-                    x.EmployeeId,
-                    WorkDate = DateOnly.FromDateTime(
-                        TimeZoneInfo.ConvertTimeFromUtc(x.Timestamp, VietnamTimeZone))
+                    var localTime = TimeZoneInfo.ConvertTimeFromUtc(log.Timestamp, VietnamTimeZone);
+                    var workDate = localTime.TimeOfDay < cutOffTime
+                        ? DateOnly.FromDateTime(localTime.AddDays(-1))
+                        : DateOnly.FromDateTime(localTime);
+                    return new { Log = log, EmployeeId = log.EmployeeId, WorkDate = workDate, LocalTime = localTime };
                 })
+                .GroupBy(x => new { x.EmployeeId, x.WorkDate })
                 .ToList();
 
             await _transaction.ExecuteAsync(async () =>
             {
                 foreach (var group in groupedByEmployeeDate)
                 {
-                    var orderedLogs = group.OrderBy(x => x.Timestamp).ThenBy(x => x.Id).ToList();
-                    var pairResult = BuildPairs(orderedLogs, group.Key.WorkDate);
+                    var orderedLogs = group.OrderBy(x => x.LocalTime).ThenBy(x => x.Log.Id).ToList();
+                    var pairResult = BuildPairs(orderedLogs.Select(x => x.Log).ToList(), group.Key.WorkDate);
 
                     await UpsertDailyTimesheetAsync(
                         group.Key.EmployeeId,
@@ -294,80 +297,198 @@ public class AttendanceResolutionService : IAttendanceResolutionService
         var totalLate = 0;
         var totalEarly = 0;
         var totalStayLateMinutes = 0; // Số phút ở lại trễ (chưa phải OT)
+        var totalActualWorkedMinutes = 0;
+        var unmatchedPairCount = 0;
 
-        for (var i = 0; i < pairs.Count; i++)
+        // TH1: Ngày nghỉ (Shift == null) nhưng có đi làm (OT nguyên ngày)
+        if (shiftSegments == null || shiftSegments.Count == 0)
         {
-            var pair = pairs[i];
-            var targetSegment = shiftSegments != null && i < shiftSegments.Count ? shiftSegments[i] : null;
-
-            var expectedIn = targetSegment != null
-                ? CombineDateTime(pair.WorkDate, targetSegment.StartTime, targetSegment.StartDayOffset)
-                : (DateTime?)null;
-            var expectedOut = targetSegment != null
-                ? CombineDateTime(pair.WorkDate, targetSegment.EndTime, targetSegment.EndDayOffset)
-                : (DateTime?)null;
-
-            var actualIn = pair.InLog.Timestamp;
-            var actualOut = pair.OutLog?.Timestamp;
-
-            var lateMinutes = 0;
-            var earlyLeaveMinutes = 0;
-            var segmentStatus = pair.MissingOut ? "MissingOut" : "Normal";
-
-            // Nếu ShiftSegment này nằm trong danh sách đã được nghỉ phép → miễn trừ
-            if (targetSegment != null && approvedLeaveSegmentIds.Contains(targetSegment.Id))
+            // Nếu không có ca làm việc, tính tổng thời gian làm việc thực tế từ các cặp PunchPair
+            foreach (var pair in pairs)
             {
-                segmentStatus = "OnLeave";
-                // Không tính Late/EarlyLeave cho ca đã có phép
-            }
-            else
-            {
-                if (expectedIn.HasValue)
+                var actualInUtc = pair.InLog.Timestamp;
+                var actualOutUtc = pair.OutLog?.Timestamp ?? actualInUtc;
+                var actualInLocal = TimeZoneInfo.ConvertTimeFromUtc(actualInUtc, VietnamTimeZone);
+                var actualOutLocal = TimeZoneInfo.ConvertTimeFromUtc(actualOutUtc, VietnamTimeZone);
+                var workedMins = (int)Math.Round((actualOutLocal - actualInLocal).TotalMinutes);
+
+                totalActualWorkedMinutes += workedMins;
+                totalStayLateMinutes += workedMins;
+
+                segments.Add(new DailyTimesheetSegment
                 {
-                    var grace = shift?.GracePeriodMinutes ?? 0;
-                    var lateThreshold = attendanceSetting?.LateThresholdMinutes ?? 0;
-                    var lateAllowance = Math.Max(grace, lateThreshold);
-                    var rawLate = (int)Math.Round((actualIn - expectedIn.Value).TotalMinutes);
-                    lateMinutes = Math.Max(0, rawLate - lateAllowance);
-                }
-
-                if (expectedOut.HasValue && actualOut.HasValue)
-                {
-                    var earlyThreshold = attendanceSetting?.EarlyLeaveThresholdMinutes ?? 0;
-                    var rawEarly = (int)Math.Round((expectedOut.Value - actualOut.Value).TotalMinutes);
-                    earlyLeaveMinutes = Math.Max(0, rawEarly - earlyThreshold);
-                }
+                    Id = Guid.NewGuid(),
+                    DailyTimesheetId = Guid.Empty,
+                    TargetShiftSegmentId = null,
+                    ActualCheckIn = actualInUtc,
+                    ActualCheckOut = pair.OutLog?.Timestamp,
+                    CheckInLatitude = pair.InLog.Latitude,
+                    CheckInLongitude = pair.InLog.Longitude,
+                    CheckInSelfieUrl = pair.InLog.SelfieUrl ?? string.Empty,
+                    CheckOutLatitude = pair.OutLog?.Latitude,
+                    CheckOutLongitude = pair.OutLog?.Longitude,
+                    CheckOutSelfieUrl = pair.OutLog?.SelfieUrl ?? string.Empty,
+                    LateMinutes = 0,
+                    EarlyLeaveMinutes = 0,
+                    Status = "NoShift"
+                });
             }
-
-            totalLate += lateMinutes;
-            totalEarly += earlyLeaveMinutes;
-
-            // Tính số phút "Ở lại trễ" (Stay Late) — chưa phải OT
-            if (expectedOut.HasValue && actualOut.HasValue)
-            {
-                var stayLate = (int)Math.Round((actualOut.Value - expectedOut.Value).TotalMinutes);
-                if (stayLate > 0)
-                    totalStayLateMinutes += stayLate;
-            }
-
-            segments.Add(new DailyTimesheetSegment
-            {
-                Id = Guid.NewGuid(),
-                DailyTimesheetId = Guid.Empty,
-                TargetShiftSegmentId = targetSegment?.Id,
-                ActualCheckIn = actualIn,
-                ActualCheckOut = actualOut,
-                CheckInLatitude = pair.InLog.Latitude,
-                CheckInLongitude = pair.InLog.Longitude,
-                CheckInSelfieUrl = pair.InLog.SelfieUrl ?? string.Empty,
-                CheckOutLatitude = pair.OutLog?.Latitude,
-                CheckOutLongitude = pair.OutLog?.Longitude,
-                CheckOutSelfieUrl = pair.OutLog?.SelfieUrl ?? string.Empty,
-                LateMinutes = lateMinutes,
-                EarlyLeaveMinutes = earlyLeaveMinutes,
-                Status = segmentStatus
-            });
         }
+        // TH2: Ngày đi làm bình thường (Có ShiftSegments) 
+        else
+        {
+            // Bắt đầu Mapping Proximity
+            var unmappedPairs = pairs.ToList(); // Danh sách các thẻ chưa được gán
+            foreach (var targetSegment in shiftSegments)
+            {
+                var expectedIn = CombineDateTime(workDate, targetSegment.StartTime, targetSegment.StartDayOffset);
+                var expectedOut = CombineDateTime(workDate, targetSegment.EndTime, targetSegment.EndDayOffset);
+                // 1. Tìm PunchPair phù hợp nhất (Gần với ExpectedIn nhất)
+                PunchPair? bestMatch = null;
+                if (unmappedPairs.Count > 0)
+                {
+                    var proximityWindowMinutes = _options.ProximityWindowMinutes <= 0
+                        ? int.MaxValue
+                        : _options.ProximityWindowMinutes;
+
+                    var bestCandidate = unmappedPairs
+                        .Select(p => new
+                        {
+                            Pair = p,
+                            DiffMinutes = Math.Abs((TimeZoneInfo.ConvertTimeFromUtc(p.InLog.Timestamp, VietnamTimeZone) - expectedIn).TotalMinutes)
+                        })
+                        .OrderBy(x => x.DiffMinutes)
+                        .First();
+
+                    if (bestCandidate.DiffMinutes <= proximityWindowMinutes)
+                    {
+                        bestMatch = bestCandidate.Pair;
+                        unmappedPairs.Remove(bestMatch); // Bỏ ra khỏi danh sách
+                    }
+                }
+                // 2. Nếu không có Pair nào map được -> VẮNG MẶT
+                if (bestMatch == null)
+                {
+                    if (approvedLeaveSegmentIds.Contains(targetSegment.Id))
+                    {
+                        // Có xin phép -> OnLeave
+                        segments.Add(new DailyTimesheetSegment
+                        {
+                            Id = Guid.NewGuid(),
+                            DailyTimesheetId = Guid.Empty,
+                            TargetShiftSegmentId = targetSegment.Id,
+                            ActualCheckIn = null,
+                            ActualCheckOut = null,
+                            LateMinutes = 0,
+                            EarlyLeaveMinutes = 0,
+                            Status = "OnLeave"
+                        });
+                    }
+                    else
+                    {
+                        // Trốn làm -> Phạt vắng mặt nguyên ca
+                        var penaltyMins = (int)(expectedOut - expectedIn).TotalMinutes;
+                        totalEarly += penaltyMins; // Phạt vào EarlyLeave hoặc Late
+                        segments.Add(new DailyTimesheetSegment
+                        {
+                            Id = Guid.NewGuid(),
+                            DailyTimesheetId = Guid.Empty,
+                            TargetShiftSegmentId = targetSegment.Id,
+                            ActualCheckIn = null,
+                            ActualCheckOut = null,
+                            LateMinutes = 0,
+                            EarlyLeaveMinutes = penaltyMins,
+                            Status = "Absent"
+                        });
+                    }
+                    continue;
+                }
+                // 3. Có thẻ (Có bestMatch) -> Tính Đi Trễ, Về Sớm
+                var actualInUtc = bestMatch.InLog.Timestamp;
+                var actualOutUtc = bestMatch.OutLog?.Timestamp;
+                var actualIn = TimeZoneInfo.ConvertTimeFromUtc(actualInUtc, VietnamTimeZone);
+                var actualOut = actualOutUtc.HasValue
+                    ? TimeZoneInfo.ConvertTimeFromUtc(actualOutUtc.Value, VietnamTimeZone)
+                    : (DateTime?)null;
+                // --- TÍNH TOÁN ACTUAL WORKED ---
+                if (actualOut.HasValue)
+                {
+                    totalActualWorkedMinutes += (int)Math.Round((actualOut.Value - actualIn).TotalMinutes);
+                }
+                // --- TÍNH ĐI TRỄ / VỀ SỚM (Áp dụng Grace Period) ---
+                var lateMins = 0;
+                var earlyMins = 0;
+                var grace = shift?.GracePeriodMinutes ?? 0;
+                // Tính trễ: Chỉ phạt phần VƯỢT QUÁ grace, không phạt toàn bộ rawLate
+                // VD: Ca 8h, grace 5p, vào 8h07 → rawLate=7, lateMins=7-5=2 (không phải 7)
+                var rawLate = (int)Math.Round((actualIn - expectedIn).TotalMinutes);
+                if (rawLate > grace) lateMins = rawLate - grace;
+                                                         // Tính về sớm / Missing Out
+                if (!actualOut.HasValue)
+                {
+                    // Missing Out phạt nặng (Từ lúc quẹt thẻ in -> Hết ca)
+                    earlyMins = Math.Max(0, (int)Math.Round((expectedOut - actualIn).TotalMinutes));
+                }
+                else
+                {
+                    var rawEarly = (int)Math.Round((expectedOut - actualOut.Value).TotalMinutes);
+                    if (rawEarly > 0) earlyMins = rawEarly;
+                }
+                // --- TÍNH OT (Đến sớm + Về trễ) ---
+                // Đến sớm (Early In OT): Math.Max(0,...) đảm bảo không bao giờ âm
+                var earlyInMins = Math.Max(0, (int)Math.Round((expectedIn - actualIn).TotalMinutes));
+                var earlyInMinThreshold = attendanceSetting?.MinimumOTMinutes ?? 0;
+                if (earlyInMins >= earlyInMinThreshold)
+                    totalStayLateMinutes += earlyInMins;
+                // Về trễ (Late Out OT)
+                if (actualOut.HasValue)
+                {
+                    var stayLateMins = (int)Math.Round((actualOut.Value - expectedOut).TotalMinutes);
+                    if (stayLateMins > 0) totalStayLateMinutes += stayLateMins;
+                }
+                // Miễn phạt nếu có phép
+                if (approvedLeaveSegmentIds.Contains(targetSegment.Id))
+                {
+                    lateMins = 0; earlyMins = 0;
+                }
+                totalLate += lateMins;
+                totalEarly += earlyMins;
+                // ... Thêm vào segments ...
+
+                segments.Add(new DailyTimesheetSegment
+                {
+                    Id = Guid.NewGuid(),
+                    DailyTimesheetId = Guid.Empty,
+                    TargetShiftSegmentId = targetSegment.Id,
+                    ActualCheckIn = actualInUtc,
+                    ActualCheckOut = actualOutUtc,
+                    CheckInLatitude = bestMatch.InLog.Latitude,
+                    CheckInLongitude = bestMatch.InLog.Longitude,
+                    CheckInSelfieUrl = bestMatch.InLog.SelfieUrl ?? string.Empty,
+                    CheckOutLatitude = bestMatch.OutLog?.Latitude,
+                    CheckOutLongitude = bestMatch.OutLog?.Longitude,
+                    CheckOutSelfieUrl = bestMatch.OutLog?.SelfieUrl ?? string.Empty,
+                    LateMinutes = lateMins,
+                    EarlyLeaveMinutes = earlyMins,
+                    Status = approvedLeaveSegmentIds.Contains(targetSegment.Id) ? "OnLeave" : (bestMatch.MissingOut ? "MissingOut" : "Normal")
+                });
+            }
+
+            if (unmappedPairs.Count > 0)
+            {
+                unmatchedPairCount += unmappedPairs.Count;
+            }
+        }
+
+        var dailyLateThreshold = attendanceSetting?.LateThresholdMinutes ?? 0;
+        if (totalLate <= dailyLateThreshold)
+            totalLate = 0;
+
+        var dailyEarlyThreshold = attendanceSetting?.EarlyLeaveThresholdMinutes ?? 0;
+        if (totalEarly <= dailyEarlyThreshold)
+            totalEarly = 0;
+
+        
 
         // OT hợp lệ chỉ được tính khi có OvertimeRequest đã duyệt
         var totalOtMinutes = 0;
@@ -379,28 +500,43 @@ public class AttendanceResolutionService : IAttendanceResolutionService
             totalOtMinutes = Math.Min(totalStayLateMinutes, approvedMinutes);
         }
 
+        // Fix: Dùng CombineDateTime để tính đúng cho ca đêm (StartDayOffset/EndDayOffset)
+        // VD: Ca đêm 22:00 → 06:00 hôm sau: EndTime - StartTime = -16h (sai). Phải dùng DateTime thực
         var standardHours = shiftSegments == null
             ? 0m
-            : Math.Round((decimal)shiftSegments.Sum(s => (s.EndTime - s.StartTime).TotalHours), 2);
+            : Math.Round((decimal)shiftSegments.Sum(s =>
+            {
+                var segStart = CombineDateTime(workDate, s.StartTime, s.StartDayOffset);
+                var segEnd   = CombineDateTime(workDate, s.EndTime,   s.EndDayOffset);
+                return (segEnd - segStart).TotalHours;
+            }), 2);
 
+        var absentSegments = segments.Where(s => s.Status == "Absent").ToList();
         var resolutionLog = new
         {
             PairCount = pairs.Count,
             MissingOutCount = pairs.Count(p => p.MissingOut),
             OutBeforeInCount = outBeforeInCount,
+            UnmappedPairCount = unmatchedPairCount,
+            ProximityWindowMinutes = _options.ProximityWindowMinutes,
             TotalLateMinutes = totalLate,
             TotalEarlyLeaveMinutes = totalEarly,
+            AbsentSegmentCount = absentSegments.Count,                                  // Số ca vắng mặt không phép
+            AbsentPenaltyMinutes = absentSegments.Sum(s => s.EarlyLeaveMinutes),        // Tổng phút bị phạt do vắng mặt
             StayLateMinutes = totalStayLateMinutes,
             ApprovedOTMinutes = totalOtMinutes,
             HasApprovedOTRequest = approvedOT != null,
             LeaveSegmentCount = approvedLeaveSegments.Count,
-            TotalOTHours = attendanceSetting?.CalculateValidOTHours(totalOtMinutes) ?? Math.Round(totalOtMinutes / 60m, 2)
+            TotalOTHours = attendanceSetting?.CalculateValidOTHours(totalOtMinutes) ?? Math.Round(totalOtMinutes / 60m, 2),
+            TotalActualWorkedMinutes = totalActualWorkedMinutes
         };
 
         // Xác định anomaly flag
         var anomalyFlags = new List<string>();
         if (pairs.Any(p => p.MissingOut)) anomalyFlags.Add("MissingOut");
         if (outBeforeInCount > 0) anomalyFlags.Add("OutBeforeIn");
+        if (unmatchedPairCount > 0) anomalyFlags.Add("UnmappedPairs");
+        if (totalStayLateMinutes > 0 && approvedOT == null) anomalyFlags.Add("OTWithoutRequest");
         var anomalyFlag = anomalyFlags.Count > 0 ? string.Join(",", anomalyFlags) : string.Empty;
 
         var existing = await _dailyTimesheetRepository.GetByEmployeeDateAsync(employeeId, workDate);
@@ -414,6 +550,7 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                 ExpectedShiftId = shift?.Id,
                 ExpectedShiftSource = shift == null ? "None" : "ShiftPattern",
                 StandardWorkingHours = standardHours,
+                TotalActualWorkedMinutes = totalActualWorkedMinutes,
                 TotalLateMinutes = totalLate,
                 TotalEarlyLeaveMinutes = totalEarly,
                 SystemAnomalyFlag = anomalyFlag,
@@ -429,6 +566,7 @@ public class AttendanceResolutionService : IAttendanceResolutionService
         existing.ExpectedShiftId = shift?.Id;
         existing.ExpectedShiftSource = shift == null ? "None" : "ShiftPattern";
         existing.StandardWorkingHours = standardHours;
+        existing.TotalActualWorkedMinutes = totalActualWorkedMinutes;
         existing.TotalLateMinutes = totalLate;
         existing.TotalEarlyLeaveMinutes = totalEarly;
         existing.SystemAnomalyFlag = anomalyFlag;
@@ -457,7 +595,8 @@ public class AttendanceResolutionService : IAttendanceResolutionService
         var dayIndex = dayOffset % cycleLength;
         if (dayIndex < 0) dayIndex += cycleLength;
 
-        var patternDay = details.Definition.Days.FirstOrDefault(d => d.DayIndex == dayIndex);
+        var patternDay = await _shiftPatternRepository.GetShiftPatternWithDaysAsync(
+            details.Definition.Id, dayIndex);   // Fix: thêm ShiftPatternId để tránh lấy nhầm lịch khác
         if (patternDay?.ScheduledShiftId == null)
             return null;
 

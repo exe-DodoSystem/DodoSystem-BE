@@ -1,22 +1,21 @@
 using SMEFLOWSystem.Core.Entities;
+using System.Runtime.CompilerServices;
 
 namespace SMEFLOWSystem.Application.Interfaces.IRepositories;
 
 public interface IShiftPatternRepository
 {
-    /// <summary>
-    /// Lấy EmployeeShiftPattern đang active cho một nhân viên tại ngày chỉ định,
-    /// kèm theo ShiftPattern -> Days -> ScheduledShift -> Segments
-    /// </summary>
+
+    // Lấy EmployeeShiftPattern đang active cho một nhân viên tại ngày chỉ định,
+    // kèm theo ShiftPattern -> Days -> ScheduledShift -> Segments
     Task<EmployeeShiftPattern?> GetActivePatternForEmployeeAsync(Guid employeeId, DateOnly targetDate);
 
-    /// <summary>
-    /// Lấy EmployeeShiftPattern và ShiftPattern cho một nhân viên tại ngày chỉ định
-    /// </summary>
+
+    // Lấy EmployeeShiftPattern và ShiftPattern cho một nhân viên tại ngày chỉ định
     Task<(EmployeeShiftPattern? Pattern, ShiftPattern? Definition)> GetActivePatternDetailsAsync(Guid employeeId, DateOnly targetDate);
 
-    /// <summary>
-    /// Lấy Shift kèm Segments theo ShiftId
-    /// </summary>
+    // Lấy Shift kèm Segments theo ShiftId
     Task<Shift?> GetShiftWithSegmentsAsync(Guid shiftId);
+
+    Task<ShiftPatternDay?> GetShiftPatternWithDaysAsync(Guid shiftPatternId, int dayIndex);
 }

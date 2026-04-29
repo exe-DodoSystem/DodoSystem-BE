@@ -13,7 +13,7 @@ public class TenantAttendanceSetting : ITenantEntity
     public int CheckInRadiusMeters { get; set; } = 100;
     public TimeOnly? WorkStartTime { get; set; }
     public TimeOnly? WorkEndTime { get; set; }
-    public TimeSpan DayStartCutOffTime { get; set; }
+    public TimeSpan DayStartCutOffTime { get; set; } = new TimeSpan(12, 1, 0);
     public int LateThresholdMinutes { get; set; } = 10;
     public int EarlyLeaveThresholdMinutes { get; set; } = 10;
     
