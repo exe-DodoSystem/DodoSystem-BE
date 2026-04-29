@@ -95,6 +95,8 @@ public static class WebApplicationExtensions
     private static void ScheduleRecurringJobs(WebApplication app)
     {
         var timeZone = TryGetVietNamTimeZone();
+        var attendanceEnabled = app.Configuration.GetValue<bool?>("AttendanceResolution:Enabled") ?? true;
+        var attendanceCron = app.Configuration["AttendanceResolution:Cron"] ?? "*/15 * * * *";
         using var scope = app.Services.CreateScope();
         var recurringJobManager = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
 
@@ -109,6 +111,15 @@ public static class WebApplicationExtensions
             job: Job.FromExpression<PayrollRecurringJob>(j => j.GeneratePayrollForAllTenant()),
             cronExpression: "0 1 1 * *",   // 01:00 AM ngày 1 hàng tháng (giờ VN)
             options: new RecurringJobOptions { TimeZone = timeZone });
+
+        if (attendanceEnabled)
+        {
+            recurringJobManager.AddOrUpdate(
+                recurringJobId: "attendance-resolution",
+                job: Job.FromExpression<AttendanceResolutionRecurringJob>(j => j.RunAsync()),
+                cronExpression: attendanceCron,
+                options: new RecurringJobOptions { TimeZone = timeZone });
+        }
 
     }
 

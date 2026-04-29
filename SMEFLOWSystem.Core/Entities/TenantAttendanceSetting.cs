@@ -13,10 +13,10 @@ public class TenantAttendanceSetting : ITenantEntity
     public int CheckInRadiusMeters { get; set; } = 100;
     public TimeOnly? WorkStartTime { get; set; }
     public TimeOnly? WorkEndTime { get; set; }
+    public TimeSpan DayStartCutOffTime { get; set; }
     public int LateThresholdMinutes { get; set; } = 10;
     public int EarlyLeaveThresholdMinutes { get; set; } = 10;
     
-    // --- BỔ SUNG NGHIỆP VỤ LÀM THÊM GIỜ (OVERTIME) ---
     public int MinimumOTMinutes { get; set; } = 30; // Dưới 30p không tính OT
     public int OTBlockMinutes { get; set; } = 30; // Block làm tròn (VD: 30p, 60p)
 

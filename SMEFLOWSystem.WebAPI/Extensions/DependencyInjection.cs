@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using SMEFLOWSystem.Core.Config;
+using SMEFLOWSystem.Application.Options;
 using SMEFLOWSystem.WebAPI.BackgroundServices;
 using System.Security.Claims;
 using System.Text;
@@ -61,6 +62,8 @@ public static class DependencyInjection
 
         services.AddHttpContextAccessor();
         services.AddAuthorization();
+
+        services.Configure<AttendanceResolutionOptions>(configuration.GetSection("AttendanceResolution"));
 
         services.Configure<EmailSettings>(configuration.GetSection("EmailSettings"));
         services.Configure<CloudinarySettings>(configuration.GetSection("Cloudinary"));

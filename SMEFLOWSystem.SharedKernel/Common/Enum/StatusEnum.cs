@@ -59,5 +59,8 @@ namespace ShareKernel.Common.Enum
         public const string OutboxFailed = "Failed";
         public const string OutboxProcessing = "Processing";
 
+        //PunchKind
+        public const string PunchIn = "In";
+        public const string PunchOut = "Out";
     }
 }

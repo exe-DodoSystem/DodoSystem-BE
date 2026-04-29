@@ -14,10 +14,13 @@ namespace SMEFLOWSystem.Core.Entities
         public Guid EmployeeId { get; set; }
         public DateOnly OvertimeDate { get; set; }
         public decimal RequestedHours { get; set; }
-        public string Reason { get; set; }
+        public string Reason { get; set; } = string.Empty;
         public decimal? ApprovedHours { get; set; }
-        public string Status { get; set; }
+        public string Status { get; set; } = "Pending";
         public Guid? ApprovedByUserId { get; set; }
         public decimal? SystemCalculatedMultiplier { get; set; }
+
+        public virtual Employee? Employee { get; set; }
+        public virtual User? ApprovedByUser { get; set; }
     }
 }

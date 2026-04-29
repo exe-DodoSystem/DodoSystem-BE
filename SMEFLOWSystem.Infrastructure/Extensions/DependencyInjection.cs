@@ -41,12 +41,16 @@ public static class DependencyInjection
         services.AddScoped<IDepartmentRepository, DepartmentRepository>();
         services.AddScoped<IPositionRepository, PositionRepository>();
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
+        services.AddScoped<IShiftPatternRepository, ShiftPatternRepository>();
         services.AddScoped<IPayrollRepository, PayrollRepository>();
+        services.AddScoped<IDailyTimesheetRepository, DailyTimesheetRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
 
         services.AddScoped<IRawPunchLogRepository, RawPunchLogRepository>();
         // services.AddScoped<IAttendanceRepository, AttendanceRepository>();
         services.AddScoped<IAttendanceSettingRepository, AttendanceSettingRepository>();
+        services.AddScoped<IOvertimeRequestRepository, OvertimeRequestRepository>();
+        services.AddScoped<ILeaveRequestRepository, LeaveRequestRepository>();
 
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 

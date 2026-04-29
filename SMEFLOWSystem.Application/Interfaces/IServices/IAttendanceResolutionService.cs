@@ -1,1 +1,6 @@
-// CHU?N B? ÐU?C VI?T L?I
+namespace SMEFLOWSystem.Application.Interfaces.IServices;
+
+public interface IAttendanceResolutionService
+{
+    Task ProcessUnresolvedPunchesAsync();
+}

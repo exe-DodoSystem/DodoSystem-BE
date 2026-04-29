@@ -10,31 +10,36 @@ namespace SMEFLOWSystem.Application.Services
     public class AttendanceService : IAttendanceService
     {
         private readonly IRawPunchLogRepository _punchLogRepo;
+        private readonly IEmployeeRepository _employeeRepository;
 
-        public AttendanceService(IRawPunchLogRepository punchLogRepo)
+        public AttendanceService(IRawPunchLogRepository punchLogRepo, IEmployeeRepository employeeRepository)
         {
             _punchLogRepo = punchLogRepo;
+            _employeeRepository = employeeRepository;
         }
 
-        public async Task<RawPunchLogDto> SubmitPunchAsync(Guid employeeId, SubmitPunchRequestDto request)
+        public async Task<RawPunchLogDto> SubmitPunchAsync(Guid userId, SubmitPunchRequestDto request)
         {
-            // 1. Create a RawPunchLog from the request
+            var employee = await _employeeRepository.GetByUserIdAsync(userId);
+            if (employee == null)
+            {
+                throw new InvalidOperationException("Employee not found for current user.");
+            }
+
             var punch = new RawPunchLog()
             {
-                EmployeeId = employeeId,
+                EmployeeId = employee.Id,
                 Timestamp = DateTime.UtcNow,
                 DeviceId = request.DeviceId,
                 PunchType = request.PunchType ?? "Auto",
                 Latitude = request.Latitude,
                 Longitude = request.Longitude,
                 SelfieUrl = request.SelfieUrl,
-                IsProcessed = false // Needs to be resolved by the engine later
+                IsProcessed = false 
             };
 
-            // 2. Save it to the repository
             await _punchLogRepo.AddAsync(punch);
 
-            // 3. Return to client
             return new RawPunchLogDto
             {
                 Id = punch.Id,

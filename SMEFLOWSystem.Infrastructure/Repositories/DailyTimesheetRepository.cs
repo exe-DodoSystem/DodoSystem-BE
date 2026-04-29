@@ -51,4 +51,22 @@ public class DailyTimesheetRepository : IDailyTimesheetRepository
         _context.DailyTimesheets.Update(timesheet);
         await _context.SaveChangesAsync();
     }
+
+    public async Task UpsertAsync(DailyTimesheet timesheet)
+    {
+        var existing = await _context.DailyTimesheets
+            .FirstOrDefaultAsync(d => d.EmployeeId == timesheet.EmployeeId && d.WorkDate == timesheet.WorkDate);
+
+        if (existing == null)
+        {
+            await _context.DailyTimesheets.AddAsync(timesheet);
+        }
+        else
+        {
+            timesheet.Id = existing.Id;
+            _context.DailyTimesheets.Update(timesheet);
+        }
+
+        await _context.SaveChangesAsync();
+    }
 }

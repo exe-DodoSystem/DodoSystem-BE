@@ -24,13 +24,20 @@ public class AttendanceController : ControllerBase
     public async Task<IActionResult> SubmitPunch([FromBody] SubmitPunchRequestDto request)
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (!Guid.TryParse(userIdClaim, out var employeeId))
+        if (!Guid.TryParse(userIdClaim, out var userId))
         {
             return Unauthorized(new { Error = "User is not authenticated correctly." });
         }
 
-        var result = await _service.SubmitPunchAsync(employeeId, request);
-        return Ok(new { Data = result, Message = "Punch submitted successfully" });
+        try
+        {
+            var result = await _service.SubmitPunchAsync(userId, request);
+            return Ok(new { Data = result, Message = "Punch submitted successfully" });
+        }
+        catch (InvalidOperationException)
+        {
+            return NotFound(new { Error = "Employee not found for current user." });
+        }
     }
 
     // Rewrite other methods later...

@@ -24,6 +24,9 @@ public class RawPunchLogConfiguration : IEntityTypeConfiguration<RawPunchLog>
         // Nếu không có Index này, quét 1 triệu dòng log mỗi đêm thì Server Database sẽ đứt bóng.
         builder.HasIndex(e => new { e.EmployeeId, e.Timestamp })
             .HasDatabaseName("IX_RawPunchLogs_Employee_Timestamp");
+
+        builder.HasIndex(e => new { e.IsProcessed, e.Timestamp })
+            .HasDatabaseName("IX_RawPunchLogs_IsProcessed_Timestamp");
             
         // Quan hệ với Employee (bảng 1 nhiều, không cho xóa Cascade để bảo toàn log lịch sử)
         builder.HasOne(e => e.Employee)

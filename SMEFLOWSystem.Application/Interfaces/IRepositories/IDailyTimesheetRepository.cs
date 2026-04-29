@@ -9,4 +9,5 @@ public interface IDailyTimesheetRepository
     Task AddAsync(DailyTimesheet timesheet);
     Task AddRangeAsync(List<DailyTimesheet> timesheets);
     Task UpdateAsync(DailyTimesheet timesheet);
+    Task UpsertAsync(DailyTimesheet timesheet);
 }

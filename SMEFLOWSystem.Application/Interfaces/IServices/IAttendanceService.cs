@@ -6,5 +6,5 @@ namespace SMEFLOWSystem.Application.Interfaces.IServices;
 
 public interface IAttendanceService
 {
-    Task<RawPunchLogDto> SubmitPunchAsync(Guid employeeId, SubmitPunchRequestDto request);
+    Task<RawPunchLogDto> SubmitPunchAsync(Guid userId, SubmitPunchRequestDto request);
 }

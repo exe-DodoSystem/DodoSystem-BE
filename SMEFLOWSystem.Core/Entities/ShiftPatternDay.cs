@@ -14,5 +14,8 @@ namespace SMEFLOWSystem.Core.Entities
         public Guid ShiftPatternId { get; set; }
         public int DayIndex { get; set; }
         public Guid? ScheduledShiftId { get; set; }
+
+        public virtual ShiftPattern? ShiftPattern { get; set; }
+        public virtual Shift? ScheduledShift { get; set; }
     }
 }

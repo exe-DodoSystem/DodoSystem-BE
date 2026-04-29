@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
 using SMEFLOWSystem.SharedKernel.Interfaces;
@@ -30,7 +30,8 @@ namespace SMEFLOWSystem.Infrastructure.Data
 
         private class DesignTimeTenantService : ICurrentTenantService
         {
-            public Guid? TenantId => null; 
+            public Guid? TenantId => null;
+            public void SetTenantId(Guid? tenantId) { }
         }
     }
 }

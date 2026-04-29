@@ -47,12 +47,14 @@ public static class DependencyInjection
         services.AddScoped<IHrPositionService, HrPositionService>();
         services.AddScoped<IHrEmployeeService, HrEmployeeService>();
         services.AddScoped<IAttendanceService, AttendanceService>();
+        services.AddScoped<IAttendanceResolutionService, AttendanceResolutionService>();
         // services.AddScoped<IPayrollService, PayrollService>();
         services.AddScoped<INotificationService, NotificationService>();
 
 
         services.AddScoped<TenantExpirationRecurringJob>();
         services.AddScoped<PayrollRecurringJob>();
+        services.AddScoped<AttendanceResolutionRecurringJob>();
 
         services.AddScoped<ISystemBootstrapService, SystemBootstrapService>();
         services.AddScoped<ISystemTenantService, SystemTenantService>();

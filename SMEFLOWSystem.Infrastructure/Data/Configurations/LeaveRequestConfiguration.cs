@@ -20,6 +20,16 @@ public class LeaveRequestConfiguration : IEntityTypeConfiguration<LeaveRequest>
             .IsRequired()
             .HasMaxLength(20);
 
+        builder.HasOne(x => x.Employee)
+            .WithMany()
+            .HasForeignKey(x => x.EmployeeId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne(x => x.ApprovedByUser)
+            .WithMany()
+            .HasForeignKey(x => x.ApprovedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // Map quan hệ cha con
         builder.HasMany(e => e.Segments)
             .WithOne(e => e.LeaveRequest)
@@ -43,5 +53,10 @@ public class LeaveRequestSegmentConfiguration : IEntityTypeConfiguration<LeaveRe
         builder.HasIndex(e => new { e.LeaveRequestId, e.TargetShiftSegmentId })
             .IsUnique()
             .HasDatabaseName("IX_LeaveRequestSegments_UniqueSegment");
+
+        builder.HasOne(x => x.TargetShiftSegment)
+            .WithMany()
+            .HasForeignKey(x => x.TargetShiftSegmentId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
