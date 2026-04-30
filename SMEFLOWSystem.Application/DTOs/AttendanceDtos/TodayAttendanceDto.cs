@@ -1,4 +1,5 @@
 namespace SMEFLOWSystem.Application.DTOs.AttendanceDtos;
+using System;
 
 public class TodayAttendanceDto
 {

@@ -2,12 +2,14 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SMEFLOWSystem.Application.DTOs.AttendanceDtos;
 using SMEFLOWSystem.Application.Interfaces.IServices;
+using System;
+using System.Threading.Tasks;
 
 namespace SMEFLOWSystem.WebAPI.Controllers;
 
 [ApiController]
 [Authorize]
-[Route("api/attendance/setting")]
+[Route("api/v1/attendance/setting")]
 public class AttendanceSettingController : ControllerBase
 {
     private readonly IAttendanceService _service;
@@ -17,14 +19,40 @@ public class AttendanceSettingController : ControllerBase
         _service = service;
     }
 
-    // Uncomment and rewrite later
-    // [HttpGet]
-    // public async Task<IActionResult> GetConfig()
-    // {
-    // }
+    [HttpGet]
+    public async Task<IActionResult> GetConfig()
+    {
+        try
+        {
+            var result = await _service.GetSettingsAsync();
+            return Ok(new { Data = result });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(new { Error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { Error = ex.Message });
+        }
+    }
 
-    // [HttpPost]
-    // public async Task<IActionResult> UpsertConfig([FromBody] AttendanceConfigRequestDto dto)
-    // {
-    // }
+    [HttpPost]
+    [Authorize(Roles = "Admin,HR")]
+    public async Task<IActionResult> UpsertConfig([FromBody] UpdateAttendanceSettingRequestDto dto)
+    {
+        try
+        {
+            var result = await _service.UpdateSettingsAsync(dto);
+            return Ok(new { Data = result, Message = "Cập nhật cấu hình chấm công thành công." });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(new { Error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { Error = ex.Message });
+        }
+    }
 }

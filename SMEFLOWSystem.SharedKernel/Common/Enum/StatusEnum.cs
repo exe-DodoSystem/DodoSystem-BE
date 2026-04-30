@@ -41,6 +41,10 @@ namespace ShareKernel.Common.Enum
         public const string AttendanceLate = "Late";
         public const string AttendanceEarlyLeave = "EarlyLeave";
         public const string AttendanceAbsent = "Absent";
+        public const string AttendanceMissingOut = "MissingOut";
+        public const string AttendanceOnLeave = "OnLeave";
+        public const string AttendanceNoShift = "NoShift";
+        public const string AttendanceNormal = "Normal";
 
         // Approval status
         public const string ApprovalPending = "PendingApproval";

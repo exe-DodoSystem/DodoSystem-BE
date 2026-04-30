@@ -1,4 +1,4 @@
-﻿using SMEFLOWSystem.SharedKernel.Interfaces;
+using SMEFLOWSystem.SharedKernel.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -20,8 +20,13 @@ namespace SMEFLOWSystem.Core.Entities
         public decimal StandardWorkingHours { get; set; }
         // Tổng phút làm việc thực tế(trừ giờ nghỉ)
         public int TotalActualWorkedMinutes { get; set; }
+        public decimal ActualWorkHours { get; set; }
+        public decimal OTHours { get; set; }
         public int TotalLateMinutes { get; set; }
+        public int LateMinutes { get; set; }
         public int TotalEarlyLeaveMinutes { get; set; }
+        public int EarlyLeaveMinutes { get; set; }
+        public string Status { get; set; } = string.Empty;
         public string SystemAnomalyFlag { get; set; } = string.Empty;
         public string ResolutionLogJson { get; set; } = string.Empty;
 

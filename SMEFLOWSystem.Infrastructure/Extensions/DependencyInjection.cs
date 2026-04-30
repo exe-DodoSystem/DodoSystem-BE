@@ -51,6 +51,7 @@ public static class DependencyInjection
         services.AddScoped<IAttendanceSettingRepository, AttendanceSettingRepository>();
         services.AddScoped<IOvertimeRequestRepository, OvertimeRequestRepository>();
         services.AddScoped<ILeaveRequestRepository, LeaveRequestRepository>();
+        services.AddScoped<ITimesheetAppealRepository, TimesheetAppealRepository>();
 
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 

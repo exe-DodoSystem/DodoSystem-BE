@@ -6,6 +6,7 @@ public interface IDailyTimesheetRepository
 {
     Task<DailyTimesheet?> GetByEmployeeDateAsync(Guid employeeId, DateOnly workDate);
     Task<List<DailyTimesheet>> GetByEmployeeMonthAsync(Guid employeeId, int month, int year);
+    Task<List<DailyTimesheet>> GetByTenantMonthAsync(Guid tenantId, int month, int year);
     Task AddAsync(DailyTimesheet timesheet);
     Task AddRangeAsync(List<DailyTimesheet> timesheets);
     Task UpdateAsync(DailyTimesheet timesheet);

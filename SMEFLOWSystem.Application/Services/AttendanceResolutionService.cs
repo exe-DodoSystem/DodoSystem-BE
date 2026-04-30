@@ -134,23 +134,32 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                 .GroupBy(x => new { x.EmployeeId, x.WorkDate })
                 .ToList();
 
-            await _transaction.ExecuteAsync(async () =>
+            foreach (var group in groupedByEmployeeDate)
             {
-                foreach (var group in groupedByEmployeeDate)
+                try
                 {
-                    var orderedLogs = group.OrderBy(x => x.LocalTime).ThenBy(x => x.Log.Id).ToList();
-                    var pairResult = BuildPairs(orderedLogs.Select(x => x.Log).ToList(), group.Key.WorkDate);
+                    await _transaction.ExecuteAsync(async () =>
+                    {
+                        var orderedLogs = group.OrderBy(x => x.LocalTime).ThenBy(x => x.Log.Id).ToList();
+                        var pairResult = BuildPairs(orderedLogs.Select(x => x.Log).ToList(), group.Key.WorkDate);
 
-                    await UpsertDailyTimesheetAsync(
-                        group.Key.EmployeeId,
-                        group.Key.WorkDate,
-                        pairResult.Pairs,
-                        pairResult.OutBeforeInCount,
-                        attendanceSetting);
+                        await UpsertDailyTimesheetAsync(
+                            group.Key.EmployeeId,
+                            group.Key.WorkDate,
+                            pairResult.Pairs,
+                            pairResult.OutBeforeInCount,
+                            attendanceSetting);
+
+                        // Chỉ mark processed cho những log của nhóm đã xử lý thành công
+                        var processedLogIds = group.Select(x => x.Log.Id).ToList();
+                        await _rawPunchLogRepository.MarkProcessedAsync(processedLogIds);
+                    });
                 }
-
-                await _rawPunchLogRepository.MarkProcessedAsync(rawLogs.Select(x => x.Id));
-            });
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Thất bại khi xử lý chấm công cho EmployeeId: {EmployeeId}, Ngày: {WorkDate}. Sẽ thử lại ở lô tiếp theo.", group.Key.EmployeeId, group.Key.WorkDate);
+                }
+            }
 
             executedBatches++;
         }
@@ -330,7 +339,7 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                     CheckOutSelfieUrl = pair.OutLog?.SelfieUrl ?? string.Empty,
                     LateMinutes = 0,
                     EarlyLeaveMinutes = 0,
-                    Status = "NoShift"
+                    Status = StatusEnum.AttendanceNoShift
                 });
             }
         }
@@ -381,7 +390,7 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                             ActualCheckOut = null,
                             LateMinutes = 0,
                             EarlyLeaveMinutes = 0,
-                            Status = "OnLeave"
+                            Status = StatusEnum.AttendanceOnLeave
                         });
                     }
                     else
@@ -398,7 +407,7 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                             ActualCheckOut = null,
                             LateMinutes = 0,
                             EarlyLeaveMinutes = penaltyMins,
-                            Status = "Absent"
+                            Status = StatusEnum.AttendanceAbsent
                         });
                     }
                     continue;
@@ -470,7 +479,7 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                     CheckOutSelfieUrl = bestMatch.OutLog?.SelfieUrl ?? string.Empty,
                     LateMinutes = lateMins,
                     EarlyLeaveMinutes = earlyMins,
-                    Status = approvedLeaveSegmentIds.Contains(targetSegment.Id) ? "OnLeave" : (bestMatch.MissingOut ? "MissingOut" : "Normal")
+                    Status = approvedLeaveSegmentIds.Contains(targetSegment.Id) ? StatusEnum.AttendanceOnLeave : (bestMatch.MissingOut ? StatusEnum.AttendanceMissingOut : StatusEnum.AttendanceNormal)
                 });
             }
 
@@ -511,7 +520,16 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                 return (segEnd - segStart).TotalHours;
             }), 2);
 
-        var absentSegments = segments.Where(s => s.Status == "Absent").ToList();
+        var otHours = attendanceSetting?.CalculateValidOTHours(totalOtMinutes) ?? Math.Round(totalOtMinutes / 60m, 2);
+        var actualWorkHours = Math.Round(totalActualWorkedMinutes / 60m, 2);
+
+        var absentSegments = segments.Where(s => s.Status == StatusEnum.AttendanceAbsent).ToList();
+        var dayStatus = StatusEnum.AttendanceNormal;
+        if (absentSegments.Count > 0) dayStatus = StatusEnum.AttendanceAbsent;
+        else if (segments.Any(s => s.Status == StatusEnum.AttendanceMissingOut)) dayStatus = StatusEnum.AttendanceMissingOut;
+        else if (totalLate > 0) dayStatus = StatusEnum.AttendanceLate;
+        else if (totalEarly > 0) dayStatus = StatusEnum.AttendanceEarlyLeave;
+
         var resolutionLog = new
         {
             PairCount = pairs.Count,
@@ -527,7 +545,7 @@ public class AttendanceResolutionService : IAttendanceResolutionService
             ApprovedOTMinutes = totalOtMinutes,
             HasApprovedOTRequest = approvedOT != null,
             LeaveSegmentCount = approvedLeaveSegments.Count,
-            TotalOTHours = attendanceSetting?.CalculateValidOTHours(totalOtMinutes) ?? Math.Round(totalOtMinutes / 60m, 2),
+            TotalOTHours = otHours,
             TotalActualWorkedMinutes = totalActualWorkedMinutes
         };
 
@@ -546,13 +564,19 @@ public class AttendanceResolutionService : IAttendanceResolutionService
             {
                 Id = Guid.NewGuid(),
                 EmployeeId = employeeId,
+                TenantId = tenantId,
                 WorkDate = workDate,
                 ExpectedShiftId = shift?.Id,
                 ExpectedShiftSource = shift == null ? "None" : "ShiftPattern",
                 StandardWorkingHours = standardHours,
                 TotalActualWorkedMinutes = totalActualWorkedMinutes,
+                ActualWorkHours = actualWorkHours,
+                OTHours = otHours,
                 TotalLateMinutes = totalLate,
+                LateMinutes = totalLate,
                 TotalEarlyLeaveMinutes = totalEarly,
+                EarlyLeaveMinutes = totalEarly,
+                Status = dayStatus,
                 SystemAnomalyFlag = anomalyFlag,
                 ResolutionLogJson = JsonSerializer.Serialize(resolutionLog),
                 IsManuallyAdjusted = false,
@@ -567,8 +591,13 @@ public class AttendanceResolutionService : IAttendanceResolutionService
         existing.ExpectedShiftSource = shift == null ? "None" : "ShiftPattern";
         existing.StandardWorkingHours = standardHours;
         existing.TotalActualWorkedMinutes = totalActualWorkedMinutes;
+        existing.ActualWorkHours = actualWorkHours;
+        existing.OTHours = otHours;
         existing.TotalLateMinutes = totalLate;
+        existing.LateMinutes = totalLate;
         existing.TotalEarlyLeaveMinutes = totalEarly;
+        existing.EarlyLeaveMinutes = totalEarly;
+        existing.Status = dayStatus;
         existing.SystemAnomalyFlag = anomalyFlag;
         existing.ResolutionLogJson = JsonSerializer.Serialize(resolutionLog);
 

@@ -34,6 +34,17 @@ public class DailyTimesheetRepository : IDailyTimesheetRepository
             .ToListAsync();
     }
 
+    public async Task<List<DailyTimesheet>> GetByTenantMonthAsync(Guid tenantId, int month, int year)
+    {
+        return await _context.DailyTimesheets
+            .AsNoTracking()
+            .Include(d => d.Employee)
+            .Include(d => d.Segments)
+            .AsSplitQuery()
+            .Where(d => d.TenantId == tenantId && d.WorkDate.Month == month && d.WorkDate.Year == year)
+            .ToListAsync();
+    }
+
     public async Task AddAsync(DailyTimesheet timesheet)
     {
         await _context.DailyTimesheets.AddAsync(timesheet);

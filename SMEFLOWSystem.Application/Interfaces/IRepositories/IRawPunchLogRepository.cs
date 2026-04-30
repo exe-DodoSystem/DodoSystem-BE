@@ -7,4 +7,5 @@ public interface IRawPunchLogRepository
     Task AddAsync(RawPunchLog punchLog);
     Task<List<RawPunchLog>> GetUnprocessedBatchAsync(int batchSize);
     Task MarkProcessedAsync(IEnumerable<Guid> punchLogIds);
+    Task MarkUnprocessedForRecalculateAsync(Guid employeeId, DateTime fromDate, DateTime toDate);
 }

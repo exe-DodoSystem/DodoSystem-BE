@@ -53,4 +53,18 @@ public class RawPunchLogRepository : IRawPunchLogRepository
 
         await _context.SaveChangesAsync();
     }
+
+    public async Task MarkUnprocessedForRecalculateAsync(Guid employeeId, DateTime fromDate, DateTime toDate)
+    {
+        var logs = await _context.RawPunchLogs
+            .Where(x => x.EmployeeId == employeeId && x.Timestamp >= fromDate && x.Timestamp <= toDate)
+            .ToListAsync();
+            
+        foreach (var log in logs)
+        {
+            log.IsProcessed = false;
+        }
+
+        await _context.SaveChangesAsync();
+    }
 }
