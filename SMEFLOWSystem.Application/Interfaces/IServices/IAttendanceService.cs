@@ -1,6 +1,7 @@
+using SMEFLOWSystem.Application.DTOs;
+using SMEFLOWSystem.Application.DTOs.AttendanceDtos;
 using System;
 using System.Threading.Tasks;
-using SMEFLOWSystem.Application.DTOs.AttendanceDtos;
 
 namespace SMEFLOWSystem.Application.Interfaces.IServices;
 

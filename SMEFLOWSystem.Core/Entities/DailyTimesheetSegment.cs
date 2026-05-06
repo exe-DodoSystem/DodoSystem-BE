@@ -19,11 +19,11 @@ namespace SMEFLOWSystem.Core.Entities
 
         public double? CheckInLatitude { get; set; }
         public double? CheckInLongitude { get; set; }
-        public string CheckInSelfieUrl { get; set; }
+        public string CheckInSelfieUrl { get; set; } = string.Empty;
 
         public double? CheckOutLatitude { get; set; }
         public double? CheckOutLongitude { get; set; }
-        public string CheckOutSelfieUrl { get; set; }
+        public string CheckOutSelfieUrl { get; set; } = string.Empty;
 
         public int LateMinutes { get; set; }
         public int EarlyLeaveMinutes { get; set; }

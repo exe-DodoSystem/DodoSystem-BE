@@ -105,6 +105,8 @@ public class AttendanceResolutionService : IAttendanceResolutionService
         var maxBatches = _options.MaxBatchesPerRun;
         var executedBatches = 0;
 
+        var lastProcessedLogs = new Dictionary<Guid, RawPunchLog>();
+        var shiftCache = new Dictionary<string, Shift?>();
         while (true)
         {
             if (maxBatches > 0 && executedBatches >= maxBatches)
@@ -120,8 +122,8 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                 return;
             }
 
-            var dedupedLogs = DeduplicateLogs(rawLogs, dedupWindowMinutes);
-            var cutOffTime = attendanceSetting?.DayStartCutOffTime ?? new TimeSpan(12, 1, 0);
+            var dedupedLogs = DeduplicateLogs(rawLogs, dedupWindowMinutes, lastProcessedLogs);
+            var cutOffTime = attendanceSetting?.DayStartCutOffTime ?? new TimeSpan(4, 0, 0);
             var groupedByEmployeeDate = dedupedLogs
                 .Select(log =>
                 {
@@ -148,7 +150,9 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                             group.Key.WorkDate,
                             pairResult.Pairs,
                             pairResult.OutBeforeInCount,
-                            attendanceSetting);
+                            attendanceSetting,
+                            shiftCache,
+                            pairResult.OrphanedOutLog);
 
                         // Chỉ mark processed cho những log của nhóm đã xử lý thành công
                         var processedLogIds = group.Select(x => x.Log.Id).ToList();
@@ -165,7 +169,7 @@ public class AttendanceResolutionService : IAttendanceResolutionService
         }
     }
 
-    private static List<RawPunchLog> DeduplicateLogs(List<RawPunchLog> rawLogs, int dedupWindowMinutes)
+    private static List<RawPunchLog> DeduplicateLogs(List<RawPunchLog> rawLogs, int dedupWindowMinutes, Dictionary<Guid, RawPunchLog> lastProcessedLogs)
     {
         if (dedupWindowMinutes <= 0)
             return rawLogs;
@@ -174,8 +178,10 @@ public class AttendanceResolutionService : IAttendanceResolutionService
 
         foreach (var employeeGroup in rawLogs.GroupBy(x => x.EmployeeId))
         {
+            var employeeId = employeeGroup.Key;
             var ordered = employeeGroup.OrderBy(x => x.Timestamp).ThenBy(x => x.Id).ToList();
-            RawPunchLog? lastKept = null;
+
+            lastProcessedLogs.TryGetValue(employeeId, out RawPunchLog? lastKept);
 
             foreach (var log in ordered)
             {
@@ -185,13 +191,19 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                     lastKept = log;
                     continue;
                 }
-
-                var diffMinutes = Math.Abs((log.Timestamp - lastKept.Timestamp).TotalMinutes);
-                if (diffMinutes >= dedupWindowMinutes)
+                else
                 {
-                    result.Add(log);
-                    lastKept = log;
+                    var diffMinutes = Math.Abs((log.Timestamp - lastKept.Timestamp).TotalMinutes);
+                    if (diffMinutes >= dedupWindowMinutes)
+                    {
+                        result.Add(log);
+                        lastKept = log;
+                    }
                 }
+            }
+            if (lastKept != null)
+            {
+                lastProcessedLogs[employeeId] = lastKept;
             }
         }
 
@@ -206,13 +218,14 @@ public class AttendanceResolutionService : IAttendanceResolutionService
         public DateOnly WorkDate { get; init; }
     }
 
-    private sealed record PairResult(List<PunchPair> Pairs, int OutBeforeInCount);
+    private sealed record PairResult(List<PunchPair> Pairs, int OutBeforeInCount, RawPunchLog? OrphanedOutLog);
 
     private static PairResult BuildPairs(List<RawPunchLog> orderedLogs, DateOnly workDate)
     {
         var pairs = new List<PunchPair>();
         RawPunchLog? open = null;
         var outBeforeInCount = 0;
+        RawPunchLog? orphanedOutLog = null;
 
         foreach (var log in orderedLogs)
         {
@@ -222,6 +235,7 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                 if (firstKind == StatusEnum.PunchOut)
                 {
                     outBeforeInCount++;
+                    if (orphanedOutLog == null) orphanedOutLog = log;
                     continue;
                 }
 
@@ -264,7 +278,7 @@ public class AttendanceResolutionService : IAttendanceResolutionService
             });
         }
 
-        return new PairResult(pairs, outBeforeInCount);
+        return new PairResult(pairs, outBeforeInCount, orphanedOutLog);
     }
 
     private static string ResolvePunchType(string? punchType, bool isOpenEmpty)
@@ -283,10 +297,13 @@ public class AttendanceResolutionService : IAttendanceResolutionService
         DateOnly workDate,
         List<PunchPair> pairs,
         int outBeforeInCount,
-        TenantAttendanceSetting? attendanceSetting)
+        TenantAttendanceSetting? attendanceSetting,
+        Dictionary<string, Shift?> shiftCache,
+        RawPunchLog? orphanedOutLog)
     {
+        var tenantId = _currentTenantService.TenantId ?? throw new InvalidOperationException("TenantId is not set in the current context.");
         var shiftInfo = await _shiftPatternRepository.GetActivePatternDetailsAsync(employeeId, workDate);
-        var shift = await ResolveShiftAsync(shiftInfo, workDate);
+        var shift = await ResolveShiftAsync(shiftInfo, workDate, shiftCache);
         var shiftSegments = shift?.Segments
             .OrderBy(s => s.StartDayOffset)
             .ThenBy(s => s.StartTime)
@@ -305,7 +322,8 @@ public class AttendanceResolutionService : IAttendanceResolutionService
         var segments = new List<DailyTimesheetSegment>();
         var totalLate = 0;
         var totalEarly = 0;
-        var totalStayLateMinutes = 0; // Số phút ở lại trễ (chưa phải OT)
+        var totalEarlyInOTMinutes = 0;
+        var totalLateOutOTMinutes = 0;
         var totalActualWorkedMinutes = 0;
         var unmatchedPairCount = 0;
 
@@ -322,7 +340,7 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                 var workedMins = (int)Math.Round((actualOutLocal - actualInLocal).TotalMinutes);
 
                 totalActualWorkedMinutes += workedMins;
-                totalStayLateMinutes += workedMins;
+                totalLateOutOTMinutes += workedMins; // OT nguyên ngày tính tạm vào LateOut
 
                 segments.Add(new DailyTimesheetSegment
                 {
@@ -330,7 +348,7 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                     DailyTimesheetId = Guid.Empty,
                     TargetShiftSegmentId = null,
                     ActualCheckIn = actualInUtc,
-                    ActualCheckOut = pair.OutLog?.Timestamp,
+                    ActualCheckOut = actualOutUtc,
                     CheckInLatitude = pair.InLog.Latitude,
                     CheckInLongitude = pair.InLog.Longitude,
                     CheckInSelfieUrl = pair.InLog.SelfieUrl ?? string.Empty,
@@ -396,8 +414,7 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                     else
                     {
                         // Trốn làm -> Phạt vắng mặt nguyên ca
-                        var penaltyMins = (int)(expectedOut - expectedIn).TotalMinutes;
-                        totalEarly += penaltyMins; // Phạt vào EarlyLeave hoặc Late
+
                         segments.Add(new DailyTimesheetSegment
                         {
                             Id = Guid.NewGuid(),
@@ -406,7 +423,7 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                             ActualCheckIn = null,
                             ActualCheckOut = null,
                             LateMinutes = 0,
-                            EarlyLeaveMinutes = penaltyMins,
+                            EarlyLeaveMinutes = 0,
                             Status = StatusEnum.AttendanceAbsent
                         });
                     }
@@ -432,7 +449,7 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                 // VD: Ca 8h, grace 5p, vào 8h07 → rawLate=7, lateMins=7-5=2 (không phải 7)
                 var rawLate = (int)Math.Round((actualIn - expectedIn).TotalMinutes);
                 if (rawLate > grace) lateMins = rawLate - grace;
-                                                         // Tính về sớm / Missing Out
+                // Tính về sớm / Missing Out
                 if (!actualOut.HasValue)
                 {
                     // Missing Out phạt nặng (Từ lúc quẹt thẻ in -> Hết ca)
@@ -448,12 +465,12 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                 var earlyInMins = Math.Max(0, (int)Math.Round((expectedIn - actualIn).TotalMinutes));
                 var earlyInMinThreshold = attendanceSetting?.MinimumOTMinutes ?? 0;
                 if (earlyInMins >= earlyInMinThreshold)
-                    totalStayLateMinutes += earlyInMins;
+                    totalEarlyInOTMinutes += earlyInMins;
                 // Về trễ (Late Out OT)
                 if (actualOut.HasValue)
                 {
                     var stayLateMins = (int)Math.Round((actualOut.Value - expectedOut).TotalMinutes);
-                    if (stayLateMins > 0) totalStayLateMinutes += stayLateMins;
+                    if (stayLateMins > 0) totalLateOutOTMinutes += stayLateMins;
                 }
                 // Miễn phạt nếu có phép
                 if (approvedLeaveSegmentIds.Contains(targetSegment.Id))
@@ -497,7 +514,7 @@ public class AttendanceResolutionService : IAttendanceResolutionService
         if (totalEarly <= dailyEarlyThreshold)
             totalEarly = 0;
 
-        
+
 
         // OT hợp lệ chỉ được tính khi có OvertimeRequest đã duyệt
         var totalOtMinutes = 0;
@@ -505,8 +522,10 @@ public class AttendanceResolutionService : IAttendanceResolutionService
         {
             // Lấy số giờ được duyệt (ApprovedHours), hoặc fallback sang RequestedHours
             var approvedMinutes = (int)((approvedOT.ApprovedHours ?? approvedOT.RequestedHours) * 60);
-            // OT hợp lệ = Min(Số phút ở lại trễ thực tế, Số phút được duyệt)
-            totalOtMinutes = Math.Min(totalStayLateMinutes, approvedMinutes);
+            // Phân bổ OT: Ưu tiên LateOut trước, dư thì duyệt EarlyIn
+            var validLateOut = Math.Min(totalLateOutOTMinutes, approvedMinutes);
+            var validEarlyIn = Math.Min(totalEarlyInOTMinutes, approvedMinutes - validLateOut);
+            totalOtMinutes = validLateOut + validEarlyIn;
         }
 
         // Fix: Dùng CombineDateTime để tính đúng cho ca đêm (StartDayOffset/EndDayOffset)
@@ -516,7 +535,7 @@ public class AttendanceResolutionService : IAttendanceResolutionService
             : Math.Round((decimal)shiftSegments.Sum(s =>
             {
                 var segStart = CombineDateTime(workDate, s.StartTime, s.StartDayOffset);
-                var segEnd   = CombineDateTime(workDate, s.EndTime,   s.EndDayOffset);
+                var segEnd = CombineDateTime(workDate, s.EndTime, s.EndDayOffset);
                 return (segEnd - segStart).TotalHours;
             }), 2);
 
@@ -541,7 +560,9 @@ public class AttendanceResolutionService : IAttendanceResolutionService
             TotalEarlyLeaveMinutes = totalEarly,
             AbsentSegmentCount = absentSegments.Count,                                  // Số ca vắng mặt không phép
             AbsentPenaltyMinutes = absentSegments.Sum(s => s.EarlyLeaveMinutes),        // Tổng phút bị phạt do vắng mặt
-            StayLateMinutes = totalStayLateMinutes,
+            StayLateMinutes = totalLateOutOTMinutes + totalEarlyInOTMinutes,
+            EarlyInOTMinutes = totalEarlyInOTMinutes,
+            LateOutOTMinutes = totalLateOutOTMinutes,
             ApprovedOTMinutes = totalOtMinutes,
             HasApprovedOTRequest = approvedOT != null,
             LeaveSegmentCount = approvedLeaveSegments.Count,
@@ -554,12 +575,14 @@ public class AttendanceResolutionService : IAttendanceResolutionService
         if (pairs.Any(p => p.MissingOut)) anomalyFlags.Add("MissingOut");
         if (outBeforeInCount > 0) anomalyFlags.Add("OutBeforeIn");
         if (unmatchedPairCount > 0) anomalyFlags.Add("UnmappedPairs");
-        if (totalStayLateMinutes > 0 && approvedOT == null) anomalyFlags.Add("OTWithoutRequest");
+        if ((totalLateOutOTMinutes > 0 || totalEarlyInOTMinutes > 0) && approvedOT == null) anomalyFlags.Add("OTWithoutRequest");
+        if (orphanedOutLog != null) anomalyFlags.Add("OrphanedOut");
         var anomalyFlag = anomalyFlags.Count > 0 ? string.Join(",", anomalyFlags) : string.Empty;
 
         var existing = await _dailyTimesheetRepository.GetByEmployeeDateAsync(employeeId, workDate);
         if (existing == null)
         {
+
             var timesheet = new DailyTimesheet
             {
                 Id = Guid.NewGuid(),
@@ -586,32 +609,41 @@ public class AttendanceResolutionService : IAttendanceResolutionService
             await _dailyTimesheetRepository.AddAsync(timesheet);
             return;
         }
-
-        existing.ExpectedShiftId = shift?.Id;
-        existing.ExpectedShiftSource = shift == null ? "None" : "ShiftPattern";
-        existing.StandardWorkingHours = standardHours;
-        existing.TotalActualWorkedMinutes = totalActualWorkedMinutes;
-        existing.ActualWorkHours = actualWorkHours;
-        existing.OTHours = otHours;
-        existing.TotalLateMinutes = totalLate;
-        existing.LateMinutes = totalLate;
-        existing.TotalEarlyLeaveMinutes = totalEarly;
-        existing.EarlyLeaveMinutes = totalEarly;
-        existing.Status = dayStatus;
-        existing.SystemAnomalyFlag = anomalyFlag;
-        existing.ResolutionLogJson = JsonSerializer.Serialize(resolutionLog);
-
-        existing.Segments.Clear();
-        foreach (var segment in segments)
+        else
         {
-            segment.DailyTimesheetId = existing.Id;
-            existing.Segments.Add(segment);
+            if (existing.IsManuallyAdjusted)
+            {
+                _logger.LogInformation("Bỏ qua Employee {EmployeeId} ngày {Date} do HR đã chỉnh sửa tay.", employeeId, workDate);
+                return;
+            }
+
+            existing.ExpectedShiftId = shift?.Id;
+            existing.ExpectedShiftSource = shift == null ? "None" : "ShiftPattern";
+            existing.StandardWorkingHours = standardHours;
+            existing.TotalActualWorkedMinutes = totalActualWorkedMinutes;
+            existing.ActualWorkHours = actualWorkHours;
+            existing.OTHours = otHours;
+            existing.TotalLateMinutes = totalLate;
+            existing.LateMinutes = totalLate;
+            existing.TotalEarlyLeaveMinutes = totalEarly;
+            existing.EarlyLeaveMinutes = totalEarly;
+            existing.Status = dayStatus;
+            existing.SystemAnomalyFlag = anomalyFlag;
+            existing.ResolutionLogJson = JsonSerializer.Serialize(resolutionLog);
+
+            existing.Segments.Clear();
+            foreach (var segment in segments)
+            {
+                segment.DailyTimesheetId = existing.Id;
+                existing.Segments.Add(segment);
+            }
+
+            await _dailyTimesheetRepository.UpdateAsync(existing);
         }
 
-        await _dailyTimesheetRepository.UpdateAsync(existing);
     }
 
-    private async Task<Shift?> ResolveShiftAsync((EmployeeShiftPattern? Pattern, ShiftPattern? Definition) details, DateOnly workDate)
+    private async Task<Shift?> ResolveShiftAsync((EmployeeShiftPattern? Pattern, ShiftPattern? Definition) details, DateOnly workDate, Dictionary<string, Shift?> shiftCache)
     {
         if (details.Pattern == null || details.Definition == null)
             return null;
@@ -624,12 +656,18 @@ public class AttendanceResolutionService : IAttendanceResolutionService
         var dayIndex = dayOffset % cycleLength;
         if (dayIndex < 0) dayIndex += cycleLength;
 
+        var cacheKey = $"{details.Definition.Id}_{dayIndex}";
+        if (shiftCache.TryGetValue(cacheKey, out var cachedShift))
+            return cachedShift;
+
         var patternDay = await _shiftPatternRepository.GetShiftPatternWithDaysAsync(
             details.Definition.Id, dayIndex);   // Fix: thêm ShiftPatternId để tránh lấy nhầm lịch khác
         if (patternDay?.ScheduledShiftId == null)
             return null;
 
-        return await _shiftPatternRepository.GetShiftWithSegmentsAsync(patternDay.ScheduledShiftId.Value);
+        var shift = await _shiftPatternRepository.GetShiftWithSegmentsAsync(patternDay.ScheduledShiftId.Value);
+        shiftCache[cacheKey] = shift;
+        return shift;
     }
 
     private static DateTime CombineDateTime(DateOnly date, TimeSpan time, int dayOffset)

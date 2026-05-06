@@ -6,7 +6,6 @@ public class HRMonthlyReportItemDto
 {
     public Guid EmployeeId { get; set; }
     public string EmployeeName { get; set; } = string.Empty;
-    public string EmployeeCode { get; set; } = string.Empty;
     public int Month { get; set; }
     public int Year { get; set; }
 

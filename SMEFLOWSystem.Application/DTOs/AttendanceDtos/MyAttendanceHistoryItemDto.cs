@@ -10,6 +10,9 @@ public class MyAttendanceHistoryItemDto
     public int TotalActualWorkedMinutes { get; set; }
     public int TotalLateMinutes { get; set; }
     public int TotalEarlyLeaveMinutes { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public decimal ActualWorkHours { get; set; }
+    public decimal OTHours { get; set; }
     public string SystemAnomalyFlag { get; set; } = string.Empty;
     public bool IsManuallyAdjusted { get; set; }
     

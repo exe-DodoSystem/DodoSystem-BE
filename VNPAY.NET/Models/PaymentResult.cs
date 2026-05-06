@@ -5,16 +5,16 @@
     /// </summary>
     public class PaymentResult
     {
-        public string PaymentId { get; set; }
+        public string PaymentId { get; set; } = string.Empty;
 
         public bool IsSuccess { get; set; }
 
-        public string Description { get; set; }
+        public string Description { get; set; } = string.Empty;
 
         public DateTime Timestamp { get; set; }
         public long VnpayTransactionId { get; set; }
 
-        public string PaymentMethod { get; set; }
+        public string PaymentMethod { get; set; } = string.Empty;
         public PaymentResponse PaymentResponse { get; set; }
 
         public TransactionStatus TransactionStatus { get; set; }

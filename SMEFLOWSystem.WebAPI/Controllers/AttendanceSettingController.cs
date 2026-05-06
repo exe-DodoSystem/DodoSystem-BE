@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SMEFLOWSystem.Application.DTOs;
 using SMEFLOWSystem.Application.DTOs.AttendanceDtos;
 using SMEFLOWSystem.Application.Interfaces.IServices;
 using System;

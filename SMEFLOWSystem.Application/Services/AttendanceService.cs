@@ -1,14 +1,15 @@
-using System;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Collections.Generic;
+using ShareKernel.Common.Enum;
+using SMEFLOWSystem.Application.DTOs;
 using SMEFLOWSystem.Application.DTOs.AttendanceDtos;
+using SMEFLOWSystem.Application.Helpers;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Application.Interfaces.IServices;
 using SMEFLOWSystem.Core.Entities;
 using SMEFLOWSystem.SharedKernel.Interfaces;
-using ShareKernel.Common.Enum;
-using SMEFLOWSystem.Application.Helpers;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace SMEFLOWSystem.Application.Services
 {
@@ -153,19 +154,9 @@ namespace SMEFLOWSystem.Application.Services
 
                 result.LateMinutes = timesheet.TotalLateMinutes;
                 result.EarlyLeaveMinutes = timesheet.TotalEarlyLeaveMinutes;
-
-                if (timesheet.SystemAnomalyFlag.Contains("MissingOut"))
-                {
-                    result.Status = StatusEnum.AttendanceMissingOut;
-                }
-                else if (timesheet.TotalLateMinutes > 0)
-                {
-                    result.Status = StatusEnum.AttendanceLate;
-                }
-                else
-                {
-                    result.Status = StatusEnum.AttendancePresent;
-                }
+                result.ActualWorkHours = timesheet.ActualWorkHours;
+                result.OTHours = timesheet.OTHours;
+                result.Status = string.IsNullOrEmpty(timesheet.Status) ? StatusEnum.AttendancePresent : timesheet.Status;
             }
             else
             {
@@ -196,6 +187,9 @@ namespace SMEFLOWSystem.Application.Services
                     TotalActualWorkedMinutes = ts.TotalActualWorkedMinutes,
                     TotalLateMinutes = ts.TotalLateMinutes,
                     TotalEarlyLeaveMinutes = ts.TotalEarlyLeaveMinutes,
+                    Status = ts.Status,
+                    ActualWorkHours = ts.ActualWorkHours,
+                    OTHours = ts.OTHours,
                     SystemAnomalyFlag = ts.SystemAnomalyFlag,
                     IsManuallyAdjusted = ts.IsManuallyAdjusted,
                     Segments = ts.Segments.Select(s => new MyAttendanceSegmentDto
@@ -504,20 +498,19 @@ namespace SMEFLOWSystem.Application.Services
 
             var timesheets = await _dailyTimesheetRepository.GetByTenantMonthAsync(tenantId.Value, month, year);
 
-            var report = timesheets.GroupBy(t => new { t.EmployeeId, t.Employee?.FullName, t.Employee?.EmployeeCode })
+            var report = timesheets.GroupBy(t => new { t.EmployeeId, t.Employee?.FullName })
                 .Select(g => new HRMonthlyReportItemDto
                 {
                     EmployeeId = g.Key.EmployeeId,
                     EmployeeName = g.Key.FullName ?? "Unknown",
-                    EmployeeCode = g.Key.EmployeeCode ?? "Unknown",
                     Month = month,
                     Year = year,
-                    TotalWorkDays = g.Count(x => x.Status == StatusEnum.AttendanceNormal || x.Status == StatusEnum.AttendanceMissingOut),
+                    TotalWorkDays = g.Count(x => x.Status != StatusEnum.AttendanceAbsent && x.Status != StatusEnum.AttendanceOnLeave),
                     TotalActualHours = g.Sum(x => x.ActualWorkHours),
                     TotalOTHours = g.Sum(x => x.OTHours),
-                    TotalLateMinutes = g.Sum(x => x.LateMinutes),
-                    TotalEarlyLeaveMinutes = g.Sum(x => x.EarlyLeaveMinutes),
-                    MissingPunches = g.Count(x => x.Status == StatusEnum.AttendanceMissingOut || x.Status == StatusEnum.AttendanceAbsent)
+                    TotalLateMinutes = g.Sum(x => x.TotalLateMinutes),
+                    TotalEarlyLeaveMinutes = g.Sum(x => x.TotalEarlyLeaveMinutes),
+                    MissingPunches = g.Count(x => x.Status == StatusEnum.AttendanceMissingOut || x.Status == StatusEnum.AttendanceNoShift)
                 })
                 .OrderBy(x => x.EmployeeName)
                 .ToList();

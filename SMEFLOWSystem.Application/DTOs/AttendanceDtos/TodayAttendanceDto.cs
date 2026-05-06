@@ -14,6 +14,8 @@ public class TodayAttendanceDto
     public string? Status { get; set; }      // Present | Late | null (chưa có)
     public int? LateMinutes { get; set; }
     public int? EarlyLeaveMinutes { get; set; }
+    public decimal ActualWorkHours { get; set; }
+    public decimal OTHours { get; set; }
 
     public string? ApprovalStatus { get; set; } // null | Pending | Approved | Rejected
 }

@@ -106,9 +106,12 @@ public class DailyTimesheetConfiguration : IEntityTypeConfiguration<DailyTimeshe
     {
         builder.HasKey(x => x.Id);
         builder.Property(x => x.StandardWorkingHours).HasColumnType("decimal(18,2)");
+        builder.Property(x => x.ActualWorkHours).HasColumnType("decimal(18,2)");
+        builder.Property(x => x.OTHours).HasColumnType("decimal(18,2)");
 
         builder.Property(x => x.ExpectedShiftSource).HasMaxLength(100);
         builder.Property(x => x.SystemAnomalyFlag).HasMaxLength(50);
+        builder.Property(x => x.Status).HasMaxLength(50);
 
         builder.HasOne(x => x.Employee)
                .WithMany()

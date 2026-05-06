@@ -57,6 +57,8 @@ public class TenantAttendanceSettingConfiguration : IEntityTypeConfiguration<Ten
         entity.Property(e => e.CheckInRadiusMeters).HasDefaultValue(100);
         entity.Property(e => e.LateThresholdMinutes).HasDefaultValue(10);
         entity.Property(e => e.EarlyLeaveThresholdMinutes).HasDefaultValue(10);
+        entity.Property(e => e.MinimumOTMinutes).HasDefaultValue(30);
+        entity.Property(e => e.OTBlockMinutes).HasDefaultValue(30);
         entity.Property(e => e.Latitude).HasColumnType("float");
         entity.Property(e => e.Longitude).HasColumnType("float");
         entity.HasOne(d => d.Tenant).WithOne(t => t.AttendanceSetting).HasForeignKey<TenantAttendanceSetting>(d => d.TenantId).OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("FK_TenantAttendanceSettings_Tenants");
