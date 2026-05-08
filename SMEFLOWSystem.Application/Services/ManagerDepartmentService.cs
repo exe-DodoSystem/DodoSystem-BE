@@ -37,7 +37,6 @@ public class ManagerDepartmentService : IManagerDepartmentService
         _currentTenant = currentTenant;
     }
 
-    /// <inheritdoc />
     public async Task<List<ManagerDepartmentDto>> GetByManagerAsync(Guid userId)
     {
         // TenantAdmin hoặc HRManager được xem, hoặc Manager xem chính mình
@@ -59,7 +58,6 @@ public class ManagerDepartmentService : IManagerDepartmentService
         }).ToList();
     }
 
-    /// <inheritdoc />
     public async Task AssignAsync(Guid userId, AssignManagerDepartmentDto request)
     {
         _currentUser.EnsureAdmin();
@@ -93,14 +91,13 @@ public class ManagerDepartmentService : IManagerDepartmentService
         }
     }
 
-    /// <inheritdoc />
     public async Task UnassignAsync(Guid userId, Guid departmentId)
     {
         _currentUser.EnsureAdmin();
         await _managerDeptRepo.RemoveAsync(userId, departmentId);
     }
 
-    /// <inheritdoc />
+
     public async Task ReplaceAsync(Guid userId, AssignManagerDepartmentDto request)
     {
         _currentUser.EnsureAdmin();

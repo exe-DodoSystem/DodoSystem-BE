@@ -28,9 +28,16 @@ public class HrInvitesController : ControllerBase
         if (!tenantId.HasValue)
             return StatusCode(403, new { error = "Thiếu TenantId" });
 
+        var userIdString = base.User.FindFirst(global::System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        Guid? invitedByUserId = null;
+        if (Guid.TryParse(userIdString, out var parsedUserId))
+        {
+            invitedByUserId = parsedUserId;
+        }
+
         try {
-        
-            await _inviteService.SendInviteAsync(tenantId.Value, request.Email, request.RoleId, request.DepartmentId, request.PositionId, request.Message);
+
+            await _inviteService.SendInviteAsync(tenantId.Value, request.Email, request.RoleId, request.DepartmentId, request.PositionId, request.Message, invitedByUserId);
             return Ok(new { success = true });
         }
         catch (UnauthorizedAccessException ex)

@@ -63,9 +63,9 @@ namespace SMEFLOWSystem.Application.Services
             return CompleteOnboardingInternalAsync(token, fullName, password, phone);
         }
 
-        public Task SendInviteAsync(Guid tenantId, string email, int roleId, Guid? departmentId, Guid? positionId, string message)
+        public Task SendInviteAsync(Guid tenantId, string email, int roleId, Guid? departmentId, Guid? positionId, string message, Guid? invitedByUserId = null)
         {
-            return SendInviteInternalAsync(tenantId, email, roleId, departmentId, positionId, message);
+            return SendInviteInternalAsync(tenantId, email, roleId, departmentId, positionId, message, invitedByUserId);
         }
 
         public Task<Invite> ValidateInviteTokenAsync(string token)
@@ -73,7 +73,7 @@ namespace SMEFLOWSystem.Application.Services
             return ValidateTokenInternalAsync(token);
         }
 
-        private async Task SendInviteInternalAsync(Guid tenantId, string email, int roleId, Guid? departmentId, Guid? positionId, string message)
+        private async Task SendInviteInternalAsync(Guid tenantId, string email, int roleId, Guid? departmentId, Guid? positionId, string message, Guid? invitedByUserId)
         {
             var emailExists = await _userRepository.IsEmailExistAsync(email);
             if (emailExists)
@@ -100,6 +100,7 @@ namespace SMEFLOWSystem.Application.Services
                 Token = token,
                 ExpiryDate = now.AddDays(7),
                 IsUsed = false,
+                InvitedByUserId = invitedByUserId,
                 Message = message,
                 CreatedAt = now,
                 UpdatedAt = null,
@@ -235,7 +236,7 @@ namespace SMEFLOWSystem.Application.Services
                         DepartmentId = invite.DepartmentId.Value,
                         TenantId = invite.TenantId,
                         AssignedAt = DateTime.UtcNow,
-                        AssignedByUserId = Guid.Empty // System auto-assign qua Invite onboarding
+                        AssignedByUserId = invite.InvitedByUserId ?? Guid.Empty // System auto-assign qua Invite onboarding
                     });
                 }
             }

@@ -137,6 +137,7 @@ public class HrEmployeeService : IHrEmployeeService
         return _mapper.Map<EmployeeDto>(emp);
     }
 
+
     public async Task<EmployeeDto> CreateAsync(EmployeeCreateDto request)
     {
         _currentUser.EnsureHrAccess();
@@ -234,5 +235,12 @@ public class HrEmployeeService : IHrEmployeeService
         var pos = await _positionRepo.GetByIdAsync(positionId.Value);
         if (pos == null) throw new ArgumentException("PositionId không tồn tại");
         if (pos.DepartmentId != departmentId.Value) throw new ArgumentException("Position không thuộc Department");
+    }
+
+    public async Task<List<EmployeeDto>> GetAllByDepartmentId(Guid departmentId)
+    {
+        _currentUser.EnsureHrAccess();
+        var employees = await _employeeRepo.GetByDepartmentIdAsync(departmentId);
+        return _mapper.Map<List<EmployeeDto>>(employees);
     }
 }

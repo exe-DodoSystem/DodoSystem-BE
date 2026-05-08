@@ -28,6 +28,7 @@ namespace SMEFLOWSystem.Core.Entities
         public DateTime ExpiryDate { get; set; }
         /// <summary>Trạng thái lời mời đã sử dụng hay chưa.</summary>
         public bool IsUsed { get; set; } = false;
+        public Guid? InvitedByUserId { get; set; }
         public string? Message { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;  // Thêm CreatedAt
         public DateTime? UpdatedAt { get; set; }  // Thêm UpdatedAt (nullable)
