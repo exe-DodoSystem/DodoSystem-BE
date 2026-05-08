@@ -1,0 +1,509 @@
+﻿
+--- FILE: BillingOrder.cs ---
+
+
+public class BillingOrder : ITenantEntity
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public string BillingOrderNumber { get; set; } = string.Empty;
+    public Guid CustomerId { get; set; }
+    public DateTime BillingDate { get; set; }
+    public decimal TotalAmount { get; set; }
+    public decimal? DiscountAmount { get; set; }
+    public decimal? FinalAmount { get; set; }
+    public string PaymentStatus { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public string? Notes { get; set; }
+    public DateTime? CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public bool? IsDeleted { get; set; }
+
+--- FILE: BillingOrderModule.cs ---
+
+public class BillingOrderModule : ITenantEntity
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid BillingOrderId { get; set; }
+    public int ModuleId { get; set; }
+    public int Quantity { get; set; } = 1;
+    public decimal UnitPrice { get; set; }
+    public int? ProrationDays { get; set; }
+    public decimal LineTotal { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+--- FILE: Customer.cs ---
+
+public partial class Customer : ITenantEntity
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public string Type { get; set; }
+    public string Name { get; set; }
+    public string CompanyName { get; set; }
+    public string Phone { get; set; }
+    public string Email { get; set; }
+    public string Address { get; set; }
+    public string Notes { get; set; }
+    public DateTime? CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public bool? IsDeleted { get; set; }
+
+--- FILE: DailyTimesheet.cs ---
+
+    public partial class DailyTimesheet : ITenantEntity
+        public Guid Id { get; set; }
+        public Guid TenantId { get; set; }
+        public Guid EmployeeId { get; set; }
+        public DateOnly WorkDate { get; set; }
+        public Guid? ExpectedShiftId { get; set; }
+        public string ExpectedShiftSource { get; set; } = string.Empty;
+        public decimal StandardWorkingHours { get; set; }
+        public int TotalActualWorkedMinutes { get; set; }
+        public decimal ActualWorkHours { get; set; }
+        public decimal OTHours { get; set; }
+        public int TotalLateMinutes { get; set; }
+        public int LateMinutes { get; set; }
+        public int TotalEarlyLeaveMinutes { get; set; }
+        public int EarlyLeaveMinutes { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public string SystemAnomalyFlag { get; set; } = string.Empty;
+        public string ResolutionLogJson { get; set; } = string.Empty;
+        public bool IsManuallyAdjusted { get; set; }
+
+--- FILE: DailyTimesheetAuditLog.cs ---
+
+    public class DailyTimesheetAuditLog
+        public Guid Id { get; set; }
+        public Guid TenantId { get; set; }
+        public Guid DailyTimesheetId { get; set; }
+        public string FieldName { get; set; } = string.Empty;
+        public string OldValue { get; set; } = string.Empty;
+        public string NewValue { get; set; }    = string.Empty;
+        public string Reason { get; set; } = string.Empty;
+        public Guid ActionByUserId { get; set; }
+        public DateTime ActionDate { get; set; }
+
+--- FILE: DailyTimesheetSegment.cs ---
+
+    public partial class DailyTimesheetSegment : ITenantEntity
+        public Guid Id { get; set; }
+        public Guid TenantId { get; set; }
+        public Guid DailyTimesheetId { get; set; }
+        public Guid? TargetShiftSegmentId { get; set; }
+        public DateTime? ActualCheckIn { get; set; }
+        public DateTime? ActualCheckOut { get; set; }
+        public double? CheckInLatitude { get; set; }
+        public double? CheckInLongitude { get; set; }
+        public string CheckInSelfieUrl { get; set; } = string.Empty;
+        public double? CheckOutLatitude { get; set; }
+        public double? CheckOutLongitude { get; set; }
+        public string CheckOutSelfieUrl { get; set; } = string.Empty;
+        public int LateMinutes { get; set; }
+        public int EarlyLeaveMinutes { get; set; }
+        public string Status { get; set; } = string.Empty;
+
+--- FILE: Department.cs ---
+
+public partial class Department : ITenantEntity
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public string Name { get; set; }
+    public DateTime? CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public bool? IsDeleted { get; set; }
+
+--- FILE: Employee.cs ---
+
+public partial class Employee : ITenantEntity
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid? UserId { get; set; }
+    public Guid? DepartmentId { get; set; }
+    public Guid? PositionId { get; set; }
+    public string FullName { get; set; }
+    public string Phone { get; set; }
+    public string Email { get; set; }
+    public DateOnly HireDate { get; set; }
+    public DateOnly? ResignationDate { get; set; }
+    public decimal BaseSalary { get; set; }
+    public string Status { get; set; }
+    public DateTime? CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public bool? IsDeleted { get; set; }
+
+--- FILE: EmployeeShiftPattern.cs ---
+
+    public partial class EmployeeShiftPattern : ITenantEntity
+        public Guid Id { get; set; }
+        public Guid TenantId { get; set; }
+        public Guid EmployeeId { get; set; }
+        public Guid ShiftPatternId { get; set; }
+        public DateOnly EffectiveStartDate { get; set; }
+        public DateOnly? EffectiveEndDate { get; set; }
+
+--- FILE: Invite.cs ---
+
+    public partial class Invite : ITenantEntity
+        public Guid Id { get; set; } = Guid.NewGuid();  // Thêm Id (GUID default)
+        public Guid TenantId { get; set; }
+        public string Email { get; set; } = string.Empty;
+        public int RoleId { get; set; }
+        public Guid? DepartmentId { get; set; }
+        public Guid? PositionId { get; set; }
+        public string Token { get; set; } = string.Empty;
+        public DateTime ExpiryDate { get; set; }
+        public bool IsUsed { get; set; } = false;
+        public string? Message { get; set; }
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;  // Thêm CreatedAt
+        public DateTime? UpdatedAt { get; set; }  // Thêm UpdatedAt (nullable)
+        public bool IsDeleted { get; set; } = false;  // Thêm IsDeleted
+
+--- FILE: LeaveRequest.cs ---
+
+public partial class LeaveRequest : ITenantEntity
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid EmployeeId { get; private set; }
+    public string LeaveType { get; private set; } = string.Empty; // PhÃ©p nÄƒm, Viá»‡c riÃªng...
+    public string Status { get; private set; } = "Pending"; // Pending, Approved, Rejected
+    public Guid? ApprovedByUserId { get; private set; }
+    public DateTime? ApprovedAt { get; private set; }
+
+--- FILE: LeaveRequestSegment.cs ---
+
+public partial class LeaveRequestSegment : ITenantEntity
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid LeaveRequestId { get; private set; }
+    public DateOnly LeaveDate { get; private set; }
+    public Guid TargetShiftSegmentId { get; private set; } 
+    public decimal HoursRequested { get; private set; }
+
+--- FILE: ManagerDepartment.cs ---
+
+public class ManagerDepartment : ITenantEntity
+    public Guid UserId { get; set; }
+    public Guid DepartmentId { get; set; }
+    public Guid TenantId { get; set; }
+    public DateTime AssignedAt { get; set; }
+    public Guid AssignedByUserId { get; set; }
+
+--- FILE: Module.cs ---
+
+public class Module
+    public int Id { get; set; }
+    public string Code { get; set; } = string.Empty;
+    public string ShortCode { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public decimal MonthlyPrice { get; set; }
+    public bool IsActive { get; set; } = true;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
+
+--- FILE: ModuleSubscription.cs ---
+
+public class ModuleSubscription : ITenantEntity
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public int ModuleId { get; set; }
+    public DateTime StartDate { get; set; }
+    public DateTime EndDate { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
+    public bool IsDeleted { get; set; }
+
+--- FILE: Notification.cs ---
+
+public partial class Notification : ITenantEntity
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid RecipientUserId { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+    public string Type { get; set; } = "General";
+    public Guid? ReferenceId { get; set; }
+    public bool IsRead { get; set; } = false;
+    public DateTime? ReadAt { get; set; }
+    public DateTime CreatedAt { get; set; }
+
+--- FILE: Order.cs ---
+
+public partial class Order : ITenantEntity
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public string OrderNumber { get; set; }
+    public Guid CustomerId { get; set; }
+    public DateTime OrderDate { get; set; }
+    public decimal TotalAmount { get; set; }
+    public decimal? DiscountAmount { get; set; }
+    public decimal? FinalAmount { get; set; }
+    public string PaymentStatus { get; set; }
+    public string Status { get; set; }
+    public string Notes { get; set; }
+    public DateTime? CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public bool? IsDeleted { get; set; }
+
+--- FILE: OrderItem.cs ---
+
+public partial class OrderItem : ITenantEntity
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid OrderId { get; set; }
+    public string Description { get; set; }
+    public int Quantity { get; set; }
+    public decimal UnitPrice { get; set; }
+    public decimal? TotalPrice { get; set; }
+    public DateTime? CreatedAt { get; set; }
+
+--- FILE: OutboxMessage.cs ---
+
+public partial class OutboxMessage
+    public Guid Id { get; set; }
+    public Guid? TenantId { get; set; }
+    public Guid EventId { get; set; }
+    public string EventType { get; set; } = string.Empty;
+    public string Exchange { get; set; } = string.Empty;
+    public string RoutingKey { get; set; } = string.Empty;
+    public string Payload { get; set; } = string.Empty;
+    public string? CorrelationId { get; set; }
+    public string Status { get; set; } = "Pending"; // Pending, Processing, Processed, Failed
+    public int RetryCount { get; set; }
+    public DateTime OccurredOnUtc { get; set; }
+    public DateTime? NextAttemptOnUtc { get; set; }
+    public DateTime? ProcessedOnUtc { get; set; }
+    public string? LastError { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+
+--- FILE: OvertimeRequest.cs ---
+
+    public partial class OvertimeRequest : ITenantEntity
+        public Guid Id { get; set; }
+        public Guid TenantId { get; set; }
+        public Guid EmployeeId { get; set; }
+        public DateOnly OvertimeDate { get; set; }
+        public decimal RequestedHours { get; set; }
+        public string Reason { get; set; } = string.Empty;
+        public decimal? ApprovedHours { get; set; }
+        public string Status { get; set; } = "Pending";
+        public Guid? ApprovedByUserId { get; set; }
+        public decimal? SystemCalculatedMultiplier { get; set; }
+
+--- FILE: PaymentTransaction.cs ---
+
+    public class PaymentTransaction : ITenantEntity
+        public Guid Id { get; set; }
+        public Guid TenantId { get; set; }
+        public Guid BillingOrderId { get; set; }
+        public string Gateway { get; set; } = string.Empty;
+        public string GatewayTransactionId { get; set; } = string.Empty;
+        public string? GatewayResponseCode { get; set; }
+        public decimal Amount { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public string? RawData { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime? ProcessedAt { get; set; }
+
+--- FILE: Payroll.cs ---
+
+public partial class Payroll : ITenantEntity
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid EmployeeId { get; set; }
+    public int Month { get; set; }
+    public int Year { get; set; }
+    public int StandardWorkingDays { get; set; }      // Số ngày công chuẩn trong tháng
+    public int ActualWorkingDays { get; set; }        // Số ngày đi làm thực tế
+    public int TotalLateMinutes { get; set; }         // Tổng phút đi trễ
+    public int TotalEarlyLeaveMinutes { get; set; }   // Tổng phút về sớm
+    public int AbsentDays { get; set; }               // Số ngày vắng mặt
+    public decimal BaseSalarySnapshot { get; set; }   // Lương cơ bản snapshot
+    public decimal BasePay { get; set; }              // Lương sau khi tính prorated (BaseSalary * tỷ lệ ngày làm)
+    public decimal? Bonus { get; set; }               // Thưởng (Admin nhập tay)
+    public decimal Deduction { get; set; }            // Tổng phạt (tự động tính từ late + early leave)
+    public decimal TotalSalary { get; set; }          // Lương thực nhận cuối cùng
+    public string Status { get; set; } = "Draft";     // Draft, Approved, Paid, Rejected
+    public string? Notes { get; set; }                // Ghi chú (ví dụ: lý do phạt, thưởng)
+    public DateTime? CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+
+--- FILE: Position.cs ---
+
+public partial class Position : ITenantEntity
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid DepartmentId { get; set; }
+    public string Name { get; set; }
+    public DateTime? CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public bool? IsDeleted { get; set; }
+
+--- FILE: ProcessedEvent.cs ---
+
+public partial class ProcessedEvent
+    public Guid Id { get; set; }
+    public Guid EventId { get; set; }
+    public string ConsumerName { get; set; } = string.Empty;
+    public DateTime ProcessedAtUtc { get; set; }
+    public DateTime CreatedAt { get; set; }
+
+--- FILE: RawPunchLog.cs ---
+
+public partial class RawPunchLog : ITenantEntity
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid EmployeeId { get; set; }
+    public DateTime Timestamp { get; set; }
+    public string PunchType { get; set; } = "Auto";
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+    public string? SelfieUrl { get; set; }
+    public string? DeviceId { get; set; } 
+    public bool IsProcessed { get; set; } = false;
+
+--- FILE: RefreshToken.cs ---
+
+public partial class RefreshToken : ITenantEntity
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid UserId { get; set; }
+    public string TokenHash { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime ExpiresAt { get; set; }
+    public DateTime? RevokedAt { get; set; }
+    public Guid? ReplacedByTokenId { get; set; }
+    public string RevokeReason { get; set; }
+
+--- FILE: Role.cs ---
+
+public partial class Role
+    public int Id { get; set; }
+    public string Name { get; set; }
+    public string Description { get; set; }
+    public bool? IsSystemRole { get; set; }
+
+--- FILE: Shift.cs ---
+
+public partial class Shift : ITenantEntity
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public string Code { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public int GracePeriodMinutes { get; set; }
+    public bool IsCrossDay { get; set; }
+
+--- FILE: ShiftPattern.cs ---
+
+    public partial class ShiftPattern : ITenantEntity
+        public Guid Id { get; set; }
+        public Guid TenantId { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public int CycleLengthDays { get; set; }
+
+--- FILE: ShiftPatternDay.cs ---
+
+    public partial class ShiftPatternDay : ITenantEntity
+        public Guid Id { get; set; }
+        public Guid TenantId { get; set; }
+        public Guid ShiftPatternId { get; set; }
+        public int DayIndex { get; set; }
+        public Guid? ScheduledShiftId { get; set; }
+
+--- FILE: ShiftSegment.cs ---
+
+public partial class ShiftSegment : ITenantEntity
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid ShiftId { get; set; }
+    public TimeSpan StartTime { get; set; }
+    public TimeSpan EndTime { get; set; }
+    public int StartDayOffset { get; set; }
+    public int EndDayOffset { get; set; }
+
+--- FILE: Tenant.cs ---
+
+public partial class Tenant
+    public Guid Id { get; set; }
+    public string Name { get; set; }
+    public string Status { get; set; }
+    public DateOnly? SubscriptionEndDate { get; set; }
+    public Guid? OwnerUserId { get; set; }
+    public User? OwnerUser { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public bool IsDeleted { get; set; }
+
+--- FILE: TenantAttendanceSetting.cs ---
+
+public class TenantAttendanceSetting : ITenantEntity
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+    public int CheckInRadiusMeters { get; set; } = 100;
+    public TimeOnly? WorkStartTime { get; set; }
+    public TimeOnly? WorkEndTime { get; set; }
+    public TimeSpan DayStartCutOffTime { get; set; } = new TimeSpan(12, 1, 0);
+    public int LateThresholdMinutes { get; set; } = 10;
+    public int EarlyLeaveThresholdMinutes { get; set; } = 10;
+    public int MinimumOTMinutes { get; set; } = 30; // Dưới 30p không tính OT
+    public int OTBlockMinutes { get; set; } = 30; // Block làm tròn (VD: 30p, 60p)
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
+
+--- FILE: TimesheetAppeal.cs ---
+
+public class TimesheetAppeal : ITenantEntity
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid EmployeeId { get; set; }
+    public DateOnly WorkDate { get; set; }
+    public string AppealType { get; set; } = string.Empty; 
+    public DateTime? RequestedCheckIn { get; set; }
+    public DateTime? RequestedCheckOut { get; set; }
+    public string Reason { get; set; } = string.Empty;
+    public string? AttachmentUrl { get; set; }
+    public string Status { get; set; } = "PendingApproval"; 
+    public Guid? ApprovedBy { get; set; }
+    public DateTime? ApprovedAt { get; set; }
+    public string? RejectReason { get; set; }
+
+--- FILE: TimesheetPeriod.cs ---
+
+public partial class TimesheetPeriod : ITenantEntity
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public int Month { get; private set; }
+    public int Year { get; private set; }
+    public DateOnly StartDate { get; private set; }
+    public DateOnly EndDate { get; private set; }
+    public bool IsLocked { get; private set; }
+    public DateTime? LockedAt { get; private set; }
+    public Guid? LockedByUserId { get; private set; }
+
+--- FILE: User.cs ---
+
+public partial class User : ITenantEntity
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public string? AvatarUrl { get; set; }
+    public string Email { get; set; }
+    public string PasswordHash { get; set; }
+    public string FullName { get; set; }
+    public string Phone { get; set; }
+    public bool IsActive { get; set; }
+    public bool IsVerified { get; set; } 
+    public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public bool IsDeleted { get; set; }
+
+--- FILE: UserRole.cs ---
+
+public partial class UserRole : ITenantEntity
+    public Guid UserId { get; set; }
+    public Guid TenantId { get; set; }
+    public int RoleId { get; set; }
+
+

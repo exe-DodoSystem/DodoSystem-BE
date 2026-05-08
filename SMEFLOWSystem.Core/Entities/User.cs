@@ -8,27 +8,40 @@ namespace SMEFLOWSystem.Core.Entities;
 
 public partial class User : ITenantEntity
 {
+    /// <summary>Khóa chính</summary>
     public Guid Id { get; set; }
 
+    /// <summary>Định danh Tenant (Multi-tenant isolation)</summary>
     public Guid TenantId { get; set; }
+
+    /// <summary>Đường dẫn ảnh đại diện của user</summary>
     public string? AvatarUrl { get; set; }
 
-
+    /// <summary>Email đăng nhập</summary>
     public string Email { get; set; }
 
+    /// <summary>Mật khẩu đã được mã hóa (băm)</summary>
     public string PasswordHash { get; set; }
 
+    /// <summary>Họ và tên đầy đủ</summary>
     public string FullName { get; set; }
 
+    /// <summary>Số điện thoại liên lạc</summary>
     public string Phone { get; set; }
 
+    /// <summary>Trạng thái tài khoản (Đang hoạt động / Bị khóa)</summary>
     public bool IsActive { get; set; }
+
+    /// <summary>Trạng thái xác thực tài khoản qua Email/OTP</summary>
     public bool IsVerified { get; set; } 
 
+    /// <summary>Thời điểm tạo tài khoản</summary>
     public DateTime CreatedAt { get; set; }
 
+    /// <summary>Thời điểm cập nhật gần nhất</summary>
     public DateTime? UpdatedAt { get; set; }
 
+    /// <summary>Cờ đánh dấu xóa mềm</summary>
     public bool IsDeleted { get; set; }
 
     public virtual ICollection<Employee> Employees { get; set; } = new List<Employee>();

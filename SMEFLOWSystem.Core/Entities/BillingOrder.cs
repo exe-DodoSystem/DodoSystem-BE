@@ -3,6 +3,9 @@ using System.Collections.Generic;
 
 namespace SMEFLOWSystem.Core.Entities;
 
+/// <summary>
+/// Hóa đơn gia hạn / mua thêm module của Tenant.
+/// </summary>
 public class BillingOrder : ITenantEntity
 {
     public Guid Id { get; set; }

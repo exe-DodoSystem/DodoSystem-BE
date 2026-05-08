@@ -8,16 +8,22 @@ namespace SMEFLOWSystem.Core.Entities;
 
 public partial class Department : ITenantEntity
 {
+    /// <summary>Khóa chính</summary>
     public Guid Id { get; set; }
 
+    /// <summary>Định danh Tenant (Multi-tenant isolation)</summary>
     public Guid TenantId { get; set; }
 
+    /// <summary>Tên phòng ban</summary>
     public string Name { get; set; }
 
+    /// <summary>Thời điểm tạo</summary>
     public DateTime? CreatedAt { get; set; }
 
+    /// <summary>Thời điểm cập nhật gần nhất</summary>
     public DateTime? UpdatedAt { get; set; }
 
+    /// <summary>Cờ đánh dấu xóa mềm</summary>
     public bool? IsDeleted { get; set; }
 
     public virtual ICollection<Employee> Employees { get; set; } = new List<Employee>();

@@ -1,22 +1,30 @@
-﻿#nullable disable
+#nullable disable
 using SMEFLOWSystem.SharedKernel.Interfaces;
 using System;
 
 namespace SMEFLOWSystem.Core.Entities;
 
+/// <summary>
+/// Cấu hình chấm công cho toàn bộ công ty.
+/// </summary>
 public class TenantAttendanceSetting : ITenantEntity
 {
     public Guid Id { get; set; }
     public Guid TenantId { get; set; }
+    /// <summary>Tọa độ GPS của văn phòng.</summary>
     public double? Latitude { get; set; }
     public double? Longitude { get; set; }
+    /// <summary>Bán kính cho phép chấm công hợp lệ (m).</summary>
     public int CheckInRadiusMeters { get; set; } = 100;
+    /// <summary>Giờ vào chuẩn.</summary>
     public TimeOnly? WorkStartTime { get; set; }
     public TimeOnly? WorkEndTime { get; set; }
     public TimeSpan DayStartCutOffTime { get; set; } = new TimeSpan(12, 1, 0);
+    /// <summary>Số phút cho phép trễ mà không bị phạt.</summary>
     public int LateThresholdMinutes { get; set; } = 10;
     public int EarlyLeaveThresholdMinutes { get; set; } = 10;
     
+    /// <summary>Số phút tối thiểu để tính Tăng ca (OT).</summary>
     public int MinimumOTMinutes { get; set; } = 30; // Dưới 30p không tính OT
     public int OTBlockMinutes { get; set; } = 30; // Block làm tròn (VD: 30p, 60p)
 

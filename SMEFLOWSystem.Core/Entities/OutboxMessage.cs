@@ -2,6 +2,9 @@ using System;
 
 namespace SMEFLOWSystem.Core.Entities;
 
+/// <summary>
+/// Lưu tạm các sự kiện cần gửi đi để đảm bảo tính nhất quán dữ liệu (Transactional Outbox Pattern).
+/// </summary>
 public partial class OutboxMessage
 {
     public Guid Id { get; set; }
@@ -17,8 +20,10 @@ public partial class OutboxMessage
 
     public string? CorrelationId { get; set; }
 
-    public string Status { get; set; } = "Pending"; // Pending, Processing, Processed, Failed
+    /// <summary>Trạng thái gửi message (Pending, Processing, Processed, Failed).</summary>
+    public string Status { get; set; } = "Pending";
 
+    /// <summary>Số lần thử lại.</summary>
     public int RetryCount { get; set; }
 
     public DateTime OccurredOnUtc { get; set; }

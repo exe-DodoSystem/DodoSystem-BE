@@ -22,10 +22,7 @@ public class ManagerDepartment : ITenantEntity
     /// <summary>Thời điểm được giao quyền</summary>
     public DateTime AssignedAt { get; set; }
 
-    /// <summary>
-    /// UserId của người thực hiện giao quyền (TenantAdmin).
-    /// Guid.Empty = system auto-assign (ví dụ: qua Invite onboarding).
-    /// </summary>
+    /// <summary>UserId của người thực hiện giao quyền (TenantAdmin). </summary>
     public Guid AssignedByUserId { get; set; }
 
     // Navigation properties

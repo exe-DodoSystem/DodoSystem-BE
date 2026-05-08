@@ -3,6 +3,9 @@ using SMEFLOWSystem.SharedKernel.Interfaces;
 
 namespace SMEFLOWSystem.Core.Entities;
 
+/// <summary>
+/// Chi tiết hóa đơn mua thêm module.
+/// </summary>
 public class BillingOrderModule : ITenantEntity
 {
     public Guid Id { get; set; }
