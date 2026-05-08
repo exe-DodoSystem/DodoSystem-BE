@@ -155,6 +155,15 @@ public static class DependencyInjection
                 };
             });
 
+        services.AddCors(options =>
+        {
+            options.AddPolicy("AllowFE", policy =>
+            {
+                policy.AllowAnyOrigin()
+                      .AllowAnyHeader()
+                      .AllowAnyMethod();
+            });
+        });
         return services;
     }
 
