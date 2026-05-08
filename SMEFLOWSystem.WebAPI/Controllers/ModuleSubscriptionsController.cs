@@ -16,6 +16,7 @@ public class ModuleSubscriptionsController : ControllerBase
         _service = service;
     }
 
+    /// <summary>Lấy danh sách tất cả các gói đăng ký module của Tenant hiện tại</summary>
     [HttpGet("me/all")]
     public async Task<ActionResult<List<ModuleSubscriptionDto>>> GetMyAll()
     {
@@ -30,6 +31,7 @@ public class ModuleSubscriptionsController : ControllerBase
         }
     }
 
+    /// <summary>Lấy thông tin gói đăng ký của Tenant theo Module ID</summary>
     [HttpGet("me/by-module-id/{moduleId:int}")]
     public async Task<ActionResult<ModuleSubscriptionDto>> GetMyByModuleId([FromRoute] int moduleId)
     {
@@ -45,6 +47,7 @@ public class ModuleSubscriptionsController : ControllerBase
         }
     }
 
+    /// <summary>Lấy thông tin gói đăng ký của Tenant theo Module Code</summary>
     [HttpGet("me/by-module-code/{code}")]
     public async Task<ActionResult<ModuleSubscriptionDto>> GetMyByModuleCode([FromRoute] string code)
     {

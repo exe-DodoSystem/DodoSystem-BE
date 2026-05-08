@@ -106,7 +106,19 @@ public class EmployeeRepository : IEmployeeRepository
     {
         return await _context.Employees
             .AsNoTracking()
+            .Include(e => e.Department)
+            .Include(e => e.Position)
             .Where(e => e.TenantId == tenantId && e.Status == StatusEnum.EmployeeWorking)
             .ToListAsync(); 
+    }
+
+    public async Task<List<Employee>> GetByDepartmentIdAsync(Guid departmentId)
+    {
+        return await _context.Employees
+            .AsNoTracking()
+            .Include(e => e.Department)
+            .Include(e => e.Position)
+            .Where(e => e.DepartmentId == departmentId && e.Status == StatusEnum.EmployeeWorking)
+            .ToListAsync();
     }
 }

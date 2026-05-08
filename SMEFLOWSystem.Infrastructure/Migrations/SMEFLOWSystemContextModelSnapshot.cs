@@ -540,6 +540,9 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                     b.Property<DateTime>("ExpiryDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<Guid?>("InvitedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bit")
@@ -575,6 +578,8 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                         .HasName("PK__Invites__3214EC07ABCDEF12");
 
                     b.HasIndex("DepartmentId");
+
+                    b.HasIndex("InvitedByUserId");
 
                     b.HasIndex("PositionId");
 
@@ -655,6 +660,35 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                         .HasDatabaseName("IX_LeaveRequestSegments_UniqueSegment");
 
                     b.ToTable("LeaveRequestSegments", (string)null);
+                });
+
+            modelBuilder.Entity("SMEFLOWSystem.Core.Entities.ManagerDepartment", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("DepartmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("AssignedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("(getdate())");
+
+                    b.Property<Guid>("AssignedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("UserId", "DepartmentId");
+
+                    b.HasIndex("DepartmentId");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("IX_ManagerDepartments_TenantId");
+
+                    b.ToTable("ManagerDepartments");
                 });
 
             modelBuilder.Entity("SMEFLOWSystem.Core.Entities.Module", b =>
@@ -1768,6 +1802,17 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                     b.ToTable("UserRoles");
                 });
 
+            modelBuilder.Entity("SMEFLOWSystem.Core.Entities.BillingOrder", b =>
+                {
+                    b.HasOne("SMEFLOWSystem.Core.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .IsRequired()
+                        .HasConstraintName("FK_BillingOrders_Tenants");
+
+                    b.Navigation("Tenant");
+                });
+
             modelBuilder.Entity("SMEFLOWSystem.Core.Entities.BillingOrderModule", b =>
                 {
                     b.HasOne("SMEFLOWSystem.Core.Entities.BillingOrder", "BillingOrder")
@@ -1903,6 +1948,11 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                         .HasForeignKey("DepartmentId")
                         .HasConstraintName("FK_Invites_Departments");
 
+                    b.HasOne("SMEFLOWSystem.Core.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("InvitedByUserId")
+                        .HasConstraintName("FK_Invites_InvitedByUserId");
+
                     b.HasOne("SMEFLOWSystem.Core.Entities.Position", "Position")
                         .WithMany("Invites")
                         .HasForeignKey("PositionId")
@@ -1964,6 +2014,36 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                     b.Navigation("LeaveRequest");
 
                     b.Navigation("TargetShiftSegment");
+                });
+
+            modelBuilder.Entity("SMEFLOWSystem.Core.Entities.ManagerDepartment", b =>
+                {
+                    b.HasOne("SMEFLOWSystem.Core.Entities.Department", "Department")
+                        .WithMany("ManagerDepartments")
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_ManagerDepartments_Departments");
+
+                    b.HasOne("SMEFLOWSystem.Core.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_ManagerDepartments_Tenants");
+
+                    b.HasOne("SMEFLOWSystem.Core.Entities.User", "User")
+                        .WithMany("ManagedDepartments")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_ManagerDepartments_Users");
+
+                    b.Navigation("Department");
+
+                    b.Navigation("Tenant");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("SMEFLOWSystem.Core.Entities.ModuleSubscription", b =>
@@ -2249,6 +2329,8 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
 
                     b.Navigation("Invites");
 
+                    b.Navigation("ManagerDepartments");
+
                     b.Navigation("Positions");
                 });
 
@@ -2324,6 +2406,8 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
             modelBuilder.Entity("SMEFLOWSystem.Core.Entities.User", b =>
                 {
                     b.Navigation("Employees");
+
+                    b.Navigation("ManagedDepartments");
 
                     b.Navigation("UserRoles");
                 });

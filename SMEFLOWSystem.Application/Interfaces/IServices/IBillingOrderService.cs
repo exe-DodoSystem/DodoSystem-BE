@@ -1,3 +1,4 @@
+using SMEFLOWSystem.Application.DTOs.ModuleDtos;
 using SMEFLOWSystem.Core.Entities;
 
 namespace SMEFLOWSystem.Application.Interfaces.IServices;
@@ -10,4 +11,6 @@ public interface IBillingOrderService
         IReadOnlyCollection<int> moduleIds,
         bool isTrialOrder = false,
         DateTime? prorateUntilUtc = null);
+
+    Task<IEnumerable<BillingOrderDto>> GetBillingOrdersAsync(Guid tenantId);
 }

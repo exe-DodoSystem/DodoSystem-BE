@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SMEFLOWSystem.Application.DTOs.PayrollDtos;
 using SMEFLOWSystem.Application.Interfaces.IServices;
@@ -20,6 +20,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             _currentTenant = currentTenant;
         }
 
+        /// <summary>[TenantAdmin] Tạo bảng lương nháp (Draft) hàng tháng cho tất cả nhân viên</summary>
         [HttpPost("generate")]
         [Authorize(Roles = "TenantAdmin")]
         public async Task<IActionResult> GenerateMonthlyPayroll([FromQuery] int month, [FromQuery] int year)
@@ -34,6 +35,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             return Ok(new { message = "Tạo phiếu lương Draft thành công." });
         }
 
+        /// <summary>[TenantAdmin, HRManager] Tính toán lại lương cho một nhân viên cụ thể</summary>
         [HttpPost("calculate/{employeeId}")]
         [Authorize(Roles = "TenantAdmin,HRManager")]
         public async Task<IActionResult> CalculateForEmployee(Guid employeeId, [FromQuery] int month, [FromQuery] int year)
@@ -45,6 +47,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             return Ok(result);
         }
 
+        /// <summary>[TenantAdmin, HRManager, Manager] Lấy danh sách bảng lương có phân trang</summary>
         [HttpGet("paged")]
         [Authorize(Roles = "TenantAdmin,HRManager,Manager")]
         public async Task<IActionResult> GetPaged([FromQuery] PayrollQueryDto query)
@@ -53,6 +56,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             return Ok(result);
         }
 
+        /// <summary>Lấy thông tin phiếu lương của chính user đang đăng nhập</summary>
         [HttpGet("my")]
         public async Task<IActionResult> GetMyPayroll([FromQuery] int? month, [FromQuery] int? year)
         {
@@ -60,6 +64,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             return Ok(result);
         }
 
+        /// <summary>[TenantAdmin] Phê duyệt phiếu lương</summary>
         [HttpPut("{payrollId}/approve")]
         [Authorize(Roles = "TenantAdmin")]
         public async Task<IActionResult> Approve(Guid payrollId)
@@ -68,6 +73,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             return Ok(new { approved = result });
         }
 
+        /// <summary>[TenantAdmin] Từ chối phiếu lương</summary>
         [HttpPut("{payrollId}/reject")]
         [Authorize(Roles = "TenantAdmin")]
         public async Task<IActionResult> Reject(Guid payrollId, [FromBody] RejectPayrollRequest request)
@@ -76,6 +82,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             return Ok(new { rejected = result });
         }
 
+        /// <summary>[TenantAdmin] Đánh dấu phiếu lương đã được thanh toán</summary>
         [HttpPut("{payrollId}/mark-paid")]
         [Authorize(Roles = "TenantAdmin")]
         public async Task<IActionResult> MarkPaid(Guid payrollId)
@@ -84,6 +91,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             return Ok(new { paid = result });
         }
 
+        /// <summary>[TenantAdmin, HRManager, Manager] Cập nhật tiền thưởng/phạt cho phiếu lương</summary>
         [HttpPut("{payrollId}/bonus-deduction")]
         [Authorize(Roles = "TenantAdmin,HRManager,Manager")]
         public async Task<IActionResult> UpdateBonusDeduction(Guid payrollId, [FromBody] UpdatePayrollDto dto)

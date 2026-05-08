@@ -20,6 +20,7 @@ public class AttendanceSettingController : ControllerBase
         _service = service;
     }
 
+    /// <summary>Lấy cấu hình chấm công hiện tại của Tenant</summary>
     [HttpGet]
     public async Task<IActionResult> GetConfig()
     {
@@ -38,6 +39,7 @@ public class AttendanceSettingController : ControllerBase
         }
     }
 
+    /// <summary>[Admin, HR] Cập nhật cấu hình chấm công (tạo mới nếu chưa có)</summary>
     [HttpPost]
     [Authorize(Roles = "Admin,HR")]
     public async Task<IActionResult> UpsertConfig([FromBody] UpdateAttendanceSettingRequestDto dto)

@@ -16,6 +16,7 @@ public class RefreshTokenController : ControllerBase
     {
         _refreshTokenService = refreshTokenService;
     }
+    /// <summary>Lấy danh sách tất cả Refresh Token của user đang đăng nhập</summary>
 
     [Authorize]
     [HttpGet("me")]
@@ -37,6 +38,7 @@ public class RefreshTokenController : ControllerBase
     }
 
     // TenantAdmin can view tokens of a user in the same tenant.
+    /// <summary>[TenantAdmin] Lấy danh sách Refresh Token của một user bất kỳ trong Tenant</summary>
     [Authorize(Roles = "TenantAdmin")]
     [HttpGet("{userId:guid}")]
     public async Task<IActionResult> GetAllTokenByUserId([FromRoute] Guid userId)
@@ -53,6 +55,7 @@ public class RefreshTokenController : ControllerBase
     }
 
     // Issue refresh token for current user (used after login if needed)
+    /// <summary>Cấp Refresh Token mới cho user đang đăng nhập</summary>
     [Authorize]
     [HttpPost("issue")]
     public async Task<IActionResult> Issue()
@@ -72,6 +75,7 @@ public class RefreshTokenController : ControllerBase
         }
     }
 
+    /// <summary>Làm mới Access Token bằng Refresh Token</summary>
     [HttpPost("refresh")]
     public async Task<IActionResult> Refresh([FromBody] RefreshRequestDto request)
     {
@@ -82,6 +86,7 @@ public class RefreshTokenController : ControllerBase
 
         return Ok(response);
     }
+    /// <summary>Đăng xuất (Thu hồi tất cả Refresh Token của user hiện tại)</summary>
 
     [Authorize]
     [HttpPost("logout")]

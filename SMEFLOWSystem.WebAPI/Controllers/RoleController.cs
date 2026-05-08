@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using SharedKernel.DTOs;
 using SMEFLOWSystem.Application.DTOs.RoleDtos;
 using SMEFLOWSystem.Application.Interfaces.IServices;
@@ -16,14 +17,18 @@ namespace SMEFLOWSystem.WebAPI.Controllers
         {
             _roleService = roleService;
         }
+        /// <summary>Lấy danh sách tất cả Roles</summary>
 
+        [Authorize]
         [HttpGet("all")]
         public async Task<IActionResult> GetAllRoles()
         {
             var roles = await _roleService.GetAllRolesAsync();
             return Ok(roles);
         }
+        /// <summary>Lấy thông tin Role theo ID</summary>
 
+        [Authorize]
         [HttpGet("{id}")]
         public async Task<IActionResult> GetRoleById(int id)
         {
@@ -34,7 +39,9 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             }
             return Ok(role);
         }
+        /// <summary>[SystemAdmin] Tạo Role mới</summary>
 
+        [Authorize(Roles = "SystemAdmin")]
         [HttpPost]
         public async Task<IActionResult> CreateRole([FromBody] RoleUpdatedDto roleDto)
         {
@@ -48,7 +55,9 @@ namespace SMEFLOWSystem.WebAPI.Controllers
                 return BadRequest(new { error = ex.Message });
             }
         }
+        /// <summary>[SystemAdmin] Cập nhật thông tin Role</summary>
 
+        [Authorize(Roles = "SystemAdmin")]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateRole(int id, [FromBody] RoleUpdatedDto roleDto)
         {
@@ -66,7 +75,9 @@ namespace SMEFLOWSystem.WebAPI.Controllers
                 return BadRequest(new { error = ex.Message });
             }
         }
+        /// <summary>Lấy danh sách Roles có phân trang</summary>
 
+        [Authorize]
         [HttpGet("all/page")]
         public async Task<IActionResult> GetAllByPage([FromQuery] PagingRequestDto request)
         {

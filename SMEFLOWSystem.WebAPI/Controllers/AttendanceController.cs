@@ -20,6 +20,7 @@ public class AttendanceController : ControllerBase
         _service = service;
     }
 
+    /// <summary>Gửi yêu cầu chấm công (Check-in/Check-out)</summary>
     [HttpPost("submit-punch")]
     public async Task<IActionResult> SubmitPunch([FromBody] SubmitPunchRequestDto request)
     {
@@ -40,6 +41,7 @@ public class AttendanceController : ControllerBase
         }
     }
 
+    /// <summary>Lấy thông tin chấm công hôm nay của user đăng nhập</summary>
     [HttpGet("my-today")]
     public async Task<IActionResult> GetMyTodayStatus()
     {
@@ -58,6 +60,7 @@ public class AttendanceController : ControllerBase
         }
     }
 
+    /// <summary>Lấy lịch sử chấm công của user đăng nhập theo tháng/năm</summary>
     [HttpGet("my-history")]
     public async Task<IActionResult> GetMyHistory([FromQuery] int month, [FromQuery] int year)
     {
@@ -76,6 +79,7 @@ public class AttendanceController : ControllerBase
         }
     }
 
+    /// <summary>[Admin, HR] Chấm công bằng tay cho nhân viên</summary>
     [HttpPost("manual-punch")]
     [Authorize(Roles = "Admin,HR")]
     public async Task<IActionResult> ManualPunch([FromBody] ManualPunchRequestDto request)
@@ -91,6 +95,7 @@ public class AttendanceController : ControllerBase
         }
     }
 
+    /// <summary>[Admin, HR] Tính toán lại công cho nhân viên trong 1 khoảng thời gian</summary>
     [HttpPost("recalculate/{employeeId}")]
     [Authorize(Roles = "Admin,HR")]
     public async Task<IActionResult> RecalculateAttendance(Guid employeeId, [FromQuery] string fromDate, [FromQuery] string toDate)
@@ -111,6 +116,7 @@ public class AttendanceController : ControllerBase
         }
     }
 
+    /// <summary>Gửi yêu cầu giải trình công (Appeal)</summary>
     [HttpPost("appeals")]
     public async Task<IActionResult> SubmitAppeal([FromBody] SubmitAppealRequestDto request)
     {
@@ -129,6 +135,7 @@ public class AttendanceController : ControllerBase
         }
     }
 
+    /// <summary>Lấy danh sách các yêu cầu giải trình của user đăng nhập</summary>
     [HttpGet("appeals")]
     public async Task<IActionResult> GetMyAppeals()
     {
@@ -147,6 +154,7 @@ public class AttendanceController : ControllerBase
         }
     }
 
+    /// <summary>[Admin, HR] Lấy danh sách các yêu cầu giải trình đang chờ duyệt</summary>
     [HttpGet("appeals/pending")]
     [Authorize(Roles = "Admin,HR")]
     public async Task<IActionResult> GetPendingAppeals()
@@ -162,6 +170,7 @@ public class AttendanceController : ControllerBase
         }
     }
 
+    /// <summary>[Admin, HR] Xử lý (Duyệt/Từ chối) yêu cầu giải trình</summary>
     [HttpPut("appeals/{appealId}/process")]
     [Authorize(Roles = "Admin,HR")]
     public async Task<IActionResult> ProcessAppeal(Guid appealId, [FromBody] ApproveAppealRequestDto request)
@@ -182,6 +191,7 @@ public class AttendanceController : ControllerBase
         }
     }
 
+    /// <summary>[Admin, HR] Lấy báo cáo chấm công tháng của tất cả nhân viên</summary>
     [HttpGet("hr-monthly-report")]
     [Authorize(Roles = "Admin,HR")]
     public async Task<IActionResult> GetHRMonthlyReport([FromQuery] int month, [FromQuery] int year)

@@ -20,6 +20,13 @@ public class BillingOrderModuleRepository : IBillingOrderModuleRepository
         await _context.SaveChangesAsync();
     }
 
+    public async Task<List<BillingOrderModule>> GetByBillingOrderId(Guid billingOrderId)
+    {
+        return await _context.BillingOrderModules
+            .Where(x => x.BillingOrderId == billingOrderId)
+            .ToListAsync();
+    }
+
     public Task<List<BillingOrderModule>> GetByBillingOrderIdIgnoreTenantAsync(Guid billingOrderId)
         => _context.BillingOrderModules
             .IgnoreQueryFilters()

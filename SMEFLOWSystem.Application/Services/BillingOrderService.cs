@@ -1,4 +1,6 @@
+using AutoMapper;
 using ShareKernel.Common.Enum;
+using SMEFLOWSystem.Application.DTOs.ModuleDtos;
 using SMEFLOWSystem.Application.Helpers;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Application.Interfaces.IServices;
@@ -11,15 +13,21 @@ public class BillingOrderService : IBillingOrderService
     private readonly IBillingOrderRepository _billingOrderRepo;
     private readonly IModuleRepository _moduleRepo;
     private readonly IBillingOrderModuleRepository _billingOrderModuleRepo;
+    private readonly IModuleSubscriptionRepository _moduleSubscriptionRepo;
+    private readonly IMapper _mapper;
 
     public BillingOrderService(
         IBillingOrderRepository billingOrderRepo,
         IModuleRepository moduleRepo,
-        IBillingOrderModuleRepository billingOrderModuleRepo)
+        IBillingOrderModuleRepository billingOrderModuleRepo,
+        IModuleSubscriptionRepository moduleSubscriptionRepo,
+        IMapper mapper)
     {
         _billingOrderRepo = billingOrderRepo;
         _moduleRepo = moduleRepo;
         _billingOrderModuleRepo = billingOrderModuleRepo;
+        _moduleSubscriptionRepo = moduleSubscriptionRepo;
+        _mapper = mapper;
     }
 
     public async Task<BillingOrder> CreateModuleBillingOrderAsync(
@@ -36,7 +44,21 @@ public class BillingOrderService : IBillingOrderService
         if (modules.Count != moduleIds.Distinct().Count())
             throw new Exception("Có module không tồn tại hoặc đang bị tắt!");
 
+        var existingSubscriptions = await _moduleSubscriptionRepo.GetByTenantIdAsync(tenantId);
         var now = DateTime.UtcNow;
+
+
+        foreach (var moduleId in moduleIds)
+        {
+            var existingSub = existingSubscriptions.FirstOrDefault(s => s.ModuleId == moduleId && !s.IsDeleted);
+            if (existingSub != null && existingSub.EndDate > now)
+            {
+                var moduleCode = modules.First(m => m.Id == moduleId).Code;
+                throw new Exception($"Module {moduleCode} đã được đăng ký và còn hạn đến {existingSub.EndDate:dd/MM/yyyy}!");
+            }
+        }
+
+
         var lines = modules.Select(m =>
         {
             var lineTotal = m.MonthlyPrice;
@@ -57,6 +79,7 @@ public class BillingOrderService : IBillingOrderService
             return new BillingOrderModule
             {
                 Id = Guid.NewGuid(),
+                TenantId = tenantId,
                 ModuleId = m.Id,
                 Quantity = 1,
                 UnitPrice = m.MonthlyPrice,
@@ -99,11 +122,18 @@ public class BillingOrderService : IBillingOrderService
         return billingOrder;
     }
 
+
     private static decimal GetDiscountPercent(int moduleCount)
     {
         if (moduleCount >= 4) return 0.20m;
         if (moduleCount >= 3) return 0.15m;
         if (moduleCount >= 2) return 0.10m;
         return 0m;
+    }
+
+    public async Task<IEnumerable<BillingOrderDto>> GetBillingOrdersAsync(Guid tenantId)
+    {
+        var orders = await _billingOrderRepo.GetByTenantIdAsync(tenantId);
+        return _mapper.Map<IEnumerable<BillingOrderDto>>(orders);
     }
 }

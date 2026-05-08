@@ -1,4 +1,4 @@
-﻿using Hangfire.Server;
+using Hangfire.Server;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using ShareKernel.Common.Enum;
@@ -7,6 +7,7 @@ using SMEFLOWSystem.Application.Helpers;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Application.Interfaces.IServices;
 using SMEFLOWSystem.Core.Entities;
+using SMEFLOWSystem.SharedKernel.Common;
 using SMEFLOWSystem.SharedKernel.Interfaces;
 using System;
 using System.Collections.Generic;
@@ -29,6 +30,7 @@ namespace SMEFLOWSystem.Application.Services
         private readonly IModuleSubscriptionRepository _moduleSubscriptionRepository;
         private readonly IConfiguration _configuration;
         private readonly IOutboxMessageRepository _outboxMessageRepository;
+        private readonly IManagerDepartmentRepository _managerDepartmentRepository;
 
         public InviteService(
             IInviteRepository inviteRepository,
@@ -40,7 +42,8 @@ namespace SMEFLOWSystem.Application.Services
             IModuleRepository moduleRepository,
             IModuleSubscriptionRepository moduleSubscriptionRepository,
             IConfiguration configuration,
-            IOutboxMessageRepository outboxMessageRepository)
+            IOutboxMessageRepository outboxMessageRepository,
+            IManagerDepartmentRepository managerDepartmentRepository)
         {
             _inviteRepository = inviteRepository;
             _userRepository = userRepository;
@@ -52,6 +55,7 @@ namespace SMEFLOWSystem.Application.Services
             _moduleSubscriptionRepository = moduleSubscriptionRepository;
             _configuration = configuration;
             _outboxMessageRepository = outboxMessageRepository;
+            _managerDepartmentRepository = managerDepartmentRepository;
         }
 
         public Task CompleteOnboardingAsync(string token, string fullName, string password, string? phone)
@@ -59,9 +63,9 @@ namespace SMEFLOWSystem.Application.Services
             return CompleteOnboardingInternalAsync(token, fullName, password, phone);
         }
 
-        public Task SendInviteAsync(Guid tenantId, string email, int roleId, Guid? departmentId, Guid? positionId, string message)
+        public Task SendInviteAsync(Guid tenantId, string email, int roleId, Guid? departmentId, Guid? positionId, string message, Guid? invitedByUserId = null)
         {
-            return SendInviteInternalAsync(tenantId, email, roleId, departmentId, positionId, message);
+            return SendInviteInternalAsync(tenantId, email, roleId, departmentId, positionId, message, invitedByUserId);
         }
 
         public Task<Invite> ValidateInviteTokenAsync(string token)
@@ -69,7 +73,7 @@ namespace SMEFLOWSystem.Application.Services
             return ValidateTokenInternalAsync(token);
         }
 
-        private async Task SendInviteInternalAsync(Guid tenantId, string email, int roleId, Guid? departmentId, Guid? positionId, string message)
+        private async Task SendInviteInternalAsync(Guid tenantId, string email, int roleId, Guid? departmentId, Guid? positionId, string message, Guid? invitedByUserId)
         {
             var emailExists = await _userRepository.IsEmailExistAsync(email);
             if (emailExists)
@@ -96,6 +100,7 @@ namespace SMEFLOWSystem.Application.Services
                 Token = token,
                 ExpiryDate = now.AddDays(7),
                 IsUsed = false,
+                InvitedByUserId = invitedByUserId,
                 Message = message,
                 CreatedAt = now,
                 UpdatedAt = null,
@@ -215,6 +220,26 @@ namespace SMEFLOWSystem.Application.Services
                 IsDeleted = false
             };
             await _employeeRepository.AddAsync(employee);
+
+            // Auto-assign phòng ban vào ManagerDepartment nếu user được mời với role Manager
+            var managerRole = await _roleRepository.GetRoleByNameAsync(RoleConstants.Manager);
+            if (managerRole != null
+                && invite.RoleId == managerRole.Id
+                && invite.DepartmentId.HasValue)
+            {
+                var alreadyAssigned = await _managerDepartmentRepository.ExistsAsync(user.Id, invite.DepartmentId.Value);
+                if (!alreadyAssigned)
+                {
+                    await _managerDepartmentRepository.AddAsync(new ManagerDepartment
+                    {
+                        UserId = user.Id,
+                        DepartmentId = invite.DepartmentId.Value,
+                        TenantId = invite.TenantId,
+                        AssignedAt = DateTime.UtcNow,
+                        AssignedByUserId = invite.InvitedByUserId ?? Guid.Empty // System auto-assign qua Invite onboarding
+                    });
+                }
+            }
 
             invite.IsUsed = true;
             invite.UpdatedAt = DateTime.UtcNow;

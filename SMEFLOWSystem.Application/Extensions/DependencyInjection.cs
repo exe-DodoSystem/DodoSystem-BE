@@ -20,6 +20,10 @@ public static class DependencyInjection
     {
         
         services.AddAutoMapper(typeof(RoleMappingProfile).Assembly);
+        services.AddAutoMapper(typeof(ModuleDtosMappingProfile).Assembly);
+        services.AddAutoMapper(typeof(UserMappingProfile).Assembly);
+        services.AddAutoMapper(typeof(HrMappingProfile).Assembly);
+
 
         services.AddValidatorsFromAssemblyContaining<RegisterRequestDtoValidator>();
         services.AddValidatorsFromAssemblyContaining<ChangePasswordRequestDtoValidator>();
@@ -46,6 +50,11 @@ public static class DependencyInjection
         services.AddScoped<IHrDepartmentService, HrDepartmentService>();
         services.AddScoped<IHrPositionService, HrPositionService>();
         services.AddScoped<IHrEmployeeService, HrEmployeeService>();
+
+        // HR Authorization: Centralized scope service + Manager-Department assignment
+        services.AddScoped<IHrAuthorizationService, HrAuthorizationService>();
+        services.AddScoped<IManagerDepartmentService, ManagerDepartmentService>();
+
         services.AddScoped<IAttendanceService, AttendanceService>();
         services.AddScoped<IAttendanceResolutionService, AttendanceResolutionService>();
         // services.AddScoped<IPayrollService, PayrollService>();

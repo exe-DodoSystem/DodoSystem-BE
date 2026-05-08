@@ -39,6 +39,7 @@ public class InviteConfiguration : IEntityTypeConfiguration<Invite>
         entity.HasOne(d => d.Role).WithMany(p => p.Invites).HasForeignKey(d => d.RoleId).OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("FK_Invites_Roles");
         entity.HasOne(d => d.Department).WithMany(p => p.Invites).HasForeignKey(d => d.DepartmentId).HasConstraintName("FK_Invites_Departments");
         entity.HasOne(d => d.Position).WithMany(p => p.Invites).HasForeignKey(d => d.PositionId).HasConstraintName("FK_Invites_Positions");
+        entity.HasOne<User>().WithMany().HasForeignKey(e => e.InvitedByUserId).HasConstraintName("FK_Invites_InvitedByUserId");
     }
 }
 

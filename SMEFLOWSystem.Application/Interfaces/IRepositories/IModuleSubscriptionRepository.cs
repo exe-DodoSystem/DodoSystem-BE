@@ -8,4 +8,5 @@ public interface IModuleSubscriptionRepository
     Task AddAsync(ModuleSubscription subscription);
     Task UpdateIgnoreTenantAsync(ModuleSubscription subscription);
     Task<List<ModuleSubscription>> GetByTenantIgnoreTenantAsync(Guid tenantId);
+    Task<List<ModuleSubscription>> GetByTenantIdAsync(Guid tenantId);
 }

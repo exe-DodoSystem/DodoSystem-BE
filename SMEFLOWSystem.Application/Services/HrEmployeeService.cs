@@ -16,6 +16,7 @@ public class HrEmployeeService : IHrEmployeeService
     private readonly IDepartmentRepository _departmentRepo;
     private readonly IPositionRepository _positionRepo;
     private readonly ICurrentUserService _currentUser;
+    private readonly IHrAuthorizationService _hrAuth;
     private readonly IMapper _mapper;
 
     public HrEmployeeService(
@@ -23,12 +24,14 @@ public class HrEmployeeService : IHrEmployeeService
         IDepartmentRepository departmentRepo,
         IPositionRepository positionRepo,
         ICurrentUserService currentUser,
+        IHrAuthorizationService hrAuth,
         IMapper mapper)
     {
         _employeeRepo = employeeRepo;
         _departmentRepo = departmentRepo;
         _positionRepo = positionRepo;
         _currentUser = currentUser;
+        _hrAuth = hrAuth;
         _mapper = mapper;
     }
 
@@ -36,13 +39,74 @@ public class HrEmployeeService : IHrEmployeeService
     {
         _currentUser.EnsureHrAccess();
 
+        // Xác định phạm vi DepartmentId được phép xem
+        // - null  = Admin/HRManager → không giới hạn (dùng query.DepartmentId như cũ)
+        // - list  = Manager → chỉ trong danh sách phòng ban được giao
+        var accessibleIds = await _hrAuth.GetAccessibleDepartmentIdsAsync();
+
         Guid? departmentId = query.DepartmentId;
-        if (IsManagerScoped())
+
+        if (accessibleIds != null)
         {
-            var myDeptId = await GetManagerDepartmentIdOrThrowAsync();
-            if (departmentId.HasValue && departmentId.Value != myDeptId)
+            // Manager scope: nếu request có DepartmentId nhưng không nằm trong danh sách → Forbidden
+            if (departmentId.HasValue && !accessibleIds.Contains(departmentId.Value))
                 throw new UnauthorizedAccessException("Forbidden");
-            departmentId = myDeptId;
+
+            // Nếu Manager không filter cụ thể, ta không thể lấy tất cả → cần filter theo danh sách
+            // Lưu ý: Repository cần hỗ trợ filter theo nhiều departmentId
+            // Nếu chưa có, tạm thời dùng departmentId đầu tiên hoặc loop
+            // → Hiện tại nếu Manager có 1 phòng ban, dùng như cũ
+            // → Nếu nhiều phòng ban, lấy tất cả và ghép lại
+            if (!departmentId.HasValue)
+            {
+                // Manager không chỉ định → lấy tất cả trong phạm vi cho phép
+                if (accessibleIds.Count == 0)
+                {
+                    return new PagedResultDto<EmployeeDto>
+                    {
+                        Items = new List<EmployeeDto>(),
+                        TotalCount = 0,
+                        PageNumber = query.PageNumber,
+                        PageSize = query.PageSize
+                    };
+                }
+
+                if (accessibleIds.Count == 1)
+                {
+                    departmentId = accessibleIds[0];
+                }
+                else
+                {
+                    // Nhiều phòng ban: load từng cái và ghép (đủ dùng cho MVP)
+                    var allItems = new List<Employee>();
+                    var totalCount = 0;
+                    foreach (var deptId in accessibleIds)
+                    {
+                        var (deptItems, deptTotal) = await _employeeRepo.GetPagedAsync(
+                            departmentId: deptId,
+                            positionId: query.PositionId,
+                            status: query.Status,
+                            includeResigned: query.IncludeResigned,
+                            search: query.Search,
+                            pageNumber: 1,
+                            pageSize: int.MaxValue,
+                            sortBy: query.SortBy,
+                            sortDir: query.SortDir);
+                        allItems.AddRange(deptItems);
+                        totalCount += deptTotal;
+                    }
+                    // Áp dụng phân trang thủ công
+                    var skip = (query.PageNumber - 1) * query.PageSize;
+                    var paged = allItems.Skip(skip).Take(query.PageSize).ToList();
+                    return new PagedResultDto<EmployeeDto>
+                    {
+                        Items = _mapper.Map<List<EmployeeDto>>(paged),
+                        TotalCount = totalCount,
+                        PageNumber = query.PageNumber,
+                        PageSize = query.PageSize
+                    };
+                }
+            }
         }
 
         var (items, total) = await _employeeRepo.GetPagedAsync(
@@ -69,19 +133,20 @@ public class HrEmployeeService : IHrEmployeeService
     {
         _currentUser.EnsureHrAccess();
         var emp = await _employeeRepo.GetByIdAsync(id) ?? throw new KeyNotFoundException("Employee not found");
-        await EnsureEmployeeAccessibleAsync(emp);
+        await _hrAuth.EnsureEmployeeAccessAsync(emp);
         return _mapper.Map<EmployeeDto>(emp);
     }
+
 
     public async Task<EmployeeDto> CreateAsync(EmployeeCreateDto request)
     {
         _currentUser.EnsureHrAccess();
 
-        if (IsManagerScoped())
+        // Manager chỉ được tạo nhân viên trong phòng ban mình quản lý
+        if (!_currentUser.IsAdmin() && !_currentUser.IsHrManager())
         {
-            var myDeptId = await GetManagerDepartmentIdOrThrowAsync();
-            if (!request.DepartmentId.HasValue || request.DepartmentId.Value != myDeptId)
-                throw new UnauthorizedAccessException("Forbidden");
+            if (request.DepartmentId.HasValue)
+                await _hrAuth.EnsureDepartmentAccessAsync(request.DepartmentId.Value);
         }
 
         await ValidateDepartmentPositionAsync(request.DepartmentId, request.PositionId);
@@ -106,13 +171,13 @@ public class HrEmployeeService : IHrEmployeeService
     {
         _currentUser.EnsureHrAccess();
         var emp = await _employeeRepo.GetByIdAsync(id) ?? throw new KeyNotFoundException("Employee not found");
-        await EnsureEmployeeAccessibleAsync(emp);
+        await _hrAuth.EnsureEmployeeAccessAsync(emp);
 
-        if (IsManagerScoped())
+        // Validate department mới cũng phải trong phạm vi quản lý
+        if (!_currentUser.IsAdmin() && !_currentUser.IsHrManager())
         {
-            var myDeptId = await GetManagerDepartmentIdOrThrowAsync();
-            if (!request.DepartmentId.HasValue || request.DepartmentId.Value != myDeptId)
-                throw new UnauthorizedAccessException("Forbidden");
+            if (request.DepartmentId.HasValue)
+                await _hrAuth.EnsureDepartmentAccessAsync(request.DepartmentId.Value);
         }
 
         await ValidateDepartmentPositionAsync(request.DepartmentId, request.PositionId);
@@ -149,35 +214,13 @@ public class HrEmployeeService : IHrEmployeeService
     {
         _currentUser.EnsureHrAccess();
         var emp = await _employeeRepo.GetByIdAsync(id) ?? throw new KeyNotFoundException("Employee not found");
-        await EnsureEmployeeAccessibleAsync(emp);
+        await _hrAuth.EnsureEmployeeAccessAsync(emp);
 
         emp.Status = StatusEnum.EmployeeResigned;
         emp.ResignationDate ??= DateOnly.FromDateTime(DateTime.UtcNow);
         emp.IsDeleted = true;
         emp.UpdatedAt = DateTime.UtcNow;
         await _employeeRepo.UpdateAsync(emp);
-    }
-
-    // Manager scoped = Manager role AND not Admin
-    private bool IsManagerScoped() => _currentUser.IsManager() && !_currentUser.IsAdmin();
-
-    private async Task<Guid> GetManagerDepartmentIdOrThrowAsync()
-    {
-        var userId = _currentUser.RequireUserId();
-        var emp = await _employeeRepo.GetByUserIdAsync(userId);
-        if (emp == null || !emp.DepartmentId.HasValue || !emp.PositionId.HasValue)
-            throw new UnauthorizedAccessException("Bạn chưa được gán phòng ban/chức vụ");
-        return emp.DepartmentId.Value;
-    }
-
-    private async Task EnsureEmployeeAccessibleAsync(Employee employee)
-    {
-        if (_currentUser.IsAdmin()) return;
-        if (IsManagerScoped())
-        {
-            var myDeptId = await GetManagerDepartmentIdOrThrowAsync();
-            if (employee.DepartmentId != myDeptId) throw new UnauthorizedAccessException("Forbidden");
-        }
     }
 
     private async Task ValidateDepartmentPositionAsync(Guid? departmentId, Guid? positionId)
@@ -192,5 +235,12 @@ public class HrEmployeeService : IHrEmployeeService
         var pos = await _positionRepo.GetByIdAsync(positionId.Value);
         if (pos == null) throw new ArgumentException("PositionId không tồn tại");
         if (pos.DepartmentId != departmentId.Value) throw new ArgumentException("Position không thuộc Department");
+    }
+
+    public async Task<List<EmployeeDto>> GetAllByDepartmentId(Guid departmentId)
+    {
+        _currentUser.EnsureHrAccess();
+        var employees = await _employeeRepo.GetByDepartmentIdAsync(departmentId);
+        return _mapper.Map<List<EmployeeDto>>(employees);
     }
 }

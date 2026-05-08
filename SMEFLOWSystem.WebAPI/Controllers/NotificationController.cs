@@ -16,6 +16,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             _notificationService = notificationService;
         }
 
+        /// <summary>Lấy danh sách thông báo của user đăng nhập</summary>
         [HttpGet]
         public async Task<IActionResult> GetMyNotifications(
             [FromQuery] bool? isRead,
@@ -26,6 +27,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             return Ok(result);
         }
 
+        /// <summary>Lấy số lượng thông báo chưa đọc của user đăng nhập</summary>
         [HttpGet("unread-count")]
         public async Task<IActionResult> GetUnreadCount()
         {
@@ -33,6 +35,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             return Ok(new { unreadCount = count });
         }
 
+        /// <summary>Đánh dấu một thông báo là đã đọc</summary>
         [HttpPut("{id}/read")]
         public async Task<IActionResult> MarkAsRead(Guid id)
         {
@@ -40,6 +43,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             return Ok(new { message = "Đã đánh dấu đã đọc." });
         }
 
+        /// <summary>Đánh dấu tất cả thông báo của user là đã đọc</summary>
         [HttpPut("read-all")]
         public async Task<IActionResult> MarkAllAsRead()
         {

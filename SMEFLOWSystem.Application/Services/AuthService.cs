@@ -85,7 +85,7 @@ namespace SMEFLOWSystem.Application.Services
                 var newTenant = new Tenant
                 {
                     Id = Guid.NewGuid(),
-                    Name = request.CompanyName,
+                    Name = request.CompanyName,               
                     Status = StatusEnum.TenantTrial,
                     SubscriptionEndDate = DateOnly.FromDateTime(trialEnd),
                     CreatedAt = now,
@@ -130,8 +130,10 @@ namespace SMEFLOWSystem.Application.Services
                 {
                     Id = Guid.NewGuid(),
                     TenantId = newTenant.Id,
-                    Name = request.CompanyName,
+                    Name = request.AdminFullName,
+                    CompanyName = request.CompanyName,
                     Email = request.AdminEmail,
+                    Phone = request.PhoneNumber ?? string.Empty,
                     Type = "Internal",
                     CreatedAt = now
                 };
@@ -204,7 +206,7 @@ namespace SMEFLOWSystem.Application.Services
                                                        || string.Equals(s.Status, StatusEnum.ModuleTrial, StringComparison.OrdinalIgnoreCase))
                                                    && s.EndDate > now);
                 if (!hasValidModule)
-                    throw new Exception("Hết hạn trial, thanh toán để tiếp tục");
+                    throw new Exception("Hết hạn tất cả module, thanh toán để tiếp tục");
             }
 
             if (!string.Equals(tenant.Status, StatusEnum.TenantActive, StringComparison.OrdinalIgnoreCase)
