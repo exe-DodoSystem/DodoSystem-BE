@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SharedKernel.DTOs;
 using SMEFLOWSystem.Application.DTOs.RoleDtos;
@@ -17,6 +17,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
         {
             _roleService = roleService;
         }
+        /// <summary>Lấy danh sách tất cả Roles</summary>
 
         [Authorize]
         [HttpGet("all")]
@@ -25,6 +26,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             var roles = await _roleService.GetAllRolesAsync();
             return Ok(roles);
         }
+        /// <summary>Lấy thông tin Role theo ID</summary>
 
         [Authorize]
         [HttpGet("{id}")]
@@ -37,6 +39,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             }
             return Ok(role);
         }
+        /// <summary>[SystemAdmin] Tạo Role mới</summary>
 
         [Authorize(Roles = "SystemAdmin")]
         [HttpPost]
@@ -52,6 +55,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
                 return BadRequest(new { error = ex.Message });
             }
         }
+        /// <summary>[SystemAdmin] Cập nhật thông tin Role</summary>
 
         [Authorize(Roles = "SystemAdmin")]
         [HttpPut("{id}")]
@@ -71,6 +75,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
                 return BadRequest(new { error = ex.Message });
             }
         }
+        /// <summary>Lấy danh sách Roles có phân trang</summary>
 
         [Authorize]
         [HttpGet("all/page")]

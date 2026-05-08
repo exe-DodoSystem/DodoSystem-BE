@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using SMEFLOWSystem.Application.DTOs.UserDtos;
 using SMEFLOWSystem.Application.Interfaces.IServices;
 using System.Security.Claims;
@@ -19,6 +19,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             _userService = userService;
             _currentTenantService = currentTenantService;
         }
+        /// <summary>Lấy thông tin profile của user đang đăng nhập</summary>
 
         [Authorize]
         [HttpGet("me")]
@@ -32,6 +33,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             return Ok(user);
 
         }
+        /// <summary>[TenantAdmin] Mời user mới tham gia vào hệ thống/công ty</summary>
 
         [Authorize]
         [HttpPost("invite")]
@@ -54,6 +56,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
                 return StatusCode(500, new { error = ex.Message });
             }
         }
+        /// <summary>[TenantAdmin] Cập nhật roles cho user</summary>
 
         [Authorize(Roles = "TenantAdmin")]
         [HttpPut("{userId:guid}/role")]
@@ -69,6 +72,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
                 return BadRequest(new { error = ex.Message });
             }
         }
+        /// <summary>Cập nhật ảnh đại diện (avatar) cho user đang đăng nhập</summary>
 
         [Authorize]
         [HttpPut("me/avatar")]

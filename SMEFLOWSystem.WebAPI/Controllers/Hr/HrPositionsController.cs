@@ -17,6 +17,7 @@ public class HrPositionsController : ControllerBase
         _service = service;
     }
 
+    /// <summary>Lấy danh sách chức vụ thuộc một phòng ban cụ thể</summary>
     [HttpGet]
     public async Task<ActionResult<List<PositionDto>>> GetByDepartment([FromQuery] Guid departmentId)
     {
@@ -34,6 +35,7 @@ public class HrPositionsController : ControllerBase
         }
     }
 
+    /// <summary>[TenantAdmin, HRManager] Tạo mới chức vụ</summary>
     [HttpPost]
     public async Task<ActionResult<PositionDto>> Create([FromBody] PositionCreateDto request)
     {
@@ -55,6 +57,7 @@ public class HrPositionsController : ControllerBase
         }
     }
 
+    /// <summary>[TenantAdmin, HRManager] Cập nhật thông tin chức vụ</summary>
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<PositionDto>> Update([FromRoute] Guid id, [FromBody] PositionUpdateDto request)
     {
@@ -76,6 +79,7 @@ public class HrPositionsController : ControllerBase
         }
     }
 
+    /// <summary>[TenantAdmin, HRManager] Xóa chức vụ</summary>
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete([FromRoute] Guid id)
     {

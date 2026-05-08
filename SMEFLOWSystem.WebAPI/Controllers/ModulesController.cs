@@ -15,6 +15,7 @@ public class ModulesController : ControllerBase
         _moduleService = moduleService;
     }
 
+    /// <summary>Lấy danh sách các module đang hoạt động trên hệ thống</summary>
     [HttpGet("active")]
     public async Task<ActionResult<List<ModuleDto>>> GetActive()
     {
@@ -22,6 +23,7 @@ public class ModulesController : ControllerBase
         return Ok(modules);
     }
 
+    /// <summary>Lấy danh sách tất cả các module (Bao gồm cả ngưng hoạt động)</summary>
     [HttpGet("all")]
     public async Task<ActionResult<List<ModuleDto>>> GetAll()
     {
@@ -29,6 +31,7 @@ public class ModulesController : ControllerBase
         return Ok(modules);
     }
 
+    /// <summary>[SystemAdmin] Tạo module mới vào hệ thống</summary>
     [HttpPost]
     public async Task<ActionResult<ModuleDto>> Create([FromBody] ModuleCreateDto dto)
     {

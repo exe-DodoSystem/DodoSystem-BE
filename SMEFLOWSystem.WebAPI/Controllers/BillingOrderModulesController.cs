@@ -16,6 +16,7 @@ public class BillingOrderModulesController : ControllerBase
     {
         _service = service;
     }
+    /// <summary>[TenantAdmin] Lấy thông tin các module đã mua thuộc 1 module ID cụ thể</summary>
 
     [Authorize(Roles = "TenantAdmin")]
     [HttpGet("me/by-module-id/{moduleId:int}")]
@@ -31,6 +32,7 @@ public class BillingOrderModulesController : ControllerBase
             return Unauthorized();
         }
     }
+    /// <summary>[TenantAdmin] Lấy thông tin các module đã mua thuộc 1 module Code cụ thể</summary>
 
     [Authorize(Roles = "TenantAdmin")]
     [HttpGet("me/by-module-code/{code}")]
@@ -50,6 +52,7 @@ public class BillingOrderModulesController : ControllerBase
             return NotFound(new { error = ex.Message });
         }
     }
+    /// <summary>[TenantAdmin] Lấy danh sách module thuộc 1 đơn hàng thanh toán (Billing Order) cụ thể</summary>
 
     [Authorize(Roles = "TenantAdmin")]
     [HttpGet("me/by-billing-order-id/{billingOrderId:guid}")]
@@ -58,6 +61,7 @@ public class BillingOrderModulesController : ControllerBase
         var lines = await _service.GetByBillingOrderIdAsync(billingOrderId);
         return Ok(lines);
     }
+    /// <summary>[SystemAdmin] Lấy danh sách module thuộc 1 đơn hàng (Bỏ qua filter Tenant)</summary>
 
     [Authorize(Roles = "SystemAdmin")]
     [HttpGet("by-billing-order-id-ignore-tenant/{billingOrderId:guid}")]

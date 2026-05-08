@@ -18,6 +18,7 @@ public class HrInvitesController : ControllerBase
         _inviteService = inviteService;
         _currentTenant = currentTenant;
     }
+    /// <summary>[TenantAdmin] Gửi email mời một người dùng mới vào Tenant (Công ty)</summary>
 
     [Authorize]
     [HttpPost("send")]
@@ -47,6 +48,7 @@ public class HrInvitesController : ControllerBase
     }
 
     // Unauthenticated onboarding completion (ModuleAccessMiddleware skips unauthenticated requests)
+    /// <summary>Xác thực Token lời mời có hợp lệ hay không</summary>
     [AllowAnonymous]
     [HttpGet("validate")]
     public async Task<IActionResult> Validate([FromQuery] string token)
@@ -70,6 +72,7 @@ public class HrInvitesController : ControllerBase
             return BadRequest(new { error = ex.Message });
         }
     }
+    /// <summary>Hoàn tất đăng ký tài khoản từ lời mời</summary>
 
     [AllowAnonymous]
     [HttpPost("complete")]

@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SMEFLOWSystem.Application.Interfaces.IServices;
 using SMEFLOWSystem.SharedKernel.Interfaces;
@@ -18,6 +18,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             _currentTenant = currentTenant;
         }
 
+        /// <summary>Lấy danh sách các hóa đơn của Tenant hiện tại</summary>
         [HttpGet("/me/billing-orders")]
         public async Task<IActionResult> GetBillingOrdersByTenantAsync()
         {

@@ -17,6 +17,7 @@ public class HrDepartmentsController : ControllerBase
         _service = service;
     }
 
+    /// <summary>Lấy danh sách các phòng ban mà user có quyền truy cập</summary>
     [HttpGet]
     public async Task<ActionResult<List<DepartmentDto>>> GetAccessible()
     {
@@ -30,6 +31,7 @@ public class HrDepartmentsController : ControllerBase
         }
     }
 
+    /// <summary>[TenantAdmin, HRManager] Tạo mới phòng ban</summary>
     [HttpPost]
     public async Task<ActionResult<DepartmentDto>> Create([FromBody] DepartmentCreateDto request)
     {
@@ -48,6 +50,7 @@ public class HrDepartmentsController : ControllerBase
         }
     }
 
+    /// <summary>[TenantAdmin, HRManager] Cập nhật thông tin phòng ban</summary>
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<DepartmentDto>> Update([FromRoute] Guid id, [FromBody] DepartmentUpdateDto request)
     {
@@ -69,6 +72,7 @@ public class HrDepartmentsController : ControllerBase
         }
     }
 
+    /// <summary>[TenantAdmin, HRManager] Xóa phòng ban</summary>
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete([FromRoute] Guid id)
     {

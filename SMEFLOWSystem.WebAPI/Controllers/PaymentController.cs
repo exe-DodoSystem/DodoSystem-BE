@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Hosting;
 using SMEFLOWSystem.Application.Interfaces.IServices;
 using Microsoft.Extensions.Configuration;
@@ -26,6 +26,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             _env = env;
         }
 
+        /// <summary>Tạo URL thanh toán VNPay cho đơn hàng</summary>
         [HttpPost("create")]
         public async Task<IActionResult> CreatePayment([FromQuery] Guid orderId)
         {
@@ -41,7 +42,8 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             return Ok(url);  
         }
 
-        [HttpGet("callback/vnpay")]  
+        /// <summary>Callback IPN nhận kết quả thanh toán từ VNPay</summary>
+        [HttpGet("callback/vnpay")]
         public async Task<IActionResult> VNPayCallback([FromQuery] string? vnp_TxnRef)
         {
             var frontendUrl = _config["Payment:FrontendUrl"] ?? "http://localhost:3000";
@@ -64,6 +66,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             }
         }
 
+        /// <summary>[Dev only] Giả lập thanh toán VNPay thành công</summary>
         [HttpPost("simulate/vnpay/success")]
         public async Task<IActionResult> SimulateVNPaySuccess([FromQuery] Guid orderId, [FromQuery] string? vnp_TransactionNo = null)
         {

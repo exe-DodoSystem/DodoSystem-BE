@@ -18,6 +18,7 @@ public class HrEmployeesController : ControllerBase
         _service = service;
     }
 
+    /// <summary>Lấy danh sách nhân sự (có phân trang) trong phạm vi quyền hạn của user</summary>
     [HttpGet]
     public async Task<ActionResult<PagedResultDto<EmployeeDto>>> GetPaged([FromQuery] EmployeeQueryDto query)
     {
@@ -31,6 +32,7 @@ public class HrEmployeesController : ControllerBase
         }
     }
 
+    /// <summary>Lấy thông tin chi tiết một nhân viên</summary>
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<EmployeeDto>> GetById([FromRoute] Guid id)
     {
@@ -48,6 +50,7 @@ public class HrEmployeesController : ControllerBase
         }
     }
 
+    /// <summary>[TenantAdmin, HRManager] Thêm nhân viên mới trực tiếp</summary>
     [HttpPost]
     public async Task<ActionResult<EmployeeDto>> Create([FromBody] EmployeeCreateDto request)
     {
@@ -65,6 +68,7 @@ public class HrEmployeesController : ControllerBase
         }
     }
 
+    /// <summary>[TenantAdmin, HRManager] Cập nhật thông tin nhân viên</summary>
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<EmployeeDto>> Update([FromRoute] Guid id, [FromBody] EmployeeUpdateDto request)
     {
@@ -86,6 +90,7 @@ public class HrEmployeesController : ControllerBase
         }
     }
 
+    /// <summary>[TenantAdmin, HRManager] Xóa nhân viên</summary>
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete([FromRoute] Guid id)
     {

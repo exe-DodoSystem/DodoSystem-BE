@@ -11,19 +11,19 @@ namespace SMEFLOWSystem.Application.Services;
 public class HrDepartmentService : IHrDepartmentService
 {
     private readonly IDepartmentRepository _departmentRepo;
-    private readonly IEmployeeRepository _employeeRepo;
     private readonly ICurrentUserService _currentUser;
+    private readonly IHrAuthorizationService _hrAuth;
     private readonly IMapper _mapper;
 
     public HrDepartmentService(
         IDepartmentRepository departmentRepo,
-        IEmployeeRepository employeeRepo,
         ICurrentUserService currentUser,
+        IHrAuthorizationService hrAuth,
         IMapper mapper)
     {
         _departmentRepo = departmentRepo;
-        _employeeRepo = employeeRepo;
         _currentUser = currentUser;
+        _hrAuth = hrAuth;
         _mapper = mapper;
     }
 
@@ -31,15 +31,28 @@ public class HrDepartmentService : IHrDepartmentService
     {
         _currentUser.EnsureHrAccess();
 
-        if (_currentUser.IsAdmin())
+        // GetAccessibleDepartmentIdsAsync() trả về:
+        //   null   → TenantAdmin / HRManager → lấy tất cả
+        //   list   → Manager → chỉ các phòng ban được giao
+        var accessibleIds = await _hrAuth.GetAccessibleDepartmentIdsAsync();
+
+        if (accessibleIds == null)
         {
             var all = await _departmentRepo.GetAllAsync();
             return _mapper.Map<List<DepartmentDto>>(all);
         }
 
-        var myDeptId = await GetManagerDepartmentIdOrThrowAsync();
-        var dept = await _departmentRepo.GetByIdAsync(myDeptId) ?? throw new KeyNotFoundException("Department not found");
-        return new List<DepartmentDto> { _mapper.Map<DepartmentDto>(dept) };
+        if (accessibleIds.Count == 0)
+            return new List<DepartmentDto>(); // Manager chưa được giao phòng ban nào
+
+        var departments = new List<DepartmentDto>();
+        foreach (var deptId in accessibleIds)
+        {
+            var dept = await _departmentRepo.GetByIdAsync(deptId);
+            if (dept != null)
+                departments.Add(_mapper.Map<DepartmentDto>(dept));
+        }
+        return departments;
     }
 
     public async Task<DepartmentDto> CreateAsync(DepartmentCreateDto request)
@@ -73,14 +86,5 @@ public class HrDepartmentService : IHrDepartmentService
             throw new ArgumentException("Không thể xóa vì đang có nhân viên sử dụng");
 
         await _departmentRepo.SoftDeleteAsync(dept);
-    }
-
-    private async Task<Guid> GetManagerDepartmentIdOrThrowAsync()
-    {
-        var userId = _currentUser.RequireUserId();
-        var emp = await _employeeRepo.GetByUserIdAsync(userId);
-        if (emp == null || !emp.DepartmentId.HasValue || !emp.PositionId.HasValue)
-            throw new UnauthorizedAccessException("Bạn chưa được gán phòng ban/chức vụ");
-        return emp.DepartmentId.Value;
     }
 }
