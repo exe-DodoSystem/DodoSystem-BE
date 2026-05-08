@@ -1,66 +1,98 @@
+# =========================
 # Visual Studio / VS Code
+# =========================
 .vs/
 .vscode/
+.idea/
 
-# Build results
+# =========================
+# Build Results
+# =========================
 [Bb]in/
 [Oo]bj/
 [Ll]og/
+[Ll]ogs/
 [Tt]emp/
 
+# =========================
 # User-specific files
+# =========================
 *.user
+*.rsuser
 *.suo
 *.userosscache
 *.sln.docstates
 
-# Backup & Cache
+# =========================
+# Backup / Cache
+# =========================
 *.bak
 *.cache
-*.cache.json
 *.log
 *.pdb
-*.ldb
+*.tmp
+*.swp
+*.swo
 AssemblyInfoInputs.cache
 
-# Test results
+# =========================
+# Test Results
+# =========================
 [Tt]est[Rr]esult*/
 *.trx
 *.coverage
 *.coveragexml
 
+# =========================
 # NuGet
+# =========================
 *.nupkg
 *.snupkg
-packages/
-project.assets.json
-project.nuget.cache
-*.nuget.g.props
-*.nuget.g.targets
-*.nuget.dgspec.json
 
-# Resharper
-_ReSharper*/
-*.DotSettings.user
+# KHÔNG nên ignore packages/ nếu dùng SDK-style project (.NET 6+)
+# packages/
 
-# Rider
-.idea/
+# KHÔNG nên ignore project.assets.json nữa
+# project.assets.json
 
-# Mac & Linux
-.DS_Store
-*.swp
-*.swo
-*.tmp
+# KHÔNG cần ignore các file generated này
+# vì chúng nằm trong obj/
+# *.nuget.g.props
+# *.nuget.g.targets
+# *.nuget.dgspec.json
 
-# Publish
-publish/
-wwwroot/dist/
+# =========================
+# Node.js
+# =========================
 node_modules/
 
-# Appsettings (nếu không muốn commit config)
-# appsettings.Development.json
-# appsettings.json
+# Frontend Build
+wwwroot/dist/
 
+# =========================
+# Publish
+# =========================
+publish/
+
+# =========================
+# Local Environment Config
+# =========================
+
+# Chỉ ignore config local
+appsettings.Development.json
+appsettings.Local.json
+
+# Nếu có secrets local riêng
+secrets.json
+
+# =========================
+# OS Files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
 # Dumps
+# =========================
 *.stackdump
 *.dmp
