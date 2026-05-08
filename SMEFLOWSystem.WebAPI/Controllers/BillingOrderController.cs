@@ -63,7 +63,6 @@ namespace SMEFLOWSystem.WebAPI.Controllers
                 return Unauthorized(new { Error = "User is not authenticated correctly." });
             }
 
-            // 2. Tìm ngày hết hạn chung của Tenant để truyền vào tính prorate
             var tenant = await _systemTenantService.GetByIdAsync(tenantId.Value);
             if(tenant == null) 
                 return NotFound(new { Error = "Tenant does not exist." });
@@ -73,16 +72,14 @@ namespace SMEFLOWSystem.WebAPI.Controllers
                 ? expireDate.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc) 
                 : null;
 
-            // 3. Gọi hàm Backend tạo đơn hàng mua thêm:
             var order = await _billingOrderService.CreateModuleBillingOrderAsync(
                 tenantId: tenantId.Value,
                 customerId: userId,
                 moduleIds: newModuleIds,
                 isTrialOrder: false,
-                prorateUntilUtc: prorateDate // Tính giá tiền cho những ngày còn lại
+                prorateUntilUtc: prorateDate 
             );
 
-            // 4. Lấy IP Client
             string? clientIp = null;
             if (Request.Headers.TryGetValue("X-Forwarded-For", out var forwardedFor) && !string.IsNullOrWhiteSpace(forwardedFor))
             {
@@ -90,7 +87,6 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             }
             clientIp ??= HttpContext.Connection.RemoteIpAddress?.ToString();
 
-            // 5. Tạo Link thanh toán VNPay và trả về cho FE redirect
             var paymentUrl = await _billingService.CreatePaymentUrlAsync(order.Id, clientIp);
 
             return Ok(new { OrderId = order.Id, PaymentUrl = paymentUrl });
