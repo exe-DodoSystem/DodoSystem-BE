@@ -49,4 +49,15 @@ public class BillingOrderModuleService : IBillingOrderModuleService
         return tenantId.Value;
     }
 
+    public async Task<List<BillingOrderModuleDto>> GetByBillingOrderIdIgnoreTenantAsync(Guid billingOrderId)
+    {
+        var orderModules = await _billingOrderModuleRepo.GetByBillingOrderIdIgnoreTenantAsync(billingOrderId);
+        return _mapper.Map<List<BillingOrderModuleDto>>(orderModules);
+    }
+
+    public async Task<List<BillingOrderModuleDto>> GetByBillingOrderIdAsync(Guid billingOrderId)
+    {
+        var orderModules = await _billingOrderModuleRepo.GetByBillingOrderId(billingOrderId);
+        return _mapper.Map<List<BillingOrderModuleDto>>(orderModules);
+    }
 }

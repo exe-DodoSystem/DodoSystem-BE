@@ -46,4 +46,11 @@ public class ModuleSubscriptionRepository : IModuleSubscriptionRepository
             .IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantId && !x.IsDeleted)
             .ToListAsync();
+
+    public async Task<List<ModuleSubscription>> GetByTenantIdAsync(Guid tenantId)
+    {
+        return await _context.ModuleSubscriptions
+            .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+            .ToListAsync();
+    }
 }

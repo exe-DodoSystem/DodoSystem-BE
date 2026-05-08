@@ -44,15 +44,15 @@ namespace SMEFLOWSystem.Application.Services
 
         public async Task<PagedResultDto<RoleDto>> GetAllRolesPagingAsync(PagingRequestDto request)
         {
-            var result = await _roleRepository.GetAllRolesPagingAsync(request);    
+            var (items, totalCount) = await _roleRepository.GetAllRolesPagingAsync(request.PageNumber, request.PageSize);    
 
-            var roleDtos = _mapper.Map<IEnumerable<RoleDto>>(result.Items);
+            var roleDtos = _mapper.Map<IEnumerable<RoleDto>>(items);
             return new PagedResultDto<RoleDto>
             {
                 Items = roleDtos,
-                TotalCount = result.TotalCount,
-                PageNumber = result.PageNumber,
-                PageSize = result.PageSize
+                TotalCount = totalCount,
+                PageNumber = request.PageNumber,
+                PageSize = request.PageSize
             };
         }
 

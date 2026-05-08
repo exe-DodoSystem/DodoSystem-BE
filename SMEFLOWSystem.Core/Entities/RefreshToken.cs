@@ -5,6 +5,9 @@ using System;
 
 namespace SMEFLOWSystem.Core.Entities;
 
+/// <summary>
+/// Bảo mật Authentication (Token-based).
+/// </summary>
 public partial class RefreshToken : ITenantEntity
 {
     public Guid Id { get; set; }
@@ -13,16 +16,20 @@ public partial class RefreshToken : ITenantEntity
 
     public Guid UserId { get; set; }
 
+    /// <summary>Token chuỗi băm dùng để cấp lại JWT Access Token.</summary>
     public string TokenHash { get; set; }
 
     public DateTime CreatedAt { get; set; }
 
+    /// <summary>Thời hạn của token.</summary>
     public DateTime ExpiresAt { get; set; }
 
+    /// <summary>Thời điểm thu hồi (nếu bị hủy).</summary>
     public DateTime? RevokedAt { get; set; }
 
     public Guid? ReplacedByTokenId { get; set; }
 
+    /// <summary>Lý do thu hồi.</summary>
     public string RevokeReason { get; set; }
 
     public virtual User User { get; set; }

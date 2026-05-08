@@ -1,7 +1,11 @@
 ﻿using AutoMapper;
+using Microsoft.Extensions.Configuration;
+using Newtonsoft.Json;
 using SharedKernel.DTOs;
+using ShareKernel.Common.Enum;
 using SMEFLOWSystem.Application.DTOs.RoleDtos;
 using SMEFLOWSystem.Application.DTOs.UserDtos;
+using SMEFLOWSystem.Application.Events.Notification;
 using SMEFLOWSystem.Application.Helpers;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Application.Interfaces.IServices;
@@ -22,6 +26,8 @@ namespace SMEFLOWSystem.Application.Services
         private readonly IMapper _mapper;
         private readonly IEmailService _emailService;
         private readonly ICloudinaryService _cloudinary;
+        private readonly IConfiguration _configuration;
+        private readonly IOutboxMessageRepository _outboxMessageRepository;
 
         public UserService(
             IUserRepository userRepository,
@@ -29,7 +35,9 @@ namespace SMEFLOWSystem.Application.Services
             IUserRoleRepository userRoleRepository,
             IMapper mapper,
             IEmailService emailService,
-            ICloudinaryService cloudinary)
+            ICloudinaryService cloudinary,
+            IConfiguration configuration,
+            IOutboxMessageRepository outboxMessageRepository)
         {
             _userRepository = userRepository;
             _roleRepository = roleRepository;
@@ -37,6 +45,8 @@ namespace SMEFLOWSystem.Application.Services
             _mapper = mapper;
             _emailService = emailService;
             _cloudinary = cloudinary;
+            _configuration = configuration;
+            _outboxMessageRepository = outboxMessageRepository;
         }
 
         public async Task<UserDto> CreateAsync(UserCreatedDto user, Guid tenantId)
@@ -60,15 +70,15 @@ namespace SMEFLOWSystem.Application.Services
 
         public async Task<PagedResultDto<UserDto>> GetAllUsersPagingAsync(PagingRequestDto request)
         {
-            var user = await _userRepository.GetAllUserPagingAsync(request);
+            var (items, totalCount) = await _userRepository.GetAllUserPagingAsync(request.PageNumber, request.PageSize);
             
-            var userDto =  _mapper.Map<IEnumerable<UserDto>>(user.Items);
+            var userDto =  _mapper.Map<IEnumerable<UserDto>>(items);
             return new PagedResultDto<UserDto>
             {
                 Items = userDto,
-                TotalCount = user.TotalCount,
-                PageNumber = user.PageNumber,
-                PageSize = user.PageSize
+                TotalCount = totalCount,
+                PageNumber = request.PageNumber,
+                PageSize = request.PageSize
             };
         }
 
@@ -134,12 +144,37 @@ namespace SMEFLOWSystem.Application.Services
             };
             await _userRoleRepository.AddUserRoleAsync(userRole);
 
-            await _emailService.SendEmailAsync(
-                    newUser.Email,
-                    "Lời mời kích hoạt tài khoản DodoSystem",
-                    $"<h3>Chúc mừng {newUser.FullName}!</h3><p>Tài khoản của bạn đã được đăng ký.</p><p>Bạn có thể đăng nhập ngay bây giờ.</p>",
-                    CancellationToken.None
-                );
+            var emailEvent = new EmailNotificationRequestedEvent
+            {
+                EventId = Guid.NewGuid(),
+                OccurredAtUtc = DateTime.UtcNow,
+                TenantId = tenantId,
+                ToEmail = newUser.Email,
+                Subject = "Lời mời kích hoạt tài khoản DodoSystem",
+                Body = $"<h3>Chúc mừng {newUser.FullName}!</h3><p>Tài khoản của bạn đã được đăng ký.</p><p>Bạn có thể đăng nhập ngay bây giờ.</p>",
+                CorrelationId = newUser.Id.ToString()
+            };
+
+            var exchange = _configuration["RabbitMQ:Exchange"] ?? "smeflow.exchange";
+            var routingKey = _configuration["RabbitMQ:RoutingKeys:SendEmail"] ?? "email.send";
+
+            var outboxMessage = new OutboxMessage
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                EventId = emailEvent.EventId,
+                EventType = nameof(EmailNotificationRequestedEvent),
+                Exchange = exchange,
+                RoutingKey = routingKey,
+                Payload = JsonConvert.SerializeObject(emailEvent),
+                CorrelationId = emailEvent.CorrelationId,
+                Status = StatusEnum.OutboxPending,
+                OccurredOnUtc = DateTime.UtcNow,
+                NextAttemptOnUtc = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _outboxMessageRepository.AddAsync(outboxMessage);
 
             return _mapper.Map<UserDto>(newUser);
         }
@@ -199,13 +234,12 @@ namespace SMEFLOWSystem.Application.Services
             var user = await _userRepository.GetUserByIdAsync(userId)
                 ?? throw new ArgumentException($"User with id {userId} is not existed");
 
-            // Xóa avatar cũ nếu có
+
             if (!string.IsNullOrEmpty(user.AvatarUrl))
             {
                 try { await _cloudinary.DeleteAsync(user.AvatarUrl); } catch { }
             }
 
-            // Upload avatar mới
             var avatarUrl = await _cloudinary.UploadFileAsync(imageStream, fileName, "avatars");
 
             user.AvatarUrl = avatarUrl;

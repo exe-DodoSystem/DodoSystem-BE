@@ -12,32 +12,30 @@ public class HrPositionService : IHrPositionService
 {
     private readonly IPositionRepository _positionRepo;
     private readonly IDepartmentRepository _departmentRepo;
-    private readonly IEmployeeRepository _employeeRepo;
     private readonly ICurrentUserService _currentUser;
+    private readonly IHrAuthorizationService _hrAuth;
     private readonly IMapper _mapper;
 
     public HrPositionService(
         IPositionRepository positionRepo,
         IDepartmentRepository departmentRepo,
-        IEmployeeRepository employeeRepo,
         ICurrentUserService currentUser,
+        IHrAuthorizationService hrAuth,
         IMapper mapper)
     {
         _positionRepo = positionRepo;
         _departmentRepo = departmentRepo;
-        _employeeRepo = employeeRepo;
         _currentUser = currentUser;
+        _hrAuth = hrAuth;
         _mapper = mapper;
     }
 
     public async Task<List<PositionDto>> GetByDepartmentAsync(Guid departmentId)
     {
         _currentUser.EnsureHrAccess();
-        if (!_currentUser.IsAdmin())
-        {
-            var myDeptId = await GetManagerDepartmentIdOrThrowAsync();
-            if (myDeptId != departmentId) throw new UnauthorizedAccessException("Forbidden");
-        }
+
+        // Validate: Manager chỉ được xem position của phòng ban mình quản lý
+        await _hrAuth.EnsureDepartmentAccessAsync(departmentId);
 
         var items = await _positionRepo.GetByDepartmentIdAsync(departmentId);
         return _mapper.Map<List<PositionDto>>(items);
@@ -80,14 +78,5 @@ public class HrPositionService : IHrPositionService
         if (hasEmployees)
             throw new ArgumentException("Không thể xóa vì đang có nhân viên sử dụng");
         await _positionRepo.SoftDeleteAsync(pos);
-    }
-
-    private async Task<Guid> GetManagerDepartmentIdOrThrowAsync()
-    {
-        var userId = _currentUser.RequireUserId();
-        var emp = await _employeeRepo.GetByUserIdAsync(userId);
-        if (emp == null || !emp.DepartmentId.HasValue || !emp.PositionId.HasValue)
-            throw new UnauthorizedAccessException("Bạn chưa được gán phòng ban/chức vụ");
-        return emp.DepartmentId.Value;
     }
 }

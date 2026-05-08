@@ -9,7 +9,7 @@ namespace SMEFLOWSystem.Application.Interfaces.IServices
 {
     public interface IInviteService
     {
-        Task SendInviteAsync(Guid tenantId, string email, int roleId, Guid? departmentId, Guid? positionId, string message);
+        Task SendInviteAsync(Guid tenantId, string email, int roleId, Guid? departmentId, Guid? positionId, string message, Guid? invitedByUserId = null);
         Task<Invite> ValidateInviteTokenAsync(string token);
         Task CompleteOnboardingAsync(string token, string fullName, string password, string? phone);
     }

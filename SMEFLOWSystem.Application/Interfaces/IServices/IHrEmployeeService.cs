@@ -10,4 +10,5 @@ public interface IHrEmployeeService
     Task<EmployeeDto> CreateAsync(EmployeeCreateDto request);
     Task<EmployeeDto> UpdateAsync(Guid id, EmployeeUpdateDto request);
     Task DeleteAsync(Guid id);
+    Task<List<EmployeeDto>> GetAllByDepartmentId(Guid departmentId);
 }

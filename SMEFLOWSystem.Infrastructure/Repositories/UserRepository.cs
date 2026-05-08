@@ -28,33 +28,33 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
             return newUser.Entity;
         }
 
-        public async Task<PagedResultDto<User>> GetAllUserPagingAsync(PagingRequestDto request)
+        public async Task<(List<User> Items, int TotalCount)> GetAllUserPagingAsync(int pageNumber, int pageSize)
         {
+            if (pageNumber < 1) pageNumber = 1;
+            if (pageSize < 1) pageSize = 10;
+
             var query = _context.Users.AsNoTracking()
                 .Include(x => x.Tenant)
                 .OrderBy(x => x.CreatedAt);
 
             var totalCount = await query.CountAsync();
+            var skip = (pageNumber - 1) * pageSize;
             var users = await query
-                .Skip(request.GetSkip())
-                .Take(request.PageSize)
+                .Skip(skip)
+                .Take(pageSize)
                 .ToListAsync();
 
-            return new PagedResultDto<User>
-            {
-                Items = users,
-                TotalCount = totalCount,
-                PageNumber = request.PageNumber,
-                PageSize = request.PageSize
-            };
+            return (users, totalCount);
         }
 
         public async Task<List<User>> GetAllUsersAsync()
         {
             return await _context.Users
+                .AsNoTracking()
                 .Include(x => x.Tenant)
                 .Include(x => x.UserRoles)
                     .ThenInclude(ur => ur.Role)
+                .AsSplitQuery()
                 .OrderBy(x => x.CreatedAt)
                 .ToListAsync();
         }
@@ -88,16 +88,19 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
                 .Include(x => x.UserRoles)
                     .ThenInclude(ur => ur.Role)
                 .Include(x => x.Employees)
+                .AsSplitQuery()
                 .FirstOrDefaultAsync(u => u.Id == id);
         }
 
         public async Task<List<User>> GetUserByNameAsync(string name)
         {
             return await _context.Users
+                .AsNoTracking()
                 .Where(u => u.FullName.Contains(name))
                 .Include(x => x.Tenant)
                 .Include(x => x.UserRoles)
                     .ThenInclude(ur => ur.Role)
+                .AsSplitQuery()
                 .ToListAsync();
         }      
 
@@ -165,6 +168,7 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
                 .IgnoreQueryFilters()
                 .Include(x => x.Tenant)
                 .Include(x => x.Employees)
+                .AsSplitQuery()
                 .FirstOrDefaultAsync(u => u.Id == id);
 
             if (user != null)
@@ -207,8 +211,10 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
         public async Task<List<Role>> GetRolesByUserIdAsync(Guid userId)
         {
             var user = await _context.Users
+                .AsNoTracking()
                 .Include(u => u.UserRoles)
                     .ThenInclude(ur => ur.Role)
+                .AsSplitQuery()
                 .FirstOrDefaultAsync(u => u.Id == userId);
 
             return user?.UserRoles.Select(ur => ur.Role).ToList() ?? new List<Role>();
@@ -248,6 +254,7 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
                 .Include(x => x.UserRoles)
                     .ThenInclude(ur => ur.Role)
                 .Include(x => x.Employees)
+                .AsSplitQuery()
                 .FirstOrDefaultAsync(u => u.Id == ownerUserId);
 
             return user!;

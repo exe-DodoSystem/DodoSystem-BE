@@ -20,6 +20,13 @@ public class BillingOrderModuleRepository : IBillingOrderModuleRepository
         await _context.SaveChangesAsync();
     }
 
+    public async Task<List<BillingOrderModule>> GetByBillingOrderId(Guid billingOrderId)
+    {
+        return await _context.BillingOrderModules
+            .Where(x => x.BillingOrderId == billingOrderId)
+            .ToListAsync();
+    }
+
     public Task<List<BillingOrderModule>> GetByBillingOrderIdIgnoreTenantAsync(Guid billingOrderId)
         => _context.BillingOrderModules
             .IgnoreQueryFilters()
@@ -28,6 +35,7 @@ public class BillingOrderModuleRepository : IBillingOrderModuleRepository
 
     public Task<List<BillingOrderModule>> GetByTenantAndModuleAsync(Guid tenantId, int moduleId)
         => _context.BillingOrderModules
+            .IgnoreQueryFilters()
             .Include(x => x.BillingOrder)
             .Where(x => x.ModuleId == moduleId
                         && x.BillingOrder != null

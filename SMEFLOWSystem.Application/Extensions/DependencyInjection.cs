@@ -20,6 +20,10 @@ public static class DependencyInjection
     {
         
         services.AddAutoMapper(typeof(RoleMappingProfile).Assembly);
+        services.AddAutoMapper(typeof(ModuleDtosMappingProfile).Assembly);
+        services.AddAutoMapper(typeof(UserMappingProfile).Assembly);
+        services.AddAutoMapper(typeof(HrMappingProfile).Assembly);
+
 
         services.AddValidatorsFromAssemblyContaining<RegisterRequestDtoValidator>();
         services.AddValidatorsFromAssemblyContaining<ChangePasswordRequestDtoValidator>();
@@ -41,16 +45,25 @@ public static class DependencyInjection
         services.AddScoped<IPaymentService, PaymentService>();
         services.AddScoped<IPostPaymentSubscriptionService, PostPaymentSubscriptionService>();
         services.AddScoped<IBillingService, BillingService>();
-
-        services.AddScoped<TenantExpirationRecurringJob>();
         services.AddScoped<IOTPService, OTPService>();
         services.AddScoped<IRefreshTokenService, RefreshTokenService>();
-
         services.AddScoped<IHrDepartmentService, HrDepartmentService>();
         services.AddScoped<IHrPositionService, HrPositionService>();
         services.AddScoped<IHrEmployeeService, HrEmployeeService>();
 
+        // HR Authorization: Centralized scope service + Manager-Department assignment
+        services.AddScoped<IHrAuthorizationService, HrAuthorizationService>();
+        services.AddScoped<IManagerDepartmentService, ManagerDepartmentService>();
+
         services.AddScoped<IAttendanceService, AttendanceService>();
+        services.AddScoped<IAttendanceResolutionService, AttendanceResolutionService>();
+        // services.AddScoped<IPayrollService, PayrollService>();
+        services.AddScoped<INotificationService, NotificationService>();
+
+
+        services.AddScoped<TenantExpirationRecurringJob>();
+        services.AddScoped<PayrollRecurringJob>();
+        services.AddScoped<AttendanceResolutionRecurringJob>();
 
         services.AddScoped<ISystemBootstrapService, SystemBootstrapService>();
         services.AddScoped<ISystemTenantService, SystemTenantService>();

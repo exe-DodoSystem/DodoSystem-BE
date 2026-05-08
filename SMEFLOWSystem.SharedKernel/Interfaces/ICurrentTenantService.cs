@@ -9,5 +9,6 @@ namespace SMEFLOWSystem.SharedKernel.Interfaces
     public interface ICurrentTenantService
     {
         Guid? TenantId { get; }
+        void SetTenantId(Guid? tenantId);
     }
 }

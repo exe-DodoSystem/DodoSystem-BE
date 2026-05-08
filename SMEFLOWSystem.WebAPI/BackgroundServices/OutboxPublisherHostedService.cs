@@ -2,6 +2,7 @@
 using SMEFLOWSystem.Application.Events.Attendance;
 using SMEFLOWSystem.Application.Events.Notification;
 using SMEFLOWSystem.Application.Events.Payments;
+using SMEFLOWSystem.Application.Events.Payroll;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Core.Entities;
 using System.Text.Json;
@@ -35,7 +36,7 @@ namespace SMEFLOWSystem.WebAPI.BackgroundServices
             {
                 case nameof(PaymentSucceededEvent):
                     {
-                        var evt = JsonSerializer.Deserialize<PaymentSucceededEvent>(msg.Payload)
+                        var evt = JsonSerializer.Deserialize<PaymentSucceededEvent>(msg.Payload, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
                                   ?? throw new InvalidOperationException("Invalid payload for PaymentSucceededEvent");
                         await publisher.PublishAsync(msg.RoutingKey, evt, token);
                         break;
@@ -43,15 +44,22 @@ namespace SMEFLOWSystem.WebAPI.BackgroundServices
 
                 case nameof(AttendanceApprovedEvent):
                     {
-                        var evt = JsonSerializer.Deserialize<AttendanceApprovedEvent>(msg.Payload)
+                        var evt = JsonSerializer.Deserialize<AttendanceApprovedEvent>(msg.Payload, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
                                   ?? throw new InvalidOperationException("Invalid payload for AttendanceApprovedEvent");
                         await publisher.PublishAsync(msg.RoutingKey, evt, token);
                         break;
                     }
                 case nameof(EmailNotificationRequestedEvent):
                     {
-                        var evt = JsonSerializer.Deserialize<EmailNotificationRequestedEvent>(msg.Payload)
+                        var evt = JsonSerializer.Deserialize<EmailNotificationRequestedEvent>(msg.Payload, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
                                   ?? throw new InvalidOperationException("Invalid payload for EmailNotificationRequestedEvent");
+                        await publisher.PublishAsync(msg.RoutingKey, evt, token);
+                        break;
+                    }
+                case nameof(PayrollProcessEvent):
+                    {
+                        var evt = JsonSerializer.Deserialize<PayrollProcessEvent>(msg.Payload, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                                  ?? throw new InvalidOperationException("Invalid payload for PayrollProcessEvent");
                         await publisher.PublishAsync(msg.RoutingKey, evt, token);
                         break;
                     }

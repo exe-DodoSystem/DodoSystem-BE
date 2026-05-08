@@ -22,9 +22,9 @@ public static class CurrentUserExtensions
     public static bool IsEmployee(this ICurrentUserService user)
         => user.IsInRole(RoleConstants.Employee);
 
-    /// <summary>Có quyền HR (Manager trở lên)</summary>
+    /// <summary>Có quyền HR (TenantAdmin, HRManager, hoặc Manager)</summary>
     public static bool HasHrAccess(this ICurrentUserService user)
-        => user.IsAdmin() || user.IsManager();
+        => user.IsAdmin() || user.IsHrManager() || user.IsManager();
 
     /// <summary>Throw nếu chưa đăng nhập</summary>
     public static Guid RequireUserId(this ICurrentUserService user)

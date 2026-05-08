@@ -8,9 +8,9 @@ namespace ShareKernel.Common.Enum
 {
     public static class StatusEnum
     {
-        public const string TenantPending = "PendingPayment"; // Chờ thanh toán
-        public const string TenantTrial = "Trial";            // Dùng thử
-        public const string TenantActive = "Active";          // Đang hoạt động
+        public const string TenantPending = "PendingPayment"; 
+        public const string TenantTrial = "Trial";            
+        public const string TenantActive = "Active";          
         public const string TenantSuspended = "Suspended";    // Bị treo (hết hạn)
 
         // Module Subscription Status 
@@ -41,6 +41,10 @@ namespace ShareKernel.Common.Enum
         public const string AttendanceLate = "Late";
         public const string AttendanceEarlyLeave = "EarlyLeave";
         public const string AttendanceAbsent = "Absent";
+        public const string AttendanceMissingOut = "MissingOut";
+        public const string AttendanceOnLeave = "OnLeave";
+        public const string AttendanceNoShift = "NoShift";
+        public const string AttendanceNormal = "Normal";
 
         // Approval status
         public const string ApprovalPending = "PendingApproval";
@@ -59,5 +63,8 @@ namespace ShareKernel.Common.Enum
         public const string OutboxFailed = "Failed";
         public const string OutboxProcessing = "Processing";
 
+        //PunchKind
+        public const string PunchIn = "In";
+        public const string PunchOut = "Out";
     }
 }

@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using SMEFLOWSystem.SharedKernel.Interfaces;
 using System;
 using System.Collections.Generic;
@@ -11,6 +11,7 @@ namespace SMEFLOWSystem.Infrastructure.Tenancy
     public class CurrentTenantService : ICurrentTenantService
     {
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private static readonly AsyncLocal<Guid?> OverrideTenantId = new();
 
         public CurrentTenantService(IHttpContextAccessor httpContextAccessor)
         {
@@ -21,6 +22,11 @@ namespace SMEFLOWSystem.Infrastructure.Tenancy
         {
             get
             {
+                if (OverrideTenantId.Value.HasValue)
+                {
+                    return OverrideTenantId.Value;
+                }
+
                 var context = _httpContextAccessor.HttpContext;
                 if (context == null) return null;
 
@@ -42,6 +48,11 @@ namespace SMEFLOWSystem.Infrastructure.Tenancy
 
                 return null;
             }
+        }
+
+        public void SetTenantId(Guid? tenantId)
+        {
+            OverrideTenantId.Value = tenantId;
         }
     }
 }

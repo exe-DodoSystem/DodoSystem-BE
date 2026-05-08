@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
 using SMEFLOWSystem.Application.DTOs.AuthDtos;
@@ -24,13 +24,14 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             _emailService = emailService;
         }
 
+        /// <summary>Đăng ký Tenant (công ty) mới</summary>
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterRequestDto request)
         {
             try
             {
                 var result = await _authService.RegisterTenantAsync(request);
-                return Ok(result);
+                return Ok("Đăng ký công ty thành công");
             }
             catch (Exception ex)
             {
@@ -39,6 +40,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
         }
 
 
+        /// <summary>Đăng nhập hệ thống</summary>
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
         {
@@ -53,6 +55,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             }
         }
 
+        /// <summary>Đổi mật khẩu (dành cho user đã đăng nhập)</summary>
         [HttpPost("change-password")]
         [Authorize]
         public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequestDto request)
@@ -74,6 +77,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             }
         }
 
+        /// <summary>Yêu cầu gửi OTP quên mật khẩu</summary>
         [HttpPost("forgot-password")]
         public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequestDto request, CancellationToken cancellationToken)
         {
@@ -88,6 +92,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             return Ok("OTP đã được gửi đến email của bạn");
         }
 
+        /// <summary>Đặt lại mật khẩu mới bằng OTP</summary>
         [HttpPost("reset-password-otp")]
         public async Task<IActionResult> ResetPasswordWithOtp([FromBody] ResetPasswordWithOtpDto request)
         {

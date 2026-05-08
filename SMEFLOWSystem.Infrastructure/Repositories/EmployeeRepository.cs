@@ -66,6 +66,7 @@ public class EmployeeRepository : IEmployeeRepository
         if (pageSize < 1) pageSize = 10;
 
         var query = _context.Employees
+            .AsNoTracking()
             .Include(e => e.Department)
             .Include(e => e.Position)
             .AsQueryable();
@@ -99,5 +100,25 @@ public class EmployeeRepository : IEmployeeRepository
         var skip = (pageNumber - 1) * pageSize;
         var items = await query.Skip(skip).Take(pageSize).ToListAsync();
         return (items, total);
+    }
+
+    public async Task<List<Employee>> GetAllActiveEmployeeByTenantId(Guid tenantId)
+    {
+        return await _context.Employees
+            .AsNoTracking()
+            .Include(e => e.Department)
+            .Include(e => e.Position)
+            .Where(e => e.TenantId == tenantId && e.Status == StatusEnum.EmployeeWorking)
+            .ToListAsync(); 
+    }
+
+    public async Task<List<Employee>> GetByDepartmentIdAsync(Guid departmentId)
+    {
+        return await _context.Employees
+            .AsNoTracking()
+            .Include(e => e.Department)
+            .Include(e => e.Position)
+            .Where(e => e.DepartmentId == departmentId && e.Status == StatusEnum.EmployeeWorking)
+            .ToListAsync();
     }
 }

@@ -1,372 +1,521 @@
-using AutoMapper;
 using ShareKernel.Common.Enum;
-using SharedKernel.DTOs;
+using SMEFLOWSystem.Application.DTOs;
 using SMEFLOWSystem.Application.DTOs.AttendanceDtos;
-using SMEFLOWSystem.Application.Extensions;
 using SMEFLOWSystem.Application.Helpers;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Application.Interfaces.IServices;
-using SMEFLOWSystem.Application.Interfaces.IServices.System;
 using SMEFLOWSystem.Core.Entities;
 using SMEFLOWSystem.SharedKernel.Interfaces;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
-namespace SMEFLOWSystem.Application.Services;
-
-public class AttendanceService : IAttendanceService
+namespace SMEFLOWSystem.Application.Services
 {
-    private readonly IAttendanceRepository _attendanceRepo;
-    private readonly IAttendanceSettingRepository _settingRepo;
-    private readonly IEmployeeRepository _employeeRepo;
-    private readonly ICurrentUserService _currentUser;
-    private readonly ICurrentTenantService _currentTenant;
-    private readonly ICloudinaryService _cloudinary;
-    private readonly IFaceVerificationService _faceService;
-    private readonly IMapper _mapper;
-
-    public AttendanceService(
-        IAttendanceRepository attendanceRepo,
-        IAttendanceSettingRepository settingRepo,
-        IEmployeeRepository employeeRepo,
-        ICurrentUserService currentUser,
-        ICurrentTenantService currentTenant,
-        ICloudinaryService cloudinary,
-        IFaceVerificationService faceService,
-        IMapper mapper)
+    public class AttendanceService : IAttendanceService
     {
-        _attendanceRepo = attendanceRepo;
-        _settingRepo = settingRepo;
-        _employeeRepo = employeeRepo;
-        _currentUser = currentUser;
-        _currentTenant = currentTenant;
-        _cloudinary = cloudinary;
-        _faceService = faceService;
-        _mapper = mapper;
-    }
+        private readonly IRawPunchLogRepository _punchLogRepo;
+        private readonly IEmployeeRepository _employeeRepository;
+        private readonly IDailyTimesheetRepository _dailyTimesheetRepository;
+        private readonly IAttendanceSettingRepository _attendanceSettingRepository;
+        private readonly ICurrentTenantService _currentTenantService;
+        private readonly ITimesheetAppealRepository _appealRepository;
 
-    public async Task<CheckInResponseDto> CheckInAsync(CheckInRequestDto request)
-    {
-        var userId = _currentUser.RequireUserId();
-        var employee = await RequireEmployeeAsync(userId);
-        var setting = await RequireSettingAsync();
+        private static readonly TimeZoneInfo VietnamTimeZone = GetVietnamTimeZone();
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-
-        // Validate: chưa check-in hôm nay
-        var existing = await _attendanceRepo.GetTodayByEmployeeIdAsync(employee.Id, today);
-        if (existing != null)
-            throw new InvalidOperationException("Bạn đã check-in hôm nay rồi.");
-
-        // Validate GPS
-        ValidateGps(request.Latitude, request.Longitude, setting);
-
-        // Tính Late
-        var checkInTime = DateTime.UtcNow;
-        var status = StatusEnum.AttendancePresent;
-        int? lateMinutes = null;
-
-        if (setting.WorkStartTime.HasValue)
+        private static TimeZoneInfo GetVietnamTimeZone()
         {
-            var deadline = setting.WorkStartTime.Value.AddMinutes(setting.LateThresholdMinutes);
-            var currentTime = TimeOnly.FromDateTime(checkInTime);
-            if (currentTime > deadline)
+            try { return TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time"); }
+            catch { /* Windows không có */ }
+            try { return TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh"); }
+            catch { /* Linux không có */ }
+            return TimeZoneInfo.CreateCustomTimeZone("VN", TimeSpan.FromHours(7), "Vietnam", "Vietnam Standard Time");
+        }
+
+        public AttendanceService(
+            IRawPunchLogRepository punchLogRepo, 
+            IEmployeeRepository employeeRepository,
+            IDailyTimesheetRepository dailyTimesheetRepository,
+            IAttendanceSettingRepository attendanceSettingRepository,
+            ICurrentTenantService currentTenantService,
+            ITimesheetAppealRepository appealRepository)
+        {
+            _punchLogRepo = punchLogRepo;
+            _employeeRepository = employeeRepository;
+            _dailyTimesheetRepository = dailyTimesheetRepository;
+            _attendanceSettingRepository = attendanceSettingRepository;
+            _currentTenantService = currentTenantService;
+            _appealRepository = appealRepository;
+        }
+
+        public async Task<RawPunchLogDto> SubmitPunchAsync(Guid userId, SubmitPunchRequestDto request)
+        {
+            var employee = await _employeeRepository.GetByUserIdAsync(userId);
+            if (employee == null)
             {
-                status = StatusEnum.AttendanceLate;
-                // Dùng TimeSpan thay vì TimeOnly - TimeOnly để tránh wrap-around 24h
-                var diff = currentTime.ToTimeSpan() - setting.WorkStartTime.Value.ToTimeSpan();
-                lateMinutes = (int)Math.Max(0, diff.TotalMinutes);
+                throw new InvalidOperationException("Employee not found for current user.");
             }
-        }
 
-        string? selfieUrl = !string.IsNullOrEmpty(request.SelfieBase64)
-            ? await _cloudinary.UploadBase64Async(request.SelfieBase64, "attendance/checkin")
-            : null;
-
-        // Face verification
-        await VerifyFaceAsync(selfieUrl, employee);
-
-        var attendance = new Attendance
-        {
-            Id = Guid.NewGuid(),
-            TenantId = _currentTenant.TenantId!.Value,
-            EmployeeId = employee.Id,
-            WorkDate = today,
-            CheckInTime = checkInTime,
-            CheckInLatitude = request.Latitude,
-            CheckInLongitude = request.Longitude,
-            CheckInSelfieUrl = selfieUrl,
-            Status = status,
-            LateMinutes = lateMinutes,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        await _attendanceRepo.AddAsync(attendance);
-        return _mapper.Map<CheckInResponseDto>(attendance);
-    }
-
-    public async Task<CheckOutResponseDto> CheckOutAsync(CheckOutRequestDto request)
-    {
-        var userId = _currentUser.RequireUserId();
-        var employee = await RequireEmployeeAsync(userId);
-        var setting = await RequireSettingAsync();
-
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var attendance = await _attendanceRepo.GetTodayByEmployeeIdAsync(employee.Id, today)
-            ?? throw new KeyNotFoundException("Bạn chưa check-in hôm nay.");
-
-        if (attendance.CheckOutTime.HasValue)
-            throw new InvalidOperationException("Bạn đã check-out hôm nay rồi.");
-
-        // Validate GPS
-        ValidateGps(request.Latitude, request.Longitude, setting);
-
-        var checkOutTime = DateTime.UtcNow;
-
-        // Upload selfie
-        string? selfieUrl = !string.IsNullOrEmpty(request.SelfieBase64)
-            ? await _cloudinary.UploadBase64Async(request.SelfieBase64, "attendance/checkout")
-            : null;
-
-        // Face verification
-        await VerifyFaceAsync(selfieUrl, employee);
-
-        attendance.CheckOutTime = checkOutTime;
-        attendance.CheckOutLatitude = request.Latitude;
-        attendance.CheckOutLongitude = request.Longitude;
-        attendance.CheckOutSelfieUrl = selfieUrl;
-        attendance.UpdatedAt = DateTime.UtcNow;
-
-        // Tính EarlyLeave
-        if (setting.WorkEndTime.HasValue)
-        {
-            var currentTime = TimeOnly.FromDateTime(checkOutTime);
-            var earlyDeadline = setting.WorkEndTime.Value.AddMinutes(-setting.EarlyLeaveThresholdMinutes);
-            if (currentTime < earlyDeadline)
+            if (request.IsMockLocation)
             {
-                // Dùng TimeSpan thay vì TimeOnly - TimeOnly để tránh wrap-around 24h
-                var diff = setting.WorkEndTime.Value.ToTimeSpan() - currentTime.ToTimeSpan();
-                attendance.EarlyLeaveMinutes = (int)Math.Max(0, diff.TotalMinutes);
-                attendance.ApprovalStatus = StatusEnum.ApprovalPending;
+                throw new InvalidOperationException("FakeGPS: Phát hiện sử dụng phần mềm giả mạo vị trí. Vui lòng tắt Fake GPS!");
             }
-        }
 
-        await _attendanceRepo.UpdateAsync(attendance);
-        return _mapper.Map<CheckOutResponseDto>(attendance);
-    }
+            var tenantId = _currentTenantService.TenantId ?? employee.TenantId;
+            var attendanceSetting = await _attendanceSettingRepository.GetByTenantIdAsync(tenantId);
 
-    public async Task<AttendanceStatusDto> GetMyStatusAsync(DateOnly date)
-    {
-        var userId = _currentUser.RequireUserId();
-        var employee = await RequireEmployeeAsync(userId);
-        var setting = await _settingRepo.GetByTenantIdAsync(_currentTenant.TenantId!.Value);
-
-        var todayRecord = await _attendanceRepo.GetTodayByEmployeeIdAsync(employee.Id, date);
-
-        return new AttendanceStatusDto
-        {
-            TodayAttendance = todayRecord != null ? _mapper.Map<AttendanceDto>(todayRecord) : null,
-            OfficeLatitude = setting?.Latitude,
-            OfficeLongitude = setting?.Longitude,
-            CheckInRadiusMeters = setting?.CheckInRadiusMeters ?? 100,
-            WorkStartTime = setting?.WorkStartTime,
-            WorkEndTime = setting?.WorkEndTime
-        };
-    }
-
-    public async Task<TodayAttendanceDto?> GetTodayStatusAsync()
-    {
-        var userId = _currentUser.RequireUserId();
-        var employee = await RequireEmployeeAsync(userId);
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-
-        var record = await _attendanceRepo.GetTodayByEmployeeIdAsync(employee.Id, today);
-        if (record == null)
-            return null;
-
-        return _mapper.Map<TodayAttendanceDto>(record);
-    }
-
-    public async Task<List<AttendanceDto>> GetMyHistoryAsync(DateOnly from, DateOnly to)
-    {
-        var userId = _currentUser.RequireUserId();
-        var employee = await RequireEmployeeAsync(userId);
-        var records = await _attendanceRepo.GetByEmployeeIdAsync(employee.Id, from, to);
-        return _mapper.Map<List<AttendanceDto>>(records);
-    }
-
-    public async Task<AttendanceDto> GetByIdAsync(Guid id)
-    {
-        _currentUser.RequireUserId();
-        var record = await _attendanceRepo.GetByIdAsync(id)
-            ?? throw new KeyNotFoundException("Không tìm thấy bản ghi chấm công.");
-        return _mapper.Map<AttendanceDto>(record);
-    }
-
-    public async Task<PagedResultDto<AttendanceDto>> GetPagedAsync(AttendanceQueryDto query)
-    {
-        var userId = _currentUser.RequireUserId();
-        Guid? deptId = query.DepartmentId;
-
-        // Manager chỉ xem được dept của mình
-        if (_currentUser.IsManager() && !_currentUser.IsAdmin())
-        {
-            var emp = await _employeeRepo.GetByUserIdAsync(userId);
-            if (emp == null || !emp.DepartmentId.HasValue)
-                throw new UnauthorizedAccessException("Bạn chưa được gán phòng ban.");
-            deptId = emp.DepartmentId.Value;
-        }
-        else if (!_currentUser.IsAdmin())
-        {
-            throw new UnauthorizedAccessException("Forbidden");
-        }
-
-        var (items, total) = await _attendanceRepo.GetPagedAsync(
-            deptId,
-            query.EmployeeId,
-            query.FromDate,
-            query.ToDate,
-            query.Status,
-            query.ApprovalStatus,
-            query.Search,
-            query.PageNumber,
-            query.PageSize,
-            query.SortBy,
-            query.SortDir
-        );
-
-        return new PagedResultDto<AttendanceDto>
-        {
-            Items = _mapper.Map<List<AttendanceDto>>(items),
-            TotalCount = total,
-            PageNumber = query.PageNumber,
-            PageSize = query.PageSize
-        };
-    }
-
-    public async Task<AttendanceDto> ApproveAsync(Guid attendanceId, AttendanceApproveDto dto)
-    {
-        var userId = _currentUser.RequireUserId();
-
-        if (!_currentUser.IsAdmin() && !_currentUser.IsManager())
-            throw new UnauthorizedAccessException("Forbidden");
-
-        var record = await _attendanceRepo.GetByIdAsync(attendanceId)
-            ?? throw new KeyNotFoundException("Không tìm thấy bản ghi chấm công.");
-
-        // Self-approve prevention
-        var myEmployee = await _employeeRepo.GetByUserIdAsync(userId);
-        if (myEmployee != null && myEmployee.Id == record.EmployeeId)
-            throw new UnauthorizedAccessException("Không được tự approve bản thân.");
-
-        // Manager chỉ approve được dept của mình
-        if (_currentUser.IsManager() && !_currentUser.IsAdmin())
-        {
-            var myEmp = myEmployee ?? throw new UnauthorizedAccessException("Bạn chưa liên kết Employee.");
-            if (!myEmp.DepartmentId.HasValue)
-                throw new UnauthorizedAccessException("Bạn chưa được gán phòng ban.");
-
-            var targetEmp = await _employeeRepo.GetByIdAsync(record.EmployeeId);
-            if (targetEmp?.DepartmentId != myEmp.DepartmentId)
-                throw new UnauthorizedAccessException("Bạn chỉ có thể approve nhân viên trong phòng ban của mình.");
-        }
-
-        // Validate ApprovalStatus
-        if (dto.ApprovalStatus != StatusEnum.ApprovalApproved && dto.ApprovalStatus != StatusEnum.ApprovalRejected)
-            throw new ArgumentException("ApprovalStatus phải là 'Approved' hoặc 'Rejected'.");
-
-        if (dto.ApprovalStatus == StatusEnum.ApprovalRejected && string.IsNullOrWhiteSpace(dto.ApprovalNotes))
-            throw new ArgumentException("Cần nhập lý do khi từ chối.");
-
-        record.ApprovalStatus = dto.ApprovalStatus;
-        record.ApprovalNotes = dto.ApprovalNotes;
-        record.ApprovedByUserId = userId;
-        record.ApprovedAt = DateTime.UtcNow;
-        record.UpdatedAt = DateTime.UtcNow;
-
-        // Admin correction: override time nếu có
-        if (dto.CheckInTime.HasValue) record.CheckInTime = dto.CheckInTime;
-        if (dto.CheckOutTime.HasValue) record.CheckOutTime = dto.CheckOutTime;
-
-        await _attendanceRepo.UpdateAsync(record);
-        return _mapper.Map<AttendanceDto>(record);
-    }
-
-    public async Task<AttendanceConfigResponseDto> GetConfigAsync()
-    {
-        var tenantId = _currentTenant.TenantId ?? throw new UnauthorizedAccessException("Unauthenticated");
-        var setting = await _settingRepo.GetByTenantIdAsync(tenantId);
-
-        if (setting == null)
-            return new AttendanceConfigResponseDto { CheckInRadiusMeters = 100, LateThresholdMinutes = 10, EarlyLeaveThresholdMinutes = 10 };
-
-        return _mapper.Map<AttendanceConfigResponseDto>(setting);
-    }
-
-    public async Task<AttendanceConfigResponseDto> UpsertConfigAsync(AttendanceConfigDto dto)
-    {
-        _currentUser.EnsureAdmin();
-
-        var tenantId = _currentTenant.TenantId ?? throw new UnauthorizedAccessException("Unauthenticated");
-        var existing = await _settingRepo.GetByTenantIdAsync(tenantId);
-
-        if (existing == null)
-        {
-            existing = new TenantAttendanceSetting
+            // Geofencing Validation
+            if (attendanceSetting != null && attendanceSetting.Latitude.HasValue && attendanceSetting.Longitude.HasValue)
             {
-                Id = Guid.NewGuid(),
-                TenantId = tenantId,
-                CreatedAt = DateTime.UtcNow
+                if (!request.Latitude.HasValue || !request.Longitude.HasValue)
+                {
+                    throw new InvalidOperationException("BatBuocGPS: Vui lòng bật định vị GPS để chấm công.");
+                }
+
+                var distance = GeoHelper.DistanceInMeters(
+                    request.Latitude.Value, request.Longitude.Value,
+                    attendanceSetting.Latitude.Value, attendanceSetting.Longitude.Value);
+
+                if (distance > attendanceSetting.CheckInRadiusMeters)
+                {
+                    throw new InvalidOperationException($"NgoaiVung: Bạn đang ở ngoài vùng chấm công cho phép (Cách {Math.Round(distance)}m). Bán kính cho phép là {attendanceSetting.CheckInRadiusMeters}m.");
+                }
+            }
+
+            var punch = new RawPunchLog()
+            {
+                EmployeeId = employee.Id,
+                Timestamp = DateTime.UtcNow,
+                DeviceId = request.DeviceId,
+                PunchType = request.PunchType ?? "Auto",
+                Latitude = request.Latitude,
+                Longitude = request.Longitude,
+                SelfieUrl = request.SelfieUrl,
+                IsProcessed = false 
+            };
+
+            await _punchLogRepo.AddAsync(punch);
+
+            return new RawPunchLogDto
+            {
+                Id = punch.Id,
+                EmployeeId = punch.EmployeeId,
+                Timestamp = punch.Timestamp,
+                DeviceId = punch.DeviceId,
+                IsProcessed = punch.IsProcessed,
+                PunchType = punch.PunchType
             };
         }
 
-        _mapper.Map(dto, existing);
-        existing.UpdatedAt = DateTime.UtcNow;
-
-        await _settingRepo.UpsertAsync(existing);
-        return _mapper.Map<AttendanceConfigResponseDto>(existing);
-    }
-
-    private async Task<Employee> RequireEmployeeAsync(Guid userId)
-    {
-        return await _employeeRepo.GetByUserIdAsync(userId)
-            ?? throw new UnauthorizedAccessException("Tài khoản chưa liên kết Employee.");
-    }
-
-    private async Task<TenantAttendanceSetting> RequireSettingAsync()
-    {
-        var tenantId = _currentTenant.TenantId ?? throw new UnauthorizedAccessException("Unauthenticated");
-        var setting = await _settingRepo.GetByTenantIdAsync(tenantId)
-            ?? throw new InvalidOperationException("Công ty chưa cấu hình vị trí chấm công.");
-        if (!setting.Latitude.HasValue || !setting.Longitude.HasValue)
-            throw new InvalidOperationException("Công ty chưa cấu hình tọa độ vị trí chấm công.");
-        return setting;
-    }
-
-    private static void ValidateGps(double userLat, double userLng, TenantAttendanceSetting setting)
-    {
-        var distance = GeoHelper.DistanceInMeters(
-            userLat, userLng,
-            setting.Latitude!.Value, setting.Longitude!.Value);
-
-        if (distance > setting.CheckInRadiusMeters)
-            throw new InvalidOperationException(
-                $"Vị trí không hợp lệ. Bạn đang cách văn phòng {distance:F0}m (tối đa {setting.CheckInRadiusMeters}m).");
-    }
-
-    private async Task VerifyFaceAsync(string? selfieUrl, Employee employee)
-    {
-        if (string.IsNullOrEmpty(selfieUrl)) return;
-        var avatarUrl = employee.User?.AvatarUrl;
-        if (string.IsNullOrEmpty(avatarUrl)) return; 
-
-        var result = await _faceService.VerifyAsync(selfieUrl, avatarUrl);
-        if (!result.IsMatch)
+        public async Task<TodayAttendanceDto> GetMyTodayStatusAsync(Guid userId)
         {
-            try { await _cloudinary.DeleteAsync(selfieUrl); } catch {}
+            var employee = await _employeeRepository.GetByUserIdAsync(userId);
+            if (employee == null)
+            {
+                throw new InvalidOperationException("Employee not found for current user.");
+            }
 
-            var message = !string.IsNullOrEmpty(result.ErrorMessage)
-                ? result.ErrorMessage
-                : $"Xác minh khuôn mặt thất bại (confidence: {result.Confidence:P0}).";
-            throw new InvalidOperationException(message);
+            var tenantId = _currentTenantService.TenantId ?? employee.TenantId;
+            var attendanceSetting = await _attendanceSettingRepository.GetByTenantIdAsync(tenantId);
+            
+            var localTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, VietnamTimeZone);
+            var cutOffTime = attendanceSetting?.DayStartCutOffTime ?? new TimeSpan(12, 1, 0);
+            
+            var workDate = localTime.TimeOfDay < cutOffTime
+                ? DateOnly.FromDateTime(localTime.AddDays(-1))
+                : DateOnly.FromDateTime(localTime);
+
+            var timesheet = await _dailyTimesheetRepository.GetByEmployeeDateAsync(employee.Id, workDate);
+            
+            var result = new TodayAttendanceDto
+            {
+                HasCheckedIn = false,
+                HasCheckedOut = false
+            };
+
+            if (timesheet != null && timesheet.Segments.Any())
+            {
+                var firstSegment = timesheet.Segments.OrderBy(s => s.ActualCheckIn).FirstOrDefault(s => s.ActualCheckIn.HasValue);
+                var lastSegment = timesheet.Segments.OrderByDescending(s => s.ActualCheckOut).FirstOrDefault();
+
+                if (firstSegment?.ActualCheckIn != null)
+                {
+                    result.HasCheckedIn = true;
+                    result.CheckInTime = firstSegment.ActualCheckIn;
+                    result.CheckInSelfieUrl = firstSegment.CheckInSelfieUrl;
+                }
+
+                if (lastSegment?.ActualCheckOut != null)
+                {
+                    result.HasCheckedOut = true;
+                    result.CheckOutTime = lastSegment.ActualCheckOut;
+                }
+
+                result.LateMinutes = timesheet.TotalLateMinutes;
+                result.EarlyLeaveMinutes = timesheet.TotalEarlyLeaveMinutes;
+                result.ActualWorkHours = timesheet.ActualWorkHours;
+                result.OTHours = timesheet.OTHours;
+                result.Status = string.IsNullOrEmpty(timesheet.Status) ? StatusEnum.AttendancePresent : timesheet.Status;
+            }
+            else
+            {
+                // Nếu chưa có timesheet do job chưa chạy, ta query raw log để show tạm
+                // Sẽ query RawPunchLog có Timestamp trong workDate range này
+            }
+
+            return result;
+        }
+
+        public async Task<List<MyAttendanceHistoryItemDto>> GetMyHistoryAsync(Guid userId, int month, int year)
+        {
+            var employee = await _employeeRepository.GetByUserIdAsync(userId);
+            if (employee == null)
+            {
+                throw new InvalidOperationException("Employee not found for current user.");
+            }
+
+            var timesheets = await _dailyTimesheetRepository.GetByEmployeeMonthAsync(employee.Id, month, year);
+            var results = new List<MyAttendanceHistoryItemDto>();
+
+            foreach(var ts in timesheets)
+            {
+                var dto = new MyAttendanceHistoryItemDto
+                {
+                    WorkDate = ts.WorkDate,
+                    StandardWorkingHours = ts.StandardWorkingHours,
+                    TotalActualWorkedMinutes = ts.TotalActualWorkedMinutes,
+                    TotalLateMinutes = ts.TotalLateMinutes,
+                    TotalEarlyLeaveMinutes = ts.TotalEarlyLeaveMinutes,
+                    Status = ts.Status,
+                    ActualWorkHours = ts.ActualWorkHours,
+                    OTHours = ts.OTHours,
+                    SystemAnomalyFlag = ts.SystemAnomalyFlag,
+                    IsManuallyAdjusted = ts.IsManuallyAdjusted,
+                    Segments = ts.Segments.Select(s => new MyAttendanceSegmentDto
+                    {
+                        ActualCheckIn = s.ActualCheckIn,
+                        ActualCheckOut = s.ActualCheckOut,
+                        LateMinutes = s.LateMinutes,
+                        EarlyLeaveMinutes = s.EarlyLeaveMinutes,
+                        Status = s.Status
+                    }).ToList()
+                };
+                results.Add(dto);
+            }
+
+            return results;
+        }
+
+        public async Task<RawPunchLogDto> ManualPunchAsync(ManualPunchRequestDto request)
+        {
+            var employee = await _employeeRepository.GetByIdAsync(request.EmployeeId);
+            if (employee == null)
+                throw new InvalidOperationException("Employee not found.");
+
+            var punch = new RawPunchLog()
+            {
+                EmployeeId = request.EmployeeId,
+                Timestamp = request.Timestamp, // Giờ UTC mà HR chọn
+                DeviceId = "HR_Manual", // Đánh dấu đây là log do HR thêm tay để phân quyền audit
+                PunchType = request.PunchType,
+                IsProcessed = false,
+                Latitude = null,
+                Longitude = null,
+            };
+
+            await _punchLogRepo.AddAsync(punch);
+
+            return new RawPunchLogDto
+            {
+                Id = punch.Id,
+                EmployeeId = punch.EmployeeId,
+                Timestamp = punch.Timestamp,
+                DeviceId = punch.DeviceId,
+                IsProcessed = punch.IsProcessed,
+                PunchType = punch.PunchType
+            };
+        }
+
+        public async Task RecalculateAttendanceAsync(Guid employeeId, DateOnly fromDate, DateOnly toDate)
+        {
+            // Set IsProcessed = false cho toàn bộ log trong dải thời gian này để Background job chạy lại
+            await _punchLogRepo.MarkUnprocessedForRecalculateAsync(employeeId, fromDate.ToDateTime(TimeOnly.MinValue), toDate.ToDateTime(TimeOnly.MaxValue));
+        }
+        public async Task<TimesheetAppealDto> SubmitAppealAsync(Guid userId, SubmitAppealRequestDto request)
+        {
+            var tenantId = _currentTenantService.TenantId;
+            if (tenantId == null) throw new UnauthorizedAccessException("Tenant ID is missing.");
+
+            var employee = await _employeeRepository.GetByUserIdAsync(userId);
+            if (employee == null) throw new Exception("Employee not found");
+
+            var appeal = new TimesheetAppeal
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId.Value,
+                EmployeeId = employee.Id,
+                WorkDate = request.WorkDate,
+                AppealType = request.AppealType,
+                RequestedCheckIn = request.RequestedCheckIn,
+                RequestedCheckOut = request.RequestedCheckOut,
+                Reason = request.Reason,
+                AttachmentUrl = request.AttachmentUrl,
+                Status = "PendingApproval"
+            };
+
+            await _appealRepository.AddAsync(appeal);
+
+            return new TimesheetAppealDto
+            {
+                Id = appeal.Id,
+                EmployeeId = appeal.EmployeeId,
+                WorkDate = appeal.WorkDate,
+                AppealType = appeal.AppealType,
+                RequestedCheckIn = appeal.RequestedCheckIn,
+                RequestedCheckOut = appeal.RequestedCheckOut,
+                Reason = appeal.Reason,
+                AttachmentUrl = appeal.AttachmentUrl,
+                Status = appeal.Status,
+                ApprovedAt = appeal.ApprovedAt,
+                RejectReason = appeal.RejectReason
+            };
+        }
+
+        public async Task<List<TimesheetAppealDto>> GetMyAppealsAsync(Guid userId)
+        {
+            var tenantId = _currentTenantService.TenantId;
+            if (tenantId == null) throw new UnauthorizedAccessException("Tenant ID is missing.");
+
+            var employee = await _employeeRepository.GetByUserIdAsync(userId);
+            if (employee == null) return new List<TimesheetAppealDto>();
+
+            var appeals = await _appealRepository.GetByEmployeeAsync(employee.Id);
+            // Optionally, we could verify they belong to current tenant just to be safe
+            appeals = appeals.Where(a => a.TenantId == tenantId.Value).ToList();
+            
+            return appeals.Select(appeal => new TimesheetAppealDto
+            {
+                Id = appeal.Id,
+                EmployeeId = appeal.EmployeeId,
+                WorkDate = appeal.WorkDate,
+                AppealType = appeal.AppealType,
+                RequestedCheckIn = appeal.RequestedCheckIn,
+                RequestedCheckOut = appeal.RequestedCheckOut,
+                Reason = appeal.Reason,
+                AttachmentUrl = appeal.AttachmentUrl,
+                Status = appeal.Status,
+                ApprovedAt = appeal.ApprovedAt,
+                RejectReason = appeal.RejectReason
+            }).OrderByDescending(x => x.WorkDate).ToList();
+        }
+
+        public async Task<TimesheetAppealDto> ProcessAppealAsync(Guid hrUserId, Guid appealId, ApproveAppealRequestDto request)
+        {
+            var tenantId = _currentTenantService.TenantId;
+            if (tenantId == null) throw new UnauthorizedAccessException("Tenant ID is missing.");
+
+            var appeal = await _appealRepository.GetByIdAsync(appealId);
+            if (appeal == null || appeal.TenantId != tenantId.Value)
+                throw new Exception("Appeal not found");
+
+            if (appeal.Status != "PendingApproval")
+                throw new Exception("This appeal has already been processed.");
+
+            var hrUser = await _employeeRepository.GetByUserIdAsync(hrUserId);
+            if (hrUser == null) throw new Exception("HR Employee record not found.");
+
+            if (request.IsApproved)
+            {
+                appeal.Status = "Approved";
+                appeal.ApprovedBy = hrUser.Id;
+                appeal.ApprovedAt = DateTime.UtcNow;
+
+                // Create HR_Manual punches
+                if (appeal.AppealType == "In" || appeal.AppealType == "Both")
+                {
+                    if (appeal.RequestedCheckIn.HasValue)
+                    {
+                        await _punchLogRepo.AddAsync(new RawPunchLog
+                        {
+                            Id = Guid.NewGuid(),
+                            TenantId = tenantId.Value,
+                            EmployeeId = appeal.EmployeeId,
+                            Timestamp = appeal.RequestedCheckIn.Value,
+                            PunchType = "I",
+                            DeviceId = "HR_Manual"
+                        });
+                    }
+                }
+
+                if (appeal.AppealType == "Out" || appeal.AppealType == "Both")
+                {
+                    if (appeal.RequestedCheckOut.HasValue)
+                    {
+                        await _punchLogRepo.AddAsync(new RawPunchLog
+                        {
+                            Id = Guid.NewGuid(),
+                            TenantId = tenantId.Value,
+                            EmployeeId = appeal.EmployeeId,
+                            Timestamp = appeal.RequestedCheckOut.Value,
+                            PunchType = "O",
+                            DeviceId = "HR_Manual"
+                        });
+                    }
+                }
+
+                // Force recalculation for that day
+                await _punchLogRepo.MarkUnprocessedForRecalculateAsync(
+                    appeal.EmployeeId, 
+                    appeal.WorkDate.ToDateTime(TimeOnly.MinValue), 
+                    appeal.WorkDate.ToDateTime(TimeOnly.MaxValue)
+                );
+            }
+            else
+            {
+                appeal.Status = "Rejected";
+                appeal.ApprovedBy = hrUser.Id;
+                appeal.ApprovedAt = DateTime.UtcNow;
+                appeal.RejectReason = request.RejectReason;
+            }
+
+            await _appealRepository.UpdateAsync(appeal);
+
+            return new TimesheetAppealDto
+            {
+                Id = appeal.Id,
+                EmployeeId = appeal.EmployeeId,
+                WorkDate = appeal.WorkDate,
+                AppealType = appeal.AppealType,
+                RequestedCheckIn = appeal.RequestedCheckIn,
+                RequestedCheckOut = appeal.RequestedCheckOut,
+                Reason = appeal.Reason,
+                AttachmentUrl = appeal.AttachmentUrl,
+                Status = appeal.Status,
+                ApprovedAt = appeal.ApprovedAt,
+                RejectReason = appeal.RejectReason
+            };
+        }
+
+        public async Task<List<TimesheetAppealDto>> GetPendingAppealsAsync()
+        {
+            var tenantId = _currentTenantService.TenantId;
+            if (tenantId == null) throw new UnauthorizedAccessException("Tenant ID is missing.");
+
+            var appeals = await _appealRepository.GetPendingAsync(tenantId.Value);
+
+            return appeals.Select(appeal => new TimesheetAppealDto
+            {
+                Id = appeal.Id,
+                EmployeeId = appeal.EmployeeId,
+                WorkDate = appeal.WorkDate,
+                AppealType = appeal.AppealType,
+                RequestedCheckIn = appeal.RequestedCheckIn,
+                RequestedCheckOut = appeal.RequestedCheckOut,
+                Reason = appeal.Reason,
+                AttachmentUrl = appeal.AttachmentUrl,
+                Status = appeal.Status,
+                ApprovedAt = appeal.ApprovedAt,
+                RejectReason = appeal.RejectReason
+            }).OrderBy(x => x.WorkDate).ToList();
+        }
+
+        public async Task<AttendanceSettingDto> GetSettingsAsync()
+        {
+            var tenantId = _currentTenantService.TenantId;
+            if (tenantId == null) throw new UnauthorizedAccessException("Tenant ID is missing.");
+
+            var setting = await _attendanceSettingRepository.GetByTenantIdAsync(tenantId.Value);
+
+            if (setting == null)
+            {
+                // Return default setting if not configured yet
+                return new AttendanceSettingDto
+                {
+                    TenantId = tenantId.Value,
+                    CheckInRadiusMeters = 100,
+                    DayStartCutOffTime = new TimeSpan(12, 1, 0),
+                    LateThresholdMinutes = 10,
+                    EarlyLeaveThresholdMinutes = 10,
+                    MinimumOTMinutes = 30,
+                    OTBlockMinutes = 30
+                };
+            }
+
+            return new AttendanceSettingDto
+            {
+                TenantId = setting.TenantId,
+                Latitude = setting.Latitude,
+                Longitude = setting.Longitude,
+                CheckInRadiusMeters = setting.CheckInRadiusMeters,
+                WorkStartTime = setting.WorkStartTime?.ToTimeSpan(),
+                WorkEndTime = setting.WorkEndTime?.ToTimeSpan(),
+                DayStartCutOffTime = setting.DayStartCutOffTime,
+                LateThresholdMinutes = setting.LateThresholdMinutes,
+                EarlyLeaveThresholdMinutes = setting.EarlyLeaveThresholdMinutes,
+                MinimumOTMinutes = setting.MinimumOTMinutes,
+                OTBlockMinutes = setting.OTBlockMinutes
+            };
+        }
+
+        public async Task<AttendanceSettingDto> UpdateSettingsAsync(UpdateAttendanceSettingRequestDto request)
+        {
+            var tenantId = _currentTenantService.TenantId;
+            if (tenantId == null) throw new UnauthorizedAccessException("Tenant ID is missing.");
+
+            var setting = await _attendanceSettingRepository.GetByTenantIdAsync(tenantId.Value);
+
+            if (setting == null)
+            {
+                setting = new SMEFLOWSystem.Core.Entities.TenantAttendanceSetting
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = tenantId.Value
+                };
+            }
+
+            setting.Latitude = request.Latitude;
+            setting.Longitude = request.Longitude;
+            setting.CheckInRadiusMeters = request.CheckInRadiusMeters;
+            setting.WorkStartTime = request.WorkStartTime.HasValue ? TimeOnly.FromTimeSpan(request.WorkStartTime.Value) : null;
+            setting.WorkEndTime = request.WorkEndTime.HasValue ? TimeOnly.FromTimeSpan(request.WorkEndTime.Value) : null;
+            setting.DayStartCutOffTime = request.DayStartCutOffTime;
+            setting.LateThresholdMinutes = request.LateThresholdMinutes;
+            setting.EarlyLeaveThresholdMinutes = request.EarlyLeaveThresholdMinutes;
+            setting.MinimumOTMinutes = request.MinimumOTMinutes;
+            setting.OTBlockMinutes = request.OTBlockMinutes;
+            setting.UpdatedAt = DateTime.UtcNow;
+
+            await _attendanceSettingRepository.UpsertAsync(setting);
+
+            return await GetSettingsAsync();
+        }
+
+        public async Task<List<HRMonthlyReportItemDto>> GetHRMonthlyReportAsync(int month, int year)
+        {
+            var tenantId = _currentTenantService.TenantId;
+            if (tenantId == null) throw new UnauthorizedAccessException("Tenant ID is missing.");
+
+            var timesheets = await _dailyTimesheetRepository.GetByTenantMonthAsync(tenantId.Value, month, year);
+
+            var report = timesheets.GroupBy(t => new { t.EmployeeId, t.Employee?.FullName })
+                .Select(g => new HRMonthlyReportItemDto
+                {
+                    EmployeeId = g.Key.EmployeeId,
+                    EmployeeName = g.Key.FullName ?? "Unknown",
+                    Month = month,
+                    Year = year,
+                    TotalWorkDays = g.Count(x => x.Status != StatusEnum.AttendanceAbsent && x.Status != StatusEnum.AttendanceOnLeave),
+                    TotalActualHours = g.Sum(x => x.ActualWorkHours),
+                    TotalOTHours = g.Sum(x => x.OTHours),
+                    TotalLateMinutes = g.Sum(x => x.TotalLateMinutes),
+                    TotalEarlyLeaveMinutes = g.Sum(x => x.TotalEarlyLeaveMinutes),
+                    MissingPunches = g.Count(x => x.Status == StatusEnum.AttendanceMissingOut || x.Status == StatusEnum.AttendanceNoShift)
+                })
+                .OrderBy(x => x.EmployeeName)
+                .ToList();
+
+            return report;
         }
     }
 }

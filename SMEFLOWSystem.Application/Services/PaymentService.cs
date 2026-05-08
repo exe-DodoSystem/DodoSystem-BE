@@ -14,6 +14,7 @@ using VNPAY.NET.Utilities;
 using System.Globalization;
 using System.Security.Cryptography;
 using SMEFLOWSystem.Application.Events.Payments;
+using SMEFLOWSystem.Application.Events.Notification;
 
 namespace SMEFLOWSystem.Application.Services
 {
@@ -327,7 +328,11 @@ namespace SMEFLOWSystem.Application.Services
                 tenant.SubscriptionEndDate = DateOnly.FromDateTime(maxEndDate);
 
                 var ownerUser = tenant.OwnerUserId.HasValue ? await _userRepo.GetByIdIgnoreTenantAsync(tenant.OwnerUserId.Value) : null;
-                if (ownerUser != null)
+                if (ownerUser == null)
+                {
+                    return;
+                }
+                else
                 {
                     ownerUser.IsActive = true;
                     await _userRepo.UpdateUserIgnoreTenantAsync(ownerUser);
@@ -335,18 +340,10 @@ namespace SMEFLOWSystem.Application.Services
                 }
 
                 await _tenantRepo.UpdateIgnoreTenantAsync(tenant);
-                shouldSendEmail = !string.IsNullOrWhiteSpace(ownerEmail);
-            });
 
-            if (shouldSendEmail && ownerEmail != null && tenantName != null)
-            {
-                await _emailService.SendEmailAsync(
-                    ownerEmail,
-                    "Thanh toán thành công - Kích hoạt tài khoản SMEFLOW",
-                    $"<h3>Chúc mừng {tenantName}!</h3><p>Tài khoản của bạn đã được kích hoạt.</p><p>Mã giao dịch: {transactionId}</p><p>Bạn có thể đăng nhập ngay bây giờ.</p>",
-                    CancellationToken.None
-                );
-            }
+
+            });
+            
         }
 
         private string CreateVNPayUrl(BillingOrder order, string? clientIp)

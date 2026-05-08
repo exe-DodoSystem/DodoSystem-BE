@@ -18,6 +18,7 @@ public class SystemBootstrapController : ControllerBase
     }
 
     // NOTE: Intentionally AllowAnonymous for first-time bootstrap.
+    /// <summary>Khởi tạo Tenant Admin đầu tiên (Chỉ dùng được khi hệ thống chưa có Admin nào)</summary>
     [AllowAnonymous]
     [HttpPost]
     public async Task<IActionResult> Bootstrap([FromBody] SystemBootstrapRequestDto request)

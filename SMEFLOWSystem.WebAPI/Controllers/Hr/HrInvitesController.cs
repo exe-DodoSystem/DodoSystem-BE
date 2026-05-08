@@ -18,6 +18,7 @@ public class HrInvitesController : ControllerBase
         _inviteService = inviteService;
         _currentTenant = currentTenant;
     }
+    /// <summary>[TenantAdmin] Gửi email mời một người dùng mới vào Tenant (Công ty)</summary>
 
     [Authorize]
     [HttpPost("send")]
@@ -27,9 +28,16 @@ public class HrInvitesController : ControllerBase
         if (!tenantId.HasValue)
             return StatusCode(403, new { error = "Thiếu TenantId" });
 
+        var userIdString = base.User.FindFirst(global::System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        Guid? invitedByUserId = null;
+        if (Guid.TryParse(userIdString, out var parsedUserId))
+        {
+            invitedByUserId = parsedUserId;
+        }
+
         try {
-        
-            await _inviteService.SendInviteAsync(tenantId.Value, request.Email, request.RoleId, request.DepartmentId, request.PositionId, request.Message);
+
+            await _inviteService.SendInviteAsync(tenantId.Value, request.Email, request.RoleId, request.DepartmentId, request.PositionId, request.Message, invitedByUserId);
             return Ok(new { success = true });
         }
         catch (UnauthorizedAccessException ex)
@@ -47,6 +55,7 @@ public class HrInvitesController : ControllerBase
     }
 
     // Unauthenticated onboarding completion (ModuleAccessMiddleware skips unauthenticated requests)
+    /// <summary>Xác thực Token lời mời có hợp lệ hay không</summary>
     [AllowAnonymous]
     [HttpGet("validate")]
     public async Task<IActionResult> Validate([FromQuery] string token)
@@ -70,6 +79,7 @@ public class HrInvitesController : ControllerBase
             return BadRequest(new { error = ex.Message });
         }
     }
+    /// <summary>Hoàn tất đăng ký tài khoản từ lời mời</summary>
 
     [AllowAnonymous]
     [HttpPost("complete")]

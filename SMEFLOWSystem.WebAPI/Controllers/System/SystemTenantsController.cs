@@ -18,6 +18,7 @@ public class SystemTenantsController : ControllerBase
         _systemTenantService = systemTenantService;
     }
 
+    /// <summary>[SystemAdmin] Lấy danh sách tất cả các Tenant (Công ty) đang sử dụng hệ thống</summary>
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] PagingRequestDto request)
     {
@@ -25,6 +26,7 @@ public class SystemTenantsController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>[SystemAdmin] Lấy thông tin chi tiết một Tenant theo ID</summary>
     [HttpGet("{tenantId:guid}")]
     public async Task<IActionResult> GetById([FromRoute] Guid tenantId)
     {

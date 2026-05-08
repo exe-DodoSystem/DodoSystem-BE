@@ -1,21 +1,50 @@
-﻿#nullable disable
+#nullable disable
 using SMEFLOWSystem.SharedKernel.Interfaces;
 using System;
 
 namespace SMEFLOWSystem.Core.Entities;
 
+/// <summary>
+/// Cấu hình chấm công cho toàn bộ công ty.
+/// </summary>
 public class TenantAttendanceSetting : ITenantEntity
 {
     public Guid Id { get; set; }
     public Guid TenantId { get; set; }
+    /// <summary>Tọa độ GPS của văn phòng.</summary>
     public double? Latitude { get; set; }
     public double? Longitude { get; set; }
+    /// <summary>Bán kính cho phép chấm công hợp lệ (m).</summary>
     public int CheckInRadiusMeters { get; set; } = 100;
+    /// <summary>Giờ vào chuẩn.</summary>
     public TimeOnly? WorkStartTime { get; set; }
     public TimeOnly? WorkEndTime { get; set; }
+    public TimeSpan DayStartCutOffTime { get; set; } = new TimeSpan(12, 1, 0);
+    /// <summary>Số phút cho phép trễ mà không bị phạt.</summary>
     public int LateThresholdMinutes { get; set; } = 10;
     public int EarlyLeaveThresholdMinutes { get; set; } = 10;
+    
+    /// <summary>Số phút tối thiểu để tính Tăng ca (OT).</summary>
+    public int MinimumOTMinutes { get; set; } = 30; // Dưới 30p không tính OT
+    public int OTBlockMinutes { get; set; } = 30; // Block làm tròn (VD: 30p, 60p)
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
     public virtual Tenant Tenant { get; set; }
+
+    // --- DOMAIN LOGIC: Máy móc không được vòng do ---
+    // Hàm này giấu tiệt logic tính toán phức tạp vào trong Entity.
+    public decimal CalculateValidOTHours(int actualOTMinutes)
+    {
+        if (actualOTMinutes < MinimumOTMinutes) 
+            return 0m; // Không đủ số phút tối thiểu tối thiểu -> Bỏ.
+
+        if (OTBlockMinutes <= 0) 
+            return actualOTMinutes / 60m; // Fallback an toàn nếu chưa cấu hình Block
+
+        // Ví dụ: Làm 80 phút, chia 30p = 2 block (số nguyên). Lấy 2 * 30 = 60 phút hợp lệ.
+        int validOTMinutes = (actualOTMinutes / OTBlockMinutes) * OTBlockMinutes;
+        
+        return Math.Round((decimal)validOTMinutes / 60m, 2); // Trả về số Giờ OT thập phân làm tròn 2 chữ số
+    }
 }
