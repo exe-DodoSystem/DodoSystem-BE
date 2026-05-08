@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using SharedKernel.DTOs;
 using SMEFLOWSystem.Application.DTOs.RoleDtos;
 using SMEFLOWSystem.Application.Interfaces.IServices;
@@ -17,6 +18,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             _roleService = roleService;
         }
 
+        [Authorize]
         [HttpGet("all")]
         public async Task<IActionResult> GetAllRoles()
         {
@@ -24,6 +26,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             return Ok(roles);
         }
 
+        [Authorize]
         [HttpGet("{id}")]
         public async Task<IActionResult> GetRoleById(int id)
         {
@@ -35,6 +38,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             return Ok(role);
         }
 
+        [Authorize(Roles = "SystemAdmin")]
         [HttpPost]
         public async Task<IActionResult> CreateRole([FromBody] RoleUpdatedDto roleDto)
         {
@@ -49,6 +53,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             }
         }
 
+        [Authorize(Roles = "SystemAdmin")]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateRole(int id, [FromBody] RoleUpdatedDto roleDto)
         {
@@ -67,6 +72,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             }
         }
 
+        [Authorize]
         [HttpGet("all/page")]
         public async Task<IActionResult> GetAllByPage([FromQuery] PagingRequestDto request)
         {

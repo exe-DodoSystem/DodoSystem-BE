@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SMEFLOWSystem.Application.DTOs.ModuleDtos;
 using SMEFLOWSystem.Application.Interfaces.IServices;
@@ -16,6 +17,7 @@ public class BillingOrderModulesController : ControllerBase
         _service = service;
     }
 
+    [Authorize(Roles = "TenantAdmin")]
     [HttpGet("me/by-module-id/{moduleId:int}")]
     public async Task<ActionResult<List<BillingOrderModuleDto>>> GetMyByModuleId([FromRoute] int moduleId)
     {
@@ -30,6 +32,7 @@ public class BillingOrderModulesController : ControllerBase
         }
     }
 
+    [Authorize(Roles = "TenantAdmin")]
     [HttpGet("me/by-module-code/{code}")]
     public async Task<ActionResult<List<BillingOrderModuleDto>>> GetMyByModuleCode([FromRoute] string code)
     {
@@ -46,5 +49,21 @@ public class BillingOrderModulesController : ControllerBase
         {
             return NotFound(new { error = ex.Message });
         }
+    }
+
+    [Authorize(Roles = "TenantAdmin")]
+    [HttpGet("me/by-billing-order-id/{billingOrderId:guid}")]
+    public async Task<ActionResult<List<BillingOrderModuleDto>>> GetByBillingOrderId([FromRoute] Guid billingOrderId)
+    {
+        var lines = await _service.GetByBillingOrderIdAsync(billingOrderId);
+        return Ok(lines);
+    }
+
+    [Authorize(Roles = "SystemAdmin")]
+    [HttpGet("by-billing-order-id-ignore-tenant/{billingOrderId:guid}")]
+    public async Task<ActionResult<List<BillingOrderModuleDto>>> GetByBillingOrderIdIgnoreTenant([FromRoute] Guid billingOrderId)
+    {
+        var lines = await _service.GetByBillingOrderIdIgnoreTenantAsync(billingOrderId);
+        return Ok(lines);
     }
 }

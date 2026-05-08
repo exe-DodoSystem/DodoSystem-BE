@@ -123,3 +123,43 @@ public class TenantConfiguration : IEntityTypeConfiguration<Tenant>
         entity.HasOne(e => e.OwnerUser).WithMany().HasForeignKey(e => e.OwnerUserId).OnDelete(DeleteBehavior.NoAction);
     }
 }
+
+public class ManagerDepartmentConfiguration : IEntityTypeConfiguration<ManagerDepartment>
+{
+    public void Configure(EntityTypeBuilder<ManagerDepartment> entity)
+    {
+        // Composite Primary Key: (UserId, DepartmentId) — 1 Manager chỉ được gán 1 lần/phòng ban
+        entity.HasKey(e => new { e.UserId, e.DepartmentId });
+
+        entity.Property(e => e.AssignedAt)
+            .IsRequired()
+            .HasDefaultValueSql("(getdate())");
+
+        entity.Property(e => e.AssignedByUserId)
+            .IsRequired();
+
+        // Index trên TenantId để hỗ trợ Global Query Filter (multi-tenant isolation)
+        entity.HasIndex(e => e.TenantId).HasDatabaseName("IX_ManagerDepartments_TenantId");
+
+        // FK → Users (Manager)
+        entity.HasOne(e => e.User)
+            .WithMany(u => u.ManagedDepartments)
+            .HasForeignKey(e => e.UserId)
+            .OnDelete(DeleteBehavior.Cascade)
+            .HasConstraintName("FK_ManagerDepartments_Users");
+
+        // FK → Departments
+        entity.HasOne(e => e.Department)
+            .WithMany(d => d.ManagerDepartments)
+            .HasForeignKey(e => e.DepartmentId)
+            .OnDelete(DeleteBehavior.Cascade)
+            .HasConstraintName("FK_ManagerDepartments_Departments");
+
+        // FK → Tenants
+        entity.HasOne(e => e.Tenant)
+            .WithMany()
+            .HasForeignKey(e => e.TenantId)
+            .OnDelete(DeleteBehavior.NoAction)
+            .HasConstraintName("FK_ManagerDepartments_Tenants");
+    }
+}

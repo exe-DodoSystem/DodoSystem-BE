@@ -1,16 +1,14 @@
-using SMEFLOWSystem.SharedKernel.Interfaces;
+using System;
 using System.Collections.Generic;
 
-namespace SMEFLOWSystem.Core.Entities;
+namespace SMEFLOWSystem.Application.DTOs.ModuleDtos;
 
-public class BillingOrder : ITenantEntity
+public class BillingOrderDto
 {
     public Guid Id { get; set; }
-    public Guid TenantId { get; set; }
-    public virtual Tenant? Tenant { get; set; }
+    public string TenantName { get; set; } = string.Empty;
 
     public string BillingOrderNumber { get; set; } = string.Empty;
-    public Guid CustomerId { get; set; }
 
     public DateTime BillingDate { get; set; }
 
@@ -26,7 +24,4 @@ public class BillingOrder : ITenantEntity
     public DateTime? CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
 
-    public bool? IsDeleted { get; set; }
-
-    public virtual ICollection<BillingOrderModule> BillingOrderModules { get; set; } = new List<BillingOrderModule>();
 }

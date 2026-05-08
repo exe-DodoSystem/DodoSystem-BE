@@ -32,6 +32,7 @@ public static class WebApplicationExtensions
 
         InitializeDatabase(app);
         SeedRoles(app);
+        SeedModules(app);
 
         // Schedule recurring jobs (daily at 00:00 Vietnam time)
         ScheduleRecurringJobs(app);
@@ -79,6 +80,17 @@ public static class WebApplicationExtensions
         db.SaveChanges();
     }
 
+    private static void SeedModules(WebApplication app)
+    {
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SMEFLOWSystemContext>();
+        SeedModulesIfMissing(db, "HR", "HR", "Human Resource Management", "Module quản lý nhân sự", 150000m, true);
+        SeedModulesIfMissing(db, "ATTENDANCE", "ATT", "Attendance Management", "Module quản lý chấm công", 180000m, true);
+        SeedModulesIfMissing(db, "PAYROLL", "PAYROLL", "Payroll Management", "Module quản lý bảng lương", 180000m, true);
+        SeedModulesIfMissing(db, "DASHBOARD", "DASH", "Dashboard Management", "Module quản lý Dashboard & Báo cáo", 120000m, true);
+        db.SaveChanges();
+    }
+
     private static void SeedRoleIfMissing(SMEFLOWSystemContext db, string roleName, string description)
     {
         var exists = db.Roles.AsNoTracking().Any(r => r.Name == roleName);
@@ -89,6 +101,24 @@ public static class WebApplicationExtensions
             Name = roleName,
             Description = description,
             IsSystemRole = true
+        });
+    }
+
+    private static void SeedModulesIfMissing(SMEFLOWSystemContext db, string moduleCode, string shortCode, string moduleName, string description, decimal monthlyPrice, bool isActive)
+    {
+        var exists = db.Modules.AsNoTracking().Any(m => m.Code == moduleCode);
+
+        if(exists) return;
+
+        db.Modules.Add(new Module
+        {
+            Code = moduleCode,
+            ShortCode = shortCode,
+            Name = moduleName,
+            Description = description,
+            MonthlyPrice = monthlyPrice,
+            IsActive = isActive,
+            CreatedAt = DateTime.UtcNow
         });
     }
 

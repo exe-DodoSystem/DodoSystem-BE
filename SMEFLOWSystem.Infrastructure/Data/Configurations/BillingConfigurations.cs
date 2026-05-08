@@ -21,6 +21,7 @@ public class BillingOrderConfiguration : IEntityTypeConfiguration<BillingOrder>
         entity.Property(e => e.PaymentStatus).IsRequired().HasMaxLength(30).HasDefaultValue("Pending");
         entity.Property(e => e.Status).IsRequired().HasMaxLength(30).HasDefaultValue("Pending");
         entity.Property(e => e.TotalAmount).HasColumnType("decimal(18, 2)");
+        entity.HasOne(d => d.Tenant).WithMany().HasForeignKey(d => d.TenantId).OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("FK_BillingOrders_Tenants");
     }
 }
 

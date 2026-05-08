@@ -11,5 +11,7 @@ public class ModuleDtosMappingProfile : Profile
         CreateMap<Module, ModuleDto>();
         CreateMap<ModuleSubscription, ModuleSubscriptionDto>();
         CreateMap<BillingOrderModule, BillingOrderModuleDto>();
+        CreateMap<BillingOrder, BillingOrderDto>()
+            .ForMember(dest => dest.TenantName, opt => opt.MapFrom(src => src.Tenant != null ? src.Tenant.Name : string.Empty));
     }
 }

@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Hosting;
 using SMEFLOWSystem.Application.Interfaces.IServices;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Microsoft.AspNetCore.Http.HttpResults;
+using SMEFLOWSystem.SharedKernel.Interfaces;
 
 namespace SMEFLOWSystem.WebAPI.Controllers
 {
@@ -62,10 +64,6 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             }
         }
 
-        /// <summary>
-        /// Development-only: simulate a successful VNPay callback for an existing order.
-        /// This builds a callback query string with a valid signature and redirects into the normal callback endpoint.
-        /// </summary>
         [HttpPost("simulate/vnpay/success")]
         public async Task<IActionResult> SimulateVNPaySuccess([FromQuery] Guid orderId, [FromQuery] string? vnp_TransactionNo = null)
         {
@@ -74,7 +72,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
 
             var queryString = await _billingService.BuildSimulatedVNPaySuccessQueryStringAsync(orderId, vnp_TransactionNo);
             var callbackUrl = $"{Request.Scheme}://{Request.Host}/api/payment/callback/vnpay?{queryString}";
-            return Redirect(callbackUrl);
+            return Ok($"Thanh toán thành công cho {orderId}");
         }
     }
 }

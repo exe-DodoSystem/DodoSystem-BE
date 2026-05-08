@@ -32,6 +32,14 @@ public class BillingOrderRepository : IBillingOrderRepository
             .FirstOrDefaultAsync(o => o.Id == billingOrderId);
     }
 
+    public async Task<List<BillingOrder>> GetByTenantIdAsync(Guid tenantId)
+    {
+        return await _context.BillingOrders
+            .Include(o => o.Tenant)
+            .Where(o => o.TenantId == tenantId)
+            .ToListAsync();
+    }
+
     public async Task<BillingOrder?> UpdateAsync(BillingOrder billingOrder)
     {
         var existing = await _context.BillingOrders.FirstOrDefaultAsync(o => o.Id == billingOrder.Id);

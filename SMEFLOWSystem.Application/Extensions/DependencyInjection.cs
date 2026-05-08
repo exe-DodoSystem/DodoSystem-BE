@@ -20,6 +20,7 @@ public static class DependencyInjection
     {
         
         services.AddAutoMapper(typeof(RoleMappingProfile).Assembly);
+        services.AddAutoMapper(typeof(ModuleDtosMappingProfile).Assembly);
 
         services.AddValidatorsFromAssemblyContaining<RegisterRequestDtoValidator>();
         services.AddValidatorsFromAssemblyContaining<ChangePasswordRequestDtoValidator>();

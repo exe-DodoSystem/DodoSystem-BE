@@ -8,9 +8,9 @@ namespace ShareKernel.Common.Enum
 {
     public static class StatusEnum
     {
-        public const string TenantPending = "PendingPayment"; // Chờ thanh toán
-        public const string TenantTrial = "Trial";            // Dùng thử
-        public const string TenantActive = "Active";          // Đang hoạt động
+        public const string TenantPending = "PendingPayment"; 
+        public const string TenantTrial = "Trial";            
+        public const string TenantActive = "Active";          
         public const string TenantSuspended = "Suspended";    // Bị treo (hết hạn)
 
         // Module Subscription Status 
