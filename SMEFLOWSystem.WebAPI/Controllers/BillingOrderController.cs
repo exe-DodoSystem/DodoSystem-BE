@@ -4,6 +4,7 @@ using SMEFLOWSystem.Application.Interfaces.IServices;
 using SMEFLOWSystem.Application.Interfaces.IServices.System;
 using SMEFLOWSystem.Application.Services;
 using SMEFLOWSystem.Core.Entities;
+using ShareKernel.Common.Enum;
 using SMEFLOWSystem.SharedKernel.Interfaces;
 using System.Security.Claims;
 
@@ -18,17 +19,20 @@ namespace SMEFLOWSystem.WebAPI.Controllers
         private readonly ICurrentTenantService _currentTenant;
         private readonly ISystemTenantService _systemTenantService;
         private readonly IBillingService _billingService;
+        private readonly IUserService _userServicve;
 
         public BillingOrderController(
             IBillingOrderService billingOrderService, 
             ICurrentTenantService currentTenant, 
             ISystemTenantService systemTenantService,
-            IBillingService billingService)
+            IBillingService billingService,
+            IUserService userService)
         {
             _billingOrderService = billingOrderService;
             _currentTenant = currentTenant;
             _systemTenantService = systemTenantService;
             _billingService = billingService;
+            _userServicve = userService;
         }
 
         /// <summary>Lấy danh sách các hóa đơn của Tenant hiện tại</summary>
@@ -87,7 +91,13 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             }
             clientIp ??= HttpContext.Connection.RemoteIpAddress?.ToString();
 
+            var user = await _userServicve.GetUserByUserIdAsync(userId);
             var paymentUrl = await _billingService.CreatePaymentUrlAsync(order.Id, clientIp);
+            var createOrderId = order.Id;
+            if(createOrderId != Guid.Empty)
+            {
+                await _billingService.EnqueuePaymentLinkEmailAsync(createOrderId, user.Email, tenant.Name, clientIp, StatusEnum.EmailTypeAdditional);
+            }
 
             return Ok(new { OrderId = order.Id, PaymentUrl = paymentUrl });
         }

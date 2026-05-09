@@ -79,4 +79,23 @@ public class HrPositionService : IHrPositionService
             throw new ArgumentException("Không thể xóa vì đang có nhân viên sử dụng");
         await _positionRepo.SoftDeleteAsync(pos);
     }
+
+    public bool RotateString(string s, string goal)
+    {
+
+        bool isEqual = true;
+        if (goal[0].ToString().Equals(s[s.Length - 1]))
+        {
+            int i = 1;
+            while (i < s.Length - 1)
+            {
+                if (goal.ToString().Equals(s[i + 1]))
+                    isEqual = false;
+
+            }
+        }
+
+        return isEqual;
+
+    }
 }
