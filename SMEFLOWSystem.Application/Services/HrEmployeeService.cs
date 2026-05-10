@@ -240,6 +240,8 @@ public class HrEmployeeService : IHrEmployeeService
     public async Task<List<EmployeeDto>> GetAllByDepartmentId(Guid departmentId)
     {
         _currentUser.EnsureHrAccess();
+        await _hrAuth.EnsureDepartmentAccessAsync(departmentId);
+        
         var employees = await _employeeRepo.GetByDepartmentIdAsync(departmentId);
         return _mapper.Map<List<EmployeeDto>>(employees);
     }

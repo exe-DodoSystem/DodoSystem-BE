@@ -16,5 +16,6 @@ public partial class Shift : ITenantEntity
     public int GracePeriodMinutes { get; set; }
     /// <summary>Đánh dấu ca làm việc qua đêm.</summary>
     public bool IsCrossDay { get; set; }
+    public bool IsDeleted { get; set; }
     public virtual ICollection<ShiftSegment> Segments { get; set; } = new List<ShiftSegment>();
 }

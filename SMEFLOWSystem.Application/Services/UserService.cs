@@ -254,7 +254,7 @@ namespace SMEFLOWSystem.Application.Services
         {
             var user = await _userRepository.GetUserByIdAsync(userId);
             if(user == null)
-                throw new ArgumentException($"User with id {id} is not existed");
+                throw new ArgumentException($"User with id {userId} is not existed");
             return user;
         }
     }
