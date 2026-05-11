@@ -10,4 +10,10 @@ public interface IShiftManagementService
     Task<ShiftDto> CreateAsync(ShiftCreateDto request);
     Task<ShiftDto> UpdateAsync(Guid id, ShiftCreateDto request);
     Task DeleteAsync(Guid id);
+
+    Task<PagedResultDto<ShiftPatternDto>> GetPatternsPagedAsync(ShiftPatternQueryDto query);
+    Task<ShiftPatternDto> GetPatternByIdAsync(Guid id);
+    Task<ShiftPatternDto> CreatePatternAsync(ShiftPatternCreateDto request);
+    Task<ShiftPatternDto> UpdatePatternAsync(Guid id, ShiftPatternCreateDto request);
+    Task DeletePatternAsync(Guid id);
 }

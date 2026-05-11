@@ -18,4 +18,18 @@ public interface IShiftPatternRepository
     Task<Shift?> GetShiftWithSegmentsAsync(Guid shiftId);
 
     Task<ShiftPatternDay?> GetShiftPatternWithDaysAsync(Guid shiftPatternId, int dayIndex);
+
+    // CRUD + Query cho ShiftPattern
+    Task<(List<ShiftPattern> Items, int TotalCount)> GetPagedAsync(
+        string? search,
+        bool includeDeleted,
+        int pageNumber,
+        int pageSize);
+
+    Task<ShiftPattern?> GetByIdWithDaysAsync(Guid id);
+    Task AddAsync(ShiftPattern pattern);
+    Task<ShiftPattern> UpdateAsync(ShiftPattern pattern);
+    Task SoftDeleteAsync(ShiftPattern pattern);
+    Task<bool> HasUsageAsync(Guid shiftPatternId);
+    Task<bool> ShiftExistsAsync(Guid shiftId);
 }
