@@ -3,7 +3,7 @@ using System;
 
 namespace SMEFLOWSystem.Application.DTOs.ShiftDtos
 {
-    public class ShiftAssignmentQueryDto : PagedQueryDto
+    public class ShiftAssignmentQueryDto : PagingRequestDto
     {
         public Guid? EmployeeId { get; set; }
         public Guid? DepartmentId { get; set; }
