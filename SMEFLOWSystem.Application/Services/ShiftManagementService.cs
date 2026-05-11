@@ -1,4 +1,5 @@
 using AutoMapper;
+using Microsoft.AspNetCore.Mvc.Filters;
 using SharedKernel.DTOs;
 using SMEFLOWSystem.Application.DTOs.ShiftDtos;
 using SMEFLOWSystem.Application.Extensions;
@@ -13,6 +14,9 @@ public class ShiftManagementService : IShiftManagementService
 {
     private readonly IShiftRepository _shiftRepo;
     private readonly IShiftPatternRepository _shiftPatternRepo;
+    private readonly IShiftAssignmentRepository _shiftAssignmentRepo;
+    private readonly IEmployeeRepository _employeeRepo;
+    private readonly IHrAuthorizationService _hrAuth;
     private readonly ICurrentUserService _currentUser;
     private readonly ICurrentTenantService _currentTenant;
     private readonly IMapper _mapper;
@@ -20,12 +24,18 @@ public class ShiftManagementService : IShiftManagementService
     public ShiftManagementService(
         IShiftRepository shiftRepo,
         IShiftPatternRepository shiftPatternRepo,
+        IShiftAssignmentRepository shiftAssignmentRepo,
+        IEmployeeRepository employeeRepo,
+        IHrAuthorizationService hrAuth,
         ICurrentUserService currentUser,
         ICurrentTenantService currentTenant,
         IMapper mapper)
     {
         _shiftRepo = shiftRepo;
         _shiftPatternRepo = shiftPatternRepo;
+        _shiftAssignmentRepo = shiftAssignmentRepo;
+        _employeeRepo = employeeRepo;
+        _hrAuth = hrAuth;
         _currentUser = currentUser;
         _currentTenant = currentTenant;
         _mapper = mapper;
@@ -230,6 +240,151 @@ public class ShiftManagementService : IShiftManagementService
         await _shiftPatternRepo.SoftDeleteAsync(pattern);
     }
 
+    public async Task<List<EmployeeShiftPatternDto>> BulkAssignPatternAsync(ShiftAssignmentBulkCreateDto request)
+    {
+        _currentUser.EnsureHrAccess();
+
+        if (request.EmployeeIds == null || request.EmployeeIds.Count == 0)
+            throw new ArgumentException("Must provide at least one employee id");
+
+        var shiftPattern = await _shiftPatternRepo.GetByIdWithDaysAsync(request.ShiftPatternId)
+            ?? throw new KeyNotFoundException("Shift pattern not found");
+
+        var tenantId = _currentTenant.TenantId
+            ?? throw new InvalidOperationException("TenantId không xác định.");
+
+        var uniqueEmployeeIds = request.EmployeeIds.Distinct().ToList();
+        var employees = await _employeeRepo.GetByIdsAsync(uniqueEmployeeIds);
+
+        if (employees.Count != uniqueEmployeeIds.Count)
+            throw new ArgumentException("Danh sách nhân viên không hợp lệ.");
+
+        if (_currentUser.IsManager())
+        {
+            foreach (var emp in employees)
+            {
+                await _hrAuth.EnsureEmployeeAccessAsync(emp);
+            }
+        }
+
+        await _shiftAssignmentRepo.BulkEndPreviousAssignmentsAsync(uniqueEmployeeIds, request.EffectiveStartDate);
+
+        var assignments = employees.Select(emp => new EmployeeShiftPattern
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            EmployeeId = emp.Id,
+            ShiftPatternId = shiftPattern.Id,
+            EffectiveStartDate = request.EffectiveStartDate,
+            EffectiveEndDate = null
+        }).ToList();
+
+        await _shiftAssignmentRepo.BulkInsertAssignmentsAsync(assignments);
+        return _mapper.Map<List<EmployeeShiftPatternDto>>(assignments);
+    }
+
+    public async Task<PagedResultDto<EmployeeShiftPatternDto>> GetAssignmentsPagedAsync(ShiftAssignmentQueryDto query)
+    {
+        _currentUser.EnsureHrAccess();
+
+        var accessibleIds = await _hrAuth.GetAccessibleDepartmentIdsAsync();
+        Guid? departmentId = query.DepartmentId;
+
+        if (accessibleIds != null)
+        {
+            if (departmentId.HasValue && !accessibleIds.Contains(departmentId.Value))
+                throw new UnauthorizedAccessException("Forbidden");
+
+            if (query.EmployeeId.HasValue)
+            {
+                var emp = await _employeeRepo.GetByIdAsync(query.EmployeeId.Value)
+                    ?? throw new KeyNotFoundException("Employee not found");
+                await _hrAuth.EnsureEmployeeAccessAsync(emp);
+            }
+
+            if (!departmentId.HasValue)
+            {
+                if (accessibleIds.Count == 0)
+                {
+                    return new PagedResultDto<EmployeeShiftPatternDto>
+                    {
+                        Items = new List<EmployeeShiftPatternDto>(),
+                        TotalCount = 0,
+                        PageNumber = query.PageNumber,
+                        PageSize = query.PageSize
+                    };
+                }
+
+                if (accessibleIds.Count == 1)
+                {
+                    departmentId = accessibleIds[0];
+                }
+                else
+                {
+                    var allItems = new List<EmployeeShiftPattern>();
+                    var totalCount = 0;
+                    var today = DateOnly.FromDateTime(DateTime.UtcNow);
+                    foreach (var deptId in accessibleIds)
+                    {
+                        var (deptItems, deptTotal) = await _shiftAssignmentRepo.GetPagedAsync(
+                            query.EmployeeId,
+                            deptId,
+                            query.ShiftPatternId,
+                            query.IsActiveOnly,
+                            1,
+                            int.MaxValue,
+                            today);
+                        allItems.AddRange(deptItems);
+                        totalCount += deptTotal;
+                    }
+
+                    var skip = (query.PageNumber - 1) * query.PageSize;
+                    var paged = allItems.Skip(skip).Take(query.PageSize).ToList();
+                    return new PagedResultDto<EmployeeShiftPatternDto>
+                    {
+                        Items = _mapper.Map<List<EmployeeShiftPatternDto>>(paged),
+                        TotalCount = totalCount,
+                        PageNumber = query.PageNumber,
+                        PageSize = query.PageSize
+                    };
+                }
+            }
+        }
+
+        var (items, total) = await _shiftAssignmentRepo.GetPagedAsync(
+            query.EmployeeId,
+            departmentId,
+            query.ShiftPatternId,
+            query.IsActiveOnly,
+            query.PageNumber,
+            query.PageSize,
+            DateOnly.FromDateTime(DateTime.UtcNow));
+
+        return new PagedResultDto<EmployeeShiftPatternDto>
+        {
+            Items = _mapper.Map<List<EmployeeShiftPatternDto>>(items),
+            TotalCount = total,
+            PageNumber = query.PageNumber,
+            PageSize = query.PageSize
+        };
+    }
+
+    public async Task<EmployeeShiftPatternDto> GetAssignmentByIdAsync(Guid id)
+    {
+        _currentUser.EnsureHrAccess();
+        var assignment = await _shiftAssignmentRepo.GetByIdAsync(id)
+            ?? throw new KeyNotFoundException("Shift assignment not found");
+
+        if (_currentUser.IsManager())
+        {
+            if (assignment.Employee == null)
+                throw new KeyNotFoundException("Employee not found");
+            await _hrAuth.EnsureEmployeeAccessAsync(assignment.Employee);
+        }
+
+        return _mapper.Map<EmployeeShiftPatternDto>(assignment);
+    }
+
     private void EnsureHrManagerAccess()
     {
         if (!_currentUser.IsAdmin() && !_currentUser.IsHrManager())
@@ -298,4 +453,6 @@ public class ShiftManagementService : IShiftManagementService
                 throw new ArgumentException($"ScheduledShiftId {shiftId} không tồn tại.");
         }
     }
+
+    
 }

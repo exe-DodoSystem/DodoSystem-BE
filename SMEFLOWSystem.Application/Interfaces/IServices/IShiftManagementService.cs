@@ -16,4 +16,8 @@ public interface IShiftManagementService
     Task<ShiftPatternDto> CreatePatternAsync(ShiftPatternCreateDto request);
     Task<ShiftPatternDto> UpdatePatternAsync(Guid id, ShiftPatternCreateDto request);
     Task DeletePatternAsync(Guid id);
+
+    Task<List<EmployeeShiftPatternDto>> BulkAssignPatternAsync(ShiftAssignmentBulkCreateDto request);
+    Task<PagedResultDto<EmployeeShiftPatternDto>> GetAssignmentsPagedAsync(ShiftAssignmentQueryDto query);
+    Task<EmployeeShiftPatternDto> GetAssignmentByIdAsync(Guid id);
 }

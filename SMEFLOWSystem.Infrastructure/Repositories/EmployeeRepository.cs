@@ -30,6 +30,15 @@ public class EmployeeRepository : IEmployeeRepository
             .FirstOrDefaultAsync(e => e.UserId == userId);
     }
 
+    public async Task<List<Employee>> GetByIdsAsync(List<Guid> employeeIds)
+    {
+        return await _context.Employees
+            .Include(e => e.Department)
+            .Include(e => e.Position)
+            .Where(e => employeeIds.Contains(e.Id))
+            .ToListAsync();
+    }
+
     public async Task AddAsync(Employee employee)
     {
         await _context.Employees.AddAsync(employee);
