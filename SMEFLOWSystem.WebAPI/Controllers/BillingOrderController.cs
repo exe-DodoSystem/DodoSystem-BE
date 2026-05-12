@@ -71,7 +71,24 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             if(tenant == null) 
                 return NotFound(new { Error = "Tenant does not exist." });
 
+            if (string.Equals(tenant.Status, StatusEnum.TenantSuspended, StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest(new { Error = "Tài khoản của bạn đã bị tạm khóa. Vui lòng liên hệ quản trị viên." });
+            }
+
             var expireDate = tenant.SubscriptionEndDate;
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            if (expireDate.HasValue && expireDate.Value <= today)
+            {
+                return BadRequest(new { Error = "Gói thuê bao hiện tại đã hết hạn. Vui lòng thanh toán hóa đơn gia hạn trước khi mua thêm module." });
+            }
+
+            var pendingOrders = await _billingOrderService.GetBillingOrdersAsync(tenantId.Value);
+            if (pendingOrders.Any(o => string.Equals(o.PaymentStatus, StatusEnum.PaymentPending, StringComparison.OrdinalIgnoreCase)))
+            {
+                return BadRequest(new { Error = "Bạn đang có hóa đơn chưa thanh toán. Vui lòng hoàn tất hoặc hủy hóa đơn cũ trước khi thực hiện mua thêm module." });
+            }
+
             DateTime? prorateDate = expireDate.HasValue 
                 ? expireDate.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc) 
                 : null;

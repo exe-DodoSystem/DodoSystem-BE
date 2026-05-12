@@ -81,6 +81,8 @@ publish/
 # Chỉ ignore config local
 appsettings.Development.json
 appsettings.Local.json
+appsettings.json
+appsettings.*.json
 
 # Nếu có secrets local riêng
 secrets.json
