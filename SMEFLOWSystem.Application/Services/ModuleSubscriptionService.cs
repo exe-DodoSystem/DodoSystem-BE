@@ -43,7 +43,7 @@ public class ModuleSubscriptionService : IModuleSubscriptionService
     {
         var tenantId = GetTenantIdOrThrow();
         var sub = await _moduleSubscriptionRepo.GetByTenantAndModuleIgnoreTenantAsync(tenantId, moduleId);
-        return sub == null ? null : _mapper.Map<ModuleSubscriptionDto>(sub);
+        return (sub == null || sub.IsDeleted) ? null : _mapper.Map<ModuleSubscriptionDto>(sub);
     }
 
     public async Task<ModuleSubscriptionDto?> GetMyByModuleCodeAsync(string code)
@@ -53,7 +53,7 @@ public class ModuleSubscriptionService : IModuleSubscriptionService
         if (module == null) throw new KeyNotFoundException("Module not found");
 
         var sub = await _moduleSubscriptionRepo.GetByTenantAndModuleIgnoreTenantAsync(tenantId, module.Id);
-        return sub == null ? null : _mapper.Map<ModuleSubscriptionDto>(sub);
+        return (sub == null || sub.IsDeleted) ? null : _mapper.Map<ModuleSubscriptionDto>(sub);
     }
 
     public async Task<bool> CancelMyModuleSubscriptionAsync(int moduleId)
@@ -61,7 +61,7 @@ public class ModuleSubscriptionService : IModuleSubscriptionService
         var tenantId = GetTenantIdOrThrow();
         var sub = await _moduleSubscriptionRepo.GetByTenantAndModuleIgnoreTenantAsync(tenantId, moduleId);
         
-        if (sub == null) 
+        if (sub == null || sub.IsDeleted) 
             throw new Exception("Không tìm thấy module này trong danh sách đăng ký.");
 
         sub.IsDeleted = true;

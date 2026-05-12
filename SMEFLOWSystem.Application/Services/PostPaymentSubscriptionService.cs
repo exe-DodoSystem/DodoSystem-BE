@@ -100,6 +100,7 @@ public class PostPaymentSubscriptionService : IPostPaymentSubscriptionService
                         existingSub.EndDate = baseDate.AddMonths(1);
                     }
                     existingSub.Status = StatusEnum.ModuleActive;
+                    existingSub.IsDeleted = false;
                     await _moduleSubscriptionRepo.UpdateIgnoreTenantAsync(existingSub);
                 }
 
