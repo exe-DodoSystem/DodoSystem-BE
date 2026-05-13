@@ -76,4 +76,9 @@ public class ShiftRepository : IShiftRepository
     {
         return _context.ShiftPatternDays.AnyAsync(x => x.ScheduledShiftId == shiftId);
     }
+
+    public async Task<bool> IsCodeOrNameExists(string code, string name)
+    {
+        return await _context.Shifts.AnyAsync(s => s.Code == code || s.Name == name);
+    }
 }

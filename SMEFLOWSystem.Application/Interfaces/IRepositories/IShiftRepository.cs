@@ -15,4 +15,5 @@ public interface IShiftRepository
     Task<Shift> UpdateAsync(Shift shift);
     Task SoftDeleteAsync(Shift shift);
     Task<bool> HasUsageAsync(Guid shiftId);
+    Task<bool> IsCodeOrNameExists(string code, string name);
 }

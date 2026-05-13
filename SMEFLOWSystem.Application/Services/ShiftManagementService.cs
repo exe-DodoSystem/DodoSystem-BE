@@ -75,6 +75,9 @@ public class ShiftManagementService : IShiftManagementService
             ?? throw new InvalidOperationException("TenantId không xác định.");
 
         ValidateSegments(request.Segments);
+        var isExistingCodeOrName = await _shiftRepo.IsCodeOrNameExists(request.Code, request.Name);
+        if(isExistingCodeOrName)
+            throw new ArgumentException("Code hoặc Name đã tồn tại");
 
         var shift = _mapper.Map<Shift>(request);
         shift.Id = Guid.NewGuid();
@@ -176,6 +179,8 @@ public class ShiftManagementService : IShiftManagementService
 
         ValidatePattern(request);
         await ValidateShiftIdsAsync(request.Days);
+        if (request.CycleLengthDays > 7)
+            throw new ArgumentException("Độ dài của chu kỳ chỉ được bằng 7 hoặc dưới 7");
 
         var pattern = _mapper.Map<ShiftPattern>(request);
         pattern.Id = Guid.NewGuid();
@@ -190,7 +195,9 @@ public class ShiftManagementService : IShiftManagementService
         }
 
         await _shiftPatternRepo.AddAsync(pattern);
-        return _mapper.Map<ShiftPatternDto>(pattern);
+
+        var createdPattern = await _shiftPatternRepo.GetByIdWithDaysAsync(pattern.Id);
+        return _mapper.Map<ShiftPatternDto>(createdPattern ?? pattern);
     }
 
     public async Task<ShiftPatternDto> UpdatePatternAsync(Guid id, ShiftPatternCreateDto request)
