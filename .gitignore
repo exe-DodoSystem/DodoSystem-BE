@@ -1,100 +1,38 @@
-# =========================
+# Build outputs
+**/bin/
+**/obj/
+
+# NuGet
+*.nupkg
+packages/
+.nuget/
+
 # Visual Studio / VS Code
-# =========================
 .vs/
 .vscode/
-.idea/
-
-# =========================
-# Build Results
-# =========================
-[Bb]in/
-[Oo]bj/
-[Ll]og/
-[Ll]ogs/
-[Tt]emp/
-
-# =========================
-# User-specific files
-# =========================
 *.user
-*.rsuser
-*.suo
 *.userosscache
+*.suo
 *.sln.docstates
 
-# =========================
-# Backup / Cache
-# =========================
-*.bak
-*.cache
-*.log
-*.pdb
-*.tmp
-*.swp
-*.swo
-AssemblyInfoInputs.cache
+# Rider / IntelliJ
+.idea/
 
-# =========================
-# Test Results
-# =========================
-[Tt]est[Rr]esult*/
-*.trx
-*.coverage
-*.coveragexml
-
-# =========================
-# NuGet
-# =========================
-*.nupkg
-*.snupkg
-
-# KHÔNG nên ignore packages/ nếu dùng SDK-style project (.NET 6+)
-# packages/
-
-# KHÔNG nên ignore project.assets.json nữa
-# project.assets.json
-
-# KHÔNG cần ignore các file generated này
-# vì chúng nằm trong obj/
-# *.nuget.g.props
-# *.nuget.g.targets
-# *.nuget.dgspec.json
-
-# =========================
-# Node.js
-# =========================
-node_modules/
-
-# Frontend Build
-wwwroot/dist/
-
-# =========================
-# Publish
-# =========================
-publish/
-
-# =========================
-# Local Environment Config
-# =========================
-
-# Chỉ ignore config local
-appsettings.Development.json
-appsettings.Local.json
-appsettings.json
-appsettings.*.json
-
-# Nếu có secrets local riêng
-secrets.json
-
-# =========================
-# OS Files
-# =========================
+# OS files
 .DS_Store
 Thumbs.db
 
-# =========================
-# Dumps
-# =========================
-*.stackdump
-*.dmp
+# Logs
+*.log
+
+# Generated files
+*.cache
+*.g.cs
+*.generated.cs
+
+# Test results
+TestResults/
+
+# App settings
+**/appsettings.*.json
+!**/appsettings.json
