@@ -143,25 +143,29 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                     await _transaction.ExecuteAsync(async () =>
                     {
                         var orderedLogs = group.OrderBy(x => x.LocalTime).ThenBy(x => x.Log.Id).ToList();
-                        var pairResult = BuildPairs(orderedLogs.Select(x => x.Log).ToList(), group.Key.WorkDate);
+                        var rawLogsForDay = orderedLogs.Select(x => x.Log).ToList();
 
                         await UpsertDailyTimesheetAsync(
                             group.Key.EmployeeId,
                             group.Key.WorkDate,
-                            pairResult.Pairs,
-                            pairResult.OutBeforeInCount,
+                            rawLogsForDay,
                             attendanceSetting,
-                            shiftCache,
-                            pairResult.OrphanedOutLog);
+                            shiftCache);
 
                         // Chỉ mark processed cho những log của nhóm đã xử lý thành công
-                        var processedLogIds = group.Select(x => x.Log.Id).ToList();
+                        var processedLogIds = rawLogs
+                        .Where(x => x.EmployeeId == group.Key.EmployeeId)
+                        .Select(x => x.Id)
+                        .ToList(); 
                         await _rawPunchLogRepository.MarkProcessedAsync(processedLogIds);
                     });
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Thất bại khi xử lý chấm công cho EmployeeId: {EmployeeId}, Ngày: {WorkDate}. Sẽ thử lại ở lô tiếp theo.", group.Key.EmployeeId, group.Key.WorkDate);
+
+                    var errorLogIds = rawLogs.Where(x => x.EmployeeId == group.Key.EmployeeId).Select(x => x.Id).ToList();
+                    await _rawPunchLogRepository.MarkProcessedAsync(errorLogIds);    
                 }
             }
 
@@ -295,11 +299,9 @@ public class AttendanceResolutionService : IAttendanceResolutionService
     private async Task UpsertDailyTimesheetAsync(
         Guid employeeId,
         DateOnly workDate,
-        List<PunchPair> pairs,
-        int outBeforeInCount,
+        List<RawPunchLog> orderedLogs,
         TenantAttendanceSetting? attendanceSetting,
-        Dictionary<string, Shift?> shiftCache,
-        RawPunchLog? orphanedOutLog)
+        Dictionary<string, Shift?> shiftCache)
     {
         var tenantId = _currentTenantService.TenantId ?? throw new InvalidOperationException("TenantId is not set in the current context.");
         var shiftInfo = await _shiftPatternRepository.GetActivePatternDetailsAsync(employeeId, workDate);
@@ -325,13 +327,26 @@ public class AttendanceResolutionService : IAttendanceResolutionService
         var totalEarlyInOTMinutes = 0;
         var totalLateOutOTMinutes = 0;
         var totalActualWorkedMinutes = 0;
+        
+        var missingOutCount = 0;
+        var outBeforeInCount = 0;
         var unmatchedPairCount = 0;
+        var unmappedLogCount = 0;
+        RawPunchLog? orphanedOutLog = null;
+        var hasMissingOut = false;
+        var proximityWindowMinutes = _options.ProximityWindowMinutes <= 0 ? 240 : _options.ProximityWindowMinutes;
 
         // TH1: Ngày nghỉ (Shift == null) nhưng có đi làm (OT nguyên ngày)
         if (shiftSegments == null || shiftSegments.Count == 0)
         {
+            var pairResult = BuildPairs(orderedLogs, workDate);
+            missingOutCount = pairResult.Pairs.Count(p => p.MissingOut);
+            outBeforeInCount = pairResult.OutBeforeInCount;
+            orphanedOutLog = pairResult.OrphanedOutLog;
+            hasMissingOut = pairResult.Pairs.Any(p => p.MissingOut);
+
             // Nếu không có ca làm việc, tính tổng thời gian làm việc thực tế từ các cặp PunchPair
-            foreach (var pair in pairs)
+            foreach (var pair in pairResult.Pairs)
             {
                 var actualInUtc = pair.InLog.Timestamp;
                 var actualOutUtc = pair.OutLog?.Timestamp ?? actualInUtc;
@@ -364,146 +379,145 @@ public class AttendanceResolutionService : IAttendanceResolutionService
         // TH2: Ngày đi làm bình thường (Có ShiftSegments) 
         else
         {
-            // Bắt đầu Mapping Proximity
-            var unmappedPairs = pairs.ToList(); // Danh sách các thẻ chưa được gán
+            var unmappedLogs = orderedLogs.ToList();
+
             foreach (var targetSegment in shiftSegments)
             {
                 var expectedIn = CombineDateTime(workDate, targetSegment.StartTime, targetSegment.StartDayOffset);
                 var expectedOut = CombineDateTime(workDate, targetSegment.EndTime, targetSegment.EndDayOffset);
-                // 1. Tìm PunchPair phù hợp nhất (Gần với ExpectedIn nhất)
-                PunchPair? bestMatch = null;
-                if (unmappedPairs.Count > 0)
-                {
-                    var proximityWindowMinutes = _options.ProximityWindowMinutes <= 0
-                        ? int.MaxValue
-                        : _options.ProximityWindowMinutes;
 
-                    var bestCandidate = unmappedPairs
-                        .Select(p => new
-                        {
-                            Pair = p,
-                            DiffMinutes = Math.Abs((TimeZoneInfo.ConvertTimeFromUtc(p.InLog.Timestamp, VietnamTimeZone) - expectedIn).TotalMinutes)
-                        })
-                        .OrderBy(x => x.DiffMinutes)
+                // 1. Tìm Thẻ VÀO (InLog) gần với ExpectedIn nhất
+                RawPunchLog? bestInLog = null;
+                if (unmappedLogs.Count > 0)
+                {
+                    var bestInCandidate = unmappedLogs
+                        .Select(log => new { Log = log, Diff = Math.Abs((TimeZoneInfo.ConvertTimeFromUtc(log.Timestamp, VietnamTimeZone) - expectedIn).TotalMinutes) })
+                        .OrderBy(x => x.Diff)
                         .First();
 
-                    if (bestCandidate.DiffMinutes <= proximityWindowMinutes)
+                    if (bestInCandidate.Diff <= proximityWindowMinutes)
                     {
-                        bestMatch = bestCandidate.Pair;
-                        unmappedPairs.Remove(bestMatch); // Bỏ ra khỏi danh sách
+                        bestInLog = bestInCandidate.Log;
+                        unmappedLogs.Remove(bestInLog);
                     }
                 }
-                // 2. Nếu không có Pair nào map được -> VẮNG MẶT
-                if (bestMatch == null)
-                {
-                    if (approvedLeaveSegmentIds.Contains(targetSegment.Id))
-                    {
-                        // Có xin phép -> OnLeave
-                        segments.Add(new DailyTimesheetSegment
-                        {
-                            Id = Guid.NewGuid(),
-                            DailyTimesheetId = Guid.Empty,
-                            TargetShiftSegmentId = targetSegment.Id,
-                            ActualCheckIn = null,
-                            ActualCheckOut = null,
-                            LateMinutes = 0,
-                            EarlyLeaveMinutes = 0,
-                            Status = StatusEnum.AttendanceOnLeave
-                        });
-                    }
-                    else
-                    {
-                        // Trốn làm -> Phạt vắng mặt nguyên ca
 
-                        segments.Add(new DailyTimesheetSegment
+                // 2. Tìm Thẻ RA (OutLog) gần với ExpectedOut nhất
+                RawPunchLog? bestOutLog = null;
+                if (unmappedLogs.Count > 0)
+                {
+                    var validOutCandidates = unmappedLogs.AsEnumerable();
+                    if (bestInLog != null) 
+                        validOutCandidates = validOutCandidates.Where(x => x.Timestamp >= bestInLog.Timestamp); // Ra phải sau Vào
+
+                    if (validOutCandidates.Any())
+                    {
+                        var bestOutCandidate = validOutCandidates
+                            .Select(log => new { Log = log, Diff = Math.Abs((TimeZoneInfo.ConvertTimeFromUtc(log.Timestamp, VietnamTimeZone) - expectedOut).TotalMinutes) })
+                            .OrderBy(x => x.Diff)
+                            .First();
+
+                        if (bestOutCandidate.Diff <= proximityWindowMinutes)
                         {
-                            Id = Guid.NewGuid(),
-                            DailyTimesheetId = Guid.Empty,
-                            TargetShiftSegmentId = targetSegment.Id,
-                            ActualCheckIn = null,
-                            ActualCheckOut = null,
-                            LateMinutes = 0,
-                            EarlyLeaveMinutes = 0,
-                            Status = StatusEnum.AttendanceAbsent
-                        });
+                            bestOutLog = bestOutCandidate.Log;
+                            unmappedLogs.Remove(bestOutLog);
+                        }
                     }
+                }
+
+                // 3. Xử lý Vắng mặt nếu không có CẢ In và Out
+                if (bestInLog == null && bestOutLog == null)
+                {
+                    segments.Add(new DailyTimesheetSegment
+                    {
+                        Id = Guid.NewGuid(),
+                        DailyTimesheetId = Guid.Empty,
+                        TargetShiftSegmentId = targetSegment.Id,
+                        LateMinutes = 0,
+                        EarlyLeaveMinutes = 0,
+                        Status = approvedLeaveSegmentIds.Contains(targetSegment.Id) ? StatusEnum.AttendanceOnLeave : StatusEnum.AttendanceAbsent
+                    });
                     continue;
                 }
-                // 3. Có thẻ (Có bestMatch) -> Tính Đi Trễ, Về Sớm
-                var actualInUtc = bestMatch.InLog.Timestamp;
-                var actualOutUtc = bestMatch.OutLog?.Timestamp;
-                var actualIn = TimeZoneInfo.ConvertTimeFromUtc(actualInUtc, VietnamTimeZone);
-                var actualOut = actualOutUtc.HasValue
-                    ? TimeZoneInfo.ConvertTimeFromUtc(actualOutUtc.Value, VietnamTimeZone)
-                    : (DateTime?)null;
-                // --- TÍNH TOÁN ACTUAL WORKED ---
-                if (actualOut.HasValue)
-                {
-                    totalActualWorkedMinutes += (int)Math.Round((actualOut.Value - actualIn).TotalMinutes);
-                }
-                // --- TÍNH ĐI TRỄ / VỀ SỚM (Áp dụng Grace Period) ---
+
+                // 4. Tính toán Trễ / Sớm / Làm việc
+                DateTime? actualIn = bestInLog != null ? TimeZoneInfo.ConvertTimeFromUtc(bestInLog.Timestamp, VietnamTimeZone) : null;
+                DateTime? actualOut = bestOutLog != null ? TimeZoneInfo.ConvertTimeFromUtc(bestOutLog.Timestamp, VietnamTimeZone) : null;
+
+                if (actualIn.HasValue && actualOut.HasValue)
+                    totalActualWorkedMinutes += (int)Math.Round((actualOut.Value - actualIn.Value).TotalMinutes);
+
                 var lateMins = 0;
                 var earlyMins = 0;
                 var grace = shift?.GracePeriodMinutes ?? 0;
-                // Tính trễ: Chỉ phạt phần VƯỢT QUÁ grace, không phạt toàn bộ rawLate
-                // VD: Ca 8h, grace 5p, vào 8h07 → rawLate=7, lateMins=7-5=2 (không phải 7)
-                var rawLate = (int)Math.Round((actualIn - expectedIn).TotalMinutes);
-                if (rawLate > grace) lateMins = rawLate - grace;
-                // Tính về sớm / Missing Out
-                if (!actualOut.HasValue)
+
+                // Tính Đi Trễ / Quên quẹt Vào
+                if (!actualIn.HasValue) 
                 {
-                    // Missing Out phạt nặng (Từ lúc quẹt thẻ in -> Hết ca)
-                    earlyMins = Math.Max(0, (int)Math.Round((expectedOut - actualIn).TotalMinutes));
+                    hasMissingOut = true;
+                    missingOutCount++;
+                    lateMins = actualOut.HasValue 
+                        ? Math.Max(0, (int)Math.Round((actualOut.Value - expectedIn).TotalMinutes)) // Phạt từ đầu ca đến lúc quẹt ra
+                        : Math.Max(0, (int)Math.Round((expectedOut - expectedIn).TotalMinutes));
                 }
-                else
+                else 
+                {
+                    var rawLate = (int)Math.Round((actualIn.Value - expectedIn).TotalMinutes);
+                    if (rawLate > grace) lateMins = rawLate - grace;
+                    
+                    // Tính OT Đến Sớm
+                    var earlyInMins = Math.Max(0, (int)Math.Round((expectedIn - actualIn.Value).TotalMinutes));
+                    if (earlyInMins >= (attendanceSetting?.MinimumOTMinutes ?? 0)) totalEarlyInOTMinutes += earlyInMins;
+                }
+
+                // Tính Về Sớm / Quên quẹt Ra
+                if (!actualOut.HasValue) 
+                {
+                    hasMissingOut = true;
+                    missingOutCount++;
+                    if (actualIn.HasValue) 
+                        earlyMins = Math.Max(0, (int)Math.Round((expectedOut - actualIn.Value).TotalMinutes)); // Phạt từ lúc quẹt vào đến hết ca
+                }
+                else 
                 {
                     var rawEarly = (int)Math.Round((expectedOut - actualOut.Value).TotalMinutes);
                     if (rawEarly > 0) earlyMins = rawEarly;
-                }
-                // --- TÍNH OT (Đến sớm + Về trễ) ---
-                // Đến sớm (Early In OT): Math.Max(0,...) đảm bảo không bao giờ âm
-                var earlyInMins = Math.Max(0, (int)Math.Round((expectedIn - actualIn).TotalMinutes));
-                var earlyInMinThreshold = attendanceSetting?.MinimumOTMinutes ?? 0;
-                if (earlyInMins >= earlyInMinThreshold)
-                    totalEarlyInOTMinutes += earlyInMins;
-                // Về trễ (Late Out OT)
-                if (actualOut.HasValue)
-                {
+                    
+                    // Tính OT Về Trễ
                     var stayLateMins = (int)Math.Round((actualOut.Value - expectedOut).TotalMinutes);
                     if (stayLateMins > 0) totalLateOutOTMinutes += stayLateMins;
                 }
-                // Miễn phạt nếu có phép
+
                 if (approvedLeaveSegmentIds.Contains(targetSegment.Id))
                 {
                     lateMins = 0; earlyMins = 0;
                 }
                 totalLate += lateMins;
                 totalEarly += earlyMins;
-                // ... Thêm vào segments ...
 
+                // 5. Lưu phân đoạn
                 segments.Add(new DailyTimesheetSegment
                 {
                     Id = Guid.NewGuid(),
                     DailyTimesheetId = Guid.Empty,
                     TargetShiftSegmentId = targetSegment.Id,
-                    ActualCheckIn = actualInUtc,
-                    ActualCheckOut = actualOutUtc,
-                    CheckInLatitude = bestMatch.InLog.Latitude,
-                    CheckInLongitude = bestMatch.InLog.Longitude,
-                    CheckInSelfieUrl = bestMatch.InLog.SelfieUrl ?? string.Empty,
-                    CheckOutLatitude = bestMatch.OutLog?.Latitude,
-                    CheckOutLongitude = bestMatch.OutLog?.Longitude,
-                    CheckOutSelfieUrl = bestMatch.OutLog?.SelfieUrl ?? string.Empty,
+                    ActualCheckIn = bestInLog?.Timestamp,
+                    ActualCheckOut = bestOutLog?.Timestamp,
+                    CheckInLatitude = bestInLog?.Latitude,
+                    CheckInLongitude = bestInLog?.Longitude,
+                    CheckInSelfieUrl = bestInLog?.SelfieUrl ?? "",
+                    CheckOutLatitude = bestOutLog?.Latitude,
+                    CheckOutLongitude = bestOutLog?.Longitude,
+                    CheckOutSelfieUrl = bestOutLog?.SelfieUrl ?? "",
                     LateMinutes = lateMins,
                     EarlyLeaveMinutes = earlyMins,
-                    Status = approvedLeaveSegmentIds.Contains(targetSegment.Id) ? StatusEnum.AttendanceOnLeave : (bestMatch.MissingOut ? StatusEnum.AttendanceMissingOut : StatusEnum.AttendanceNormal)
+                    Status = approvedLeaveSegmentIds.Contains(targetSegment.Id) ? StatusEnum.AttendanceOnLeave 
+                             : (!actualIn.HasValue || !actualOut.HasValue ? StatusEnum.AttendanceMissingOut : StatusEnum.AttendanceNormal)
                 });
             }
 
-            if (unmappedPairs.Count > 0)
-            {
-                unmatchedPairCount += unmappedPairs.Count;
-            }
+            unmappedLogCount = unmappedLogs.Count;
+            unmatchedPairCount = unmappedLogCount;
         }
 
         var dailyLateThreshold = attendanceSetting?.LateThresholdMinutes ?? 0;
@@ -513,8 +527,6 @@ public class AttendanceResolutionService : IAttendanceResolutionService
         var dailyEarlyThreshold = attendanceSetting?.EarlyLeaveThresholdMinutes ?? 0;
         if (totalEarly <= dailyEarlyThreshold)
             totalEarly = 0;
-
-
 
         // OT hợp lệ chỉ được tính khi có OvertimeRequest đã duyệt
         var totalOtMinutes = 0;
@@ -529,7 +541,6 @@ public class AttendanceResolutionService : IAttendanceResolutionService
         }
 
         // Fix: Dùng CombineDateTime để tính đúng cho ca đêm (StartDayOffset/EndDayOffset)
-        // VD: Ca đêm 22:00 → 06:00 hôm sau: EndTime - StartTime = -16h (sai). Phải dùng DateTime thực
         var standardHours = shiftSegments == null
             ? 0m
             : Math.Round((decimal)shiftSegments.Sum(s =>
@@ -551,15 +562,15 @@ public class AttendanceResolutionService : IAttendanceResolutionService
 
         var resolutionLog = new
         {
-            PairCount = pairs.Count,
-            MissingOutCount = pairs.Count(p => p.MissingOut),
+            TotalRawLogs = orderedLogs.Count,
+            MissingOutCount = missingOutCount,
             OutBeforeInCount = outBeforeInCount,
-            UnmappedPairCount = unmatchedPairCount,
-            ProximityWindowMinutes = _options.ProximityWindowMinutes,
+            UnmappedLogCount = unmappedLogCount,
+            ProximityWindowMinutes = proximityWindowMinutes,
             TotalLateMinutes = totalLate,
             TotalEarlyLeaveMinutes = totalEarly,
-            AbsentSegmentCount = absentSegments.Count,                                  // Số ca vắng mặt không phép
-            AbsentPenaltyMinutes = absentSegments.Sum(s => s.EarlyLeaveMinutes),        // Tổng phút bị phạt do vắng mặt
+            AbsentSegmentCount = absentSegments.Count,
+            AbsentPenaltyMinutes = absentSegments.Sum(s => s.EarlyLeaveMinutes),
             StayLateMinutes = totalLateOutOTMinutes + totalEarlyInOTMinutes,
             EarlyInOTMinutes = totalEarlyInOTMinutes,
             LateOutOTMinutes = totalLateOutOTMinutes,
@@ -572,7 +583,7 @@ public class AttendanceResolutionService : IAttendanceResolutionService
 
         // Xác định anomaly flag
         var anomalyFlags = new List<string>();
-        if (pairs.Any(p => p.MissingOut)) anomalyFlags.Add("MissingOut");
+        if (hasMissingOut) anomalyFlags.Add("MissingOut");
         if (outBeforeInCount > 0) anomalyFlags.Add("OutBeforeIn");
         if (unmatchedPairCount > 0) anomalyFlags.Add("UnmappedPairs");
         if ((totalLateOutOTMinutes > 0 || totalEarlyInOTMinutes > 0) && approvedOT == null) anomalyFlags.Add("OTWithoutRequest");

@@ -120,7 +120,7 @@ namespace SMEFLOWSystem.Application.Services
             var attendanceSetting = await _attendanceSettingRepository.GetByTenantIdAsync(tenantId);
             
             var localTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, VietnamTimeZone);
-            var cutOffTime = attendanceSetting?.DayStartCutOffTime ?? new TimeSpan(12, 1, 0);
+            var cutOffTime = attendanceSetting?.DayStartCutOffTime ?? new TimeSpan(4, 0, 0);
             
             var workDate = localTime.TimeOfDay < cutOffTime
                 ? DateOnly.FromDateTime(localTime.AddDays(-1))
@@ -160,8 +160,25 @@ namespace SMEFLOWSystem.Application.Services
             }
             else
             {
-                // Nếu chưa có timesheet do job chưa chạy, ta query raw log để show tạm
-                // Sẽ query RawPunchLog có Timestamp trong workDate range này
+                var fromDateUtc = TimeZoneInfo.ConvertTimeFromUtc(workDate.ToDateTime(TimeOnly.FromTimeSpan(cutOffTime)), VietnamTimeZone);
+                var toDateUtc = fromDateUtc.AddDays(1);
+
+                var rawLogs = await _punchLogRepo.GetByEmployeeAndDateRangeAsync(employee.Id, fromDateUtc, toDateUtc);
+                if(rawLogs.Any())
+                {
+                    var ordered = rawLogs.OrderBy(x => x.Timestamp).ToList();
+
+                    result.HasCheckedIn = true;
+                    result.CheckInTime = ordered.First().Timestamp;
+                    result.CheckInSelfieUrl = ordered.First().SelfieUrl;
+
+                    if(ordered.Count > 1)
+                    {
+                        result.HasCheckedOut = true;
+                        result.CheckOutTime = ordered.Last().Timestamp;
+                    } 
+                        
+                }
             }
 
             return result;
@@ -342,7 +359,7 @@ namespace SMEFLOWSystem.Application.Services
                             TenantId = tenantId.Value,
                             EmployeeId = appeal.EmployeeId,
                             Timestamp = appeal.RequestedCheckIn.Value,
-                            PunchType = "I",
+                            PunchType = "In",
                             DeviceId = "HR_Manual"
                         });
                     }
@@ -358,7 +375,7 @@ namespace SMEFLOWSystem.Application.Services
                             TenantId = tenantId.Value,
                             EmployeeId = appeal.EmployeeId,
                             Timestamp = appeal.RequestedCheckOut.Value,
-                            PunchType = "O",
+                            PunchType = "Out",
                             DeviceId = "HR_Manual"
                         });
                     }
@@ -434,7 +451,7 @@ namespace SMEFLOWSystem.Application.Services
                 {
                     TenantId = tenantId.Value,
                     CheckInRadiusMeters = 100,
-                    DayStartCutOffTime = new TimeSpan(12, 1, 0),
+                    DayStartCutOffTime = new TimeSpan(4, 0, 0),
                     LateThresholdMinutes = 10,
                     EarlyLeaveThresholdMinutes = 10,
                     MinimumOTMinutes = 30,
