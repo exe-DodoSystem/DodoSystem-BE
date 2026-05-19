@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Core.Entities;
 using SMEFLOWSystem.Infrastructure.Data;
@@ -56,7 +56,7 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
         public async Task<List<Payroll>> GetDraftsByTenantMonthAsync(Guid tenantId, int month, int year)
         {
             return await _context.Payrolls
-                .Where(p => p.TenantId == tenantId && p.Month == month && p.Year == year && p.Status == StatusEnum.PayrollDraft)
+                .Where(p => p.TenantId == tenantId && p.Month == month && p.Year == year && p.Status == PayrollStatus.Draft)
                 .ToListAsync();
         }
 
@@ -106,15 +106,15 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
             if (year.HasValue)
                 query = query.Where(p => p.Year == year.Value);
 
-            if (!string.IsNullOrWhiteSpace(status))
-                query = query.Where(p => p.Status == status);
+            if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<ShareKernel.Common.Enum.PayrollStatus>(status, true, out var parsedStatus))
+                query = query.Where(p => p.Status == parsedStatus);
 
             // Sorting
             var isDesc = string.Equals(sortDir, "desc", StringComparison.OrdinalIgnoreCase);
             query = sortBy?.ToLower() switch
             {
                 "employeename" => isDesc ? query.OrderByDescending(p => p.Employee.FullName) : query.OrderBy(p => p.Employee.FullName),
-                "totalsalary" => isDesc ? query.OrderByDescending(p => p.TotalSalary) : query.OrderBy(p => p.TotalSalary),
+                "totalsalary" => isDesc ? query.OrderByDescending(p => p.NetSalary) : query.OrderBy(p => p.NetSalary),
                 "status" => isDesc ? query.OrderByDescending(p => p.Status) : query.OrderBy(p => p.Status),
                 "month" => isDesc ? query.OrderByDescending(p => p.Year).ThenByDescending(p => p.Month) : query.OrderBy(p => p.Year).ThenBy(p => p.Month),
                 _ => query.OrderByDescending(p => p.CreatedAt)

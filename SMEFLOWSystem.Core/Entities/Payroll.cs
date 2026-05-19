@@ -3,6 +3,7 @@
 using SMEFLOWSystem.SharedKernel.Interfaces;
 using System;
 using System.Collections.Generic;
+using ShareKernel.Common.Enum;
 
 namespace SMEFLOWSystem.Core.Entities;
 
@@ -28,17 +29,20 @@ public partial class Payroll : ITenantEntity
     public int TotalLateMinutes { get; set; }         // Tổng phút đi trễ
     public int TotalEarlyLeaveMinutes { get; set; }   // Tổng phút về sớm
     public int AbsentDays { get; set; }               // Số ngày vắng mặt
+    public decimal TotalOTHours { get; set; }         // Tổng giờ OT
 
     public decimal BaseSalarySnapshot { get; set; }   // Lương cơ bản snapshot
     public decimal BasePay { get; set; }              // Lương sau khi tính prorated (BaseSalary * tỷ lệ ngày làm)
+    public decimal OTPay { get; set; }                // Lương OT
+    public decimal PenaltyFee { get; set; }           // Phạt đi trễ/về sớm
 
-    public decimal? Bonus { get; set; }               // Thưởng (Admin nhập tay)
-    public decimal Deduction { get; set; }            // Tổng phạt (tự động tính từ late + early leave)
+    public decimal? CustomBonus { get; set; }         // Thưởng (Admin nhập tay)
+    public decimal CustomDeduction { get; set; }      // Khấu trừ khác (Thuế/BHXH, Admin nhập tay)
 
-    public decimal TotalSalary { get; set; }          // Lương thực nhận cuối cùng
+    public decimal NetSalary { get; set; }            // Lương thực nhận cuối cùng
 
-    /// <summary>Trạng thái bảng lương (Draft, Approved, Paid, Rejected).</summary>
-    public string Status { get; set; } = "Draft";
+    /// <summary>Trạng thái bảng lương (Draft, Published).</summary>
+    public PayrollStatus Status { get; set; } = PayrollStatus.Draft;
 
     public string? Notes { get; set; }                // Ghi chú (ví dụ: lý do phạt, thưởng)
 
