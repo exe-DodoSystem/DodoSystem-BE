@@ -41,7 +41,9 @@ public static class DependencyInjection
         services.AddScoped<IDepartmentRepository, DepartmentRepository>();
         services.AddScoped<IPositionRepository, PositionRepository>();
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
+        services.AddScoped<IShiftRepository, ShiftRepository>();
         services.AddScoped<IShiftPatternRepository, ShiftPatternRepository>();
+        services.AddScoped<IShiftAssignmentRepository, ShiftAssignmentRepository>();
         services.AddScoped<IPayrollRepository, PayrollRepository>();
         services.AddScoped<IDailyTimesheetRepository, DailyTimesheetRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();

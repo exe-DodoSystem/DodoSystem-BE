@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -66,5 +66,11 @@ namespace ShareKernel.Common.Enum
         //PunchKind
         public const string PunchIn = "In";
         public const string PunchOut = "Out";
+
+        // Email Template Types
+        public const string EmailTypeNew = "NEW";
+        public const string EmailTypeAdditional = "ADDITIONAL";
+        public const string EmailTypeRenewal = "RENEWAL";
+        public const string EmailTypeTrialOptional = "TRIAL_OPTIONAL";
     }
 }

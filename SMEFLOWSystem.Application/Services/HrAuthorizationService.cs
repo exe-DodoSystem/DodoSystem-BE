@@ -27,7 +27,6 @@ public class HrAuthorizationService : IHrAuthorizationService
         _managerDeptRepo = managerDeptRepo;
     }
 
-    /// <inheritdoc />
     public async Task<List<Guid>?> GetAccessibleDepartmentIdsAsync()
     {
         // TenantAdmin & HRManager: toàn quyền → trả về null (caller hiểu là "lấy tất cả")
@@ -46,7 +45,6 @@ public class HrAuthorizationService : IHrAuthorizationService
         throw new UnauthorizedAccessException("Bạn không có quyền truy cập dữ liệu HR.");
     }
 
-    /// <inheritdoc />
     public async Task EnsureDepartmentAccessAsync(Guid departmentId)
     {
         // TenantAdmin & HRManager: luôn có quyền
@@ -65,7 +63,6 @@ public class HrAuthorizationService : IHrAuthorizationService
         throw new UnauthorizedAccessException("Bạn không có quyền truy cập dữ liệu HR.");
     }
 
-    /// <inheritdoc />
     public async Task EnsureEmployeeAccessAsync(Employee employee)
     {
         // TenantAdmin & HRManager: luôn có quyền

@@ -50,6 +50,7 @@ public static class DependencyInjection
         services.AddScoped<IHrDepartmentService, HrDepartmentService>();
         services.AddScoped<IHrPositionService, HrPositionService>();
         services.AddScoped<IHrEmployeeService, HrEmployeeService>();
+        services.AddScoped<IShiftManagementService, ShiftManagementService>();
 
         // HR Authorization: Centralized scope service + Manager-Department assignment
         services.AddScoped<IHrAuthorizationService, HrAuthorizationService>();

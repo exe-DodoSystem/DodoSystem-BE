@@ -12,6 +12,7 @@ namespace SMEFLOWSystem.Core.Entities
         public string Name { get; set; } = string.Empty;
         /// <summary>Số ngày trong chu kỳ.</summary>
         public int CycleLengthDays { get; set; }
+        public bool IsDeleted { get; set; }
         public virtual ICollection<ShiftPatternDay> Days { get; set; } = new List<ShiftPatternDay>();
     }
 }

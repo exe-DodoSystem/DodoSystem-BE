@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Identity.Client;
 using Newtonsoft.Json;
 using SharedKernel.DTOs;
 using ShareKernel.Common.Enum;
@@ -247,6 +248,14 @@ namespace SMEFLOWSystem.Application.Services
             await _userRepository.UpdateUserAsync(user);
 
             return _mapper.Map<UserDto>(user);
+        }
+
+        public async Task<User> GetUserByUserIdAsync(Guid userId)
+        {
+            var user = await _userRepository.GetUserByIdAsync(userId);
+            if(user == null)
+                throw new ArgumentException($"User with id {userId} is not existed");
+            return user;
         }
     }
 }
