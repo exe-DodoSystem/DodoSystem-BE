@@ -20,4 +20,5 @@ public interface IShiftManagementService
     Task<List<EmployeeShiftPatternDto>> BulkAssignPatternAsync(ShiftAssignmentBulkCreateDto request);
     Task<PagedResultDto<EmployeeShiftPatternDto>> GetAssignmentsPagedAsync(ShiftAssignmentQueryDto query);
     Task<EmployeeShiftPatternDto> GetAssignmentByIdAsync(Guid id);
+    Task<MyCurrentShiftAssignmentDto?> GetMyCurrentAssignmentAsync(Guid userId);
 }

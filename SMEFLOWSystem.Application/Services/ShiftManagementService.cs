@@ -461,5 +461,44 @@ public class ShiftManagementService : IShiftManagementService
         }
     }
 
-    
+    public async Task<MyCurrentShiftAssignmentDto?> GetMyCurrentAssignmentAsync(Guid userId)
+    {
+        var employee = await _employeeRepo.GetByUserIdAsync(userId)
+            ?? throw new KeyNotFoundException("Không tìm thấy hồ sơ nhân sự cho tài khoản này.");
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var (items, _) = await _shiftAssignmentRepo.GetPagedAsync(
+            employeeId: employee.Id,
+            departmentId: null,
+            shiftPatternId: null,
+            isActiveOnly: true,
+            pageNumber: 1,
+            pageSize: 1,
+            today: today);
+
+        var activeAssignment = items.FirstOrDefault();
+        if (activeAssignment == null) return null;
+
+        var baseDto = _mapper.Map<EmployeeShiftPatternDto>(activeAssignment);
+        var dto = new MyCurrentShiftAssignmentDto
+        {
+            Id = baseDto.Id,
+            EmployeeId = baseDto.EmployeeId,
+            EmployeeName = baseDto.EmployeeName,
+            EmployeeDepartment = baseDto.EmployeeDepartment,
+            ShiftPatternId = baseDto.ShiftPatternId,
+            ShiftPatternName = baseDto.ShiftPatternName,
+            EffectiveStartDate = baseDto.EffectiveStartDate,
+            EffectiveEndDate = baseDto.EffectiveEndDate
+        };
+
+        // Nạp riêng thông tin chi tiết đầy đủ của Lịch ca (gồm Days -> Shifts -> Segments)
+        var patternDetails = await _shiftPatternRepo.GetByIdWithDaysAsync(activeAssignment.ShiftPatternId);
+        if (patternDetails != null)
+        {
+            dto.ShiftPattern = _mapper.Map<ShiftPatternDto>(patternDetails);
+        }
+
+        return dto;
+    }
 }

@@ -79,4 +79,29 @@ public class HrShiftAssignmentsController : ControllerBase
             return NotFound(new { error = ex.Message });
         }
     }
+
+    /// <summary>[Employee, TenantAdmin, HRManager, Manager] Xem lịch ca hiện tại đang gán của bản thân</summary>
+    [HttpGet("my-current")]
+    public async Task<ActionResult<MyCurrentShiftAssignmentDto>> GetMyCurrent()
+    {
+        var userIdString = base.User.FindFirst(global::System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!Guid.TryParse(userIdString, out var userId))
+        {
+            return Unauthorized(new { error = "Tài khoản chưa được xác thực đúng cách." });
+        }
+
+        try
+        {
+            var assignment = await _service.GetMyCurrentAssignmentAsync(userId);
+            if (assignment == null)
+            {
+                return NotFound(new { message = "Bạn hiện không có lịch ca làm việc nào đang hoạt động." });
+            }
+            return Ok(assignment);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+    }
 }
