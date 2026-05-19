@@ -1,4 +1,4 @@
-﻿using SharedKernel.DTOs;
+using SharedKernel.DTOs;
 using SMEFLOWSystem.Application.DTOs.PayrollDtos;
 using System;
 using System.Collections.Generic;
@@ -10,11 +10,13 @@ namespace SMEFLOWSystem.Application.Interfaces.IServices
     {
         Task<bool> GenerateMonthlyPayrollAsync(Guid tenantId, int month, int year);
         Task<PayrollDto> CalculatePayrollForEmployeeAsync(Guid tenantId, Guid employeeId, int month, int year);
-        Task<PagedResultDto<PayrollDto>> GetPagedAsync(PayrollQueryDto query);
-        Task<List<PayrollDto>> GetMyPayrollAsync(int? month, int? year);
-        Task<bool> ApproveAsync(Guid payrollId);
-        Task<bool> RejectAsync(Guid payrollId, string reason);
-        Task<bool> MarkPaidAsync(Guid payrollId);
-        Task<PayrollDto> UpdateBonusDeductionAsync(Guid payrollId, UpdatePayrollDto dto);
+        Task<PagedResultDto<PayrollDto>> GetPagedAsync(Guid tenantId, PayrollQueryDto query);
+        Task<List<PayrollDto>> GetMyPayrollAsync(Guid tenantId, Guid userId, int? month, int? year);
+        Task<bool> ApproveAsync(Guid payrollId); 
+        Task<bool> RejectAsync(Guid payrollId, string reason); 
+        Task<bool> MarkPaidAsync(Guid payrollId); 
+   
+        Task<PayrollDto> UpdateManualFieldsAsync(Guid payrollId, UpdatePayrollDto dto);
+        Task<bool> PublishPayrollAsync(Guid payrollId);
     }
 }

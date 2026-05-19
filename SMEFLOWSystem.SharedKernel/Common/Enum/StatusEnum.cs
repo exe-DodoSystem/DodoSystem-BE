@@ -51,12 +51,6 @@ namespace ShareKernel.Common.Enum
         public const string ApprovalApproved = "Approved";
         public const string ApprovalRejected = "Rejected";
 
-        // Payroll Status
-        public const string PayrollDraft = "Draft";
-        public const string PayrollApproved = "Approved";
-        public const string PayrollPaid = "Paid";
-        public const string PayrollRejected = "Rejected";
-
         // Outbox Message Status
         public const string OutboxPending = "Pending";
         public const string OutboxProcessed = "Processed";

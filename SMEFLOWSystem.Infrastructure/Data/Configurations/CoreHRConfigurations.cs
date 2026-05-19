@@ -84,13 +84,16 @@ public class PayrollConfiguration : IEntityTypeConfiguration<Payroll>
         entity.HasIndex(e => new { e.TenantId, e.EmployeeId, e.Year, e.Month }, "UQ_Payroll_Month").IsUnique();
         entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
         entity.Property(e => e.BaseSalarySnapshot).HasColumnType("decimal(18, 2)");
-        entity.Property(e => e.Bonus).HasDefaultValue(0m).HasColumnType("decimal(18, 2)");
         entity.Property(e => e.BasePay).HasColumnType("decimal(18, 2)");
+        entity.Property(e => e.TotalOTHours).HasDefaultValue(0m).HasColumnType("decimal(18, 2)");
+        entity.Property(e => e.OTPay).HasDefaultValue(0m).HasColumnType("decimal(18, 2)");
+        entity.Property(e => e.PenaltyFee).HasDefaultValue(0m).HasColumnType("decimal(18, 2)");
+        entity.Property(e => e.CustomBonus).HasDefaultValue(0m).HasColumnType("decimal(18, 2)");
+        entity.Property(e => e.CustomDeduction).HasDefaultValue(0m).HasColumnType("decimal(18, 2)");
+        entity.Property(e => e.NetSalary).HasDefaultValue(0m).HasColumnType("decimal(18, 2)");
         entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-        entity.Property(e => e.Deduction).HasDefaultValue(0m).HasColumnType("decimal(18, 2)");
         entity.Property(e => e.Notes).HasMaxLength(255);
-        entity.Property(e => e.Status).IsRequired().HasMaxLength(30).HasDefaultValue("Draft");
-        entity.Property(e => e.TotalSalary).HasColumnType("decimal(18, 2)");
+        entity.Property(e => e.Status).IsRequired().HasDefaultValue(ShareKernel.Common.Enum.PayrollStatus.Draft);
         entity.HasOne(d => d.Employee).WithMany(p => p.Payrolls).HasForeignKey(d => d.EmployeeId).OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("FK_Payrolls_Employees");
         entity.HasOne(d => d.Tenant).WithMany(p => p.Payrolls).HasForeignKey(d => d.TenantId).OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("FK_Payrolls_Tenants");
     }
