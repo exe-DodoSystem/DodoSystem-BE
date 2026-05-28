@@ -16,6 +16,7 @@ public interface IEmployeeRepository
     Task<(List<Employee> Items, int TotalCount)> GetPagedAsync(
         Guid? departmentId,
         Guid? positionId,
+        int? roleId,
         string? status,
         bool includeResigned,
         string? search,

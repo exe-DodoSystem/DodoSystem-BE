@@ -85,6 +85,7 @@ public class HrEmployeeService : IHrEmployeeService
                         var (deptItems, deptTotal) = await _employeeRepo.GetPagedAsync(
                             departmentId: deptId,
                             positionId: query.PositionId,
+                            roleId: query.RoleId,
                             status: query.Status,
                             includeResigned: query.IncludeResigned,
                             search: query.Search,
@@ -112,6 +113,7 @@ public class HrEmployeeService : IHrEmployeeService
         var (items, total) = await _employeeRepo.GetPagedAsync(
             departmentId: departmentId,
             positionId: query.PositionId,
+            roleId: query.RoleId,
             status: query.Status,
             includeResigned: query.IncludeResigned,
             search: query.Search,
