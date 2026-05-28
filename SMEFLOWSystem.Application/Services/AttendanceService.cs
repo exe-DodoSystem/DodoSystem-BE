@@ -168,7 +168,8 @@ namespace SMEFLOWSystem.Application.Services
             }
             else
             {
-                var fromDateUtc = TimeZoneInfo.ConvertTimeFromUtc(workDate.ToDateTime(TimeOnly.FromTimeSpan(cutOffTime)), VietnamTimeZone);
+                var localStart = workDate.ToDateTime(TimeOnly.FromTimeSpan(cutOffTime));
+                var fromDateUtc = TimeZoneInfo.ConvertTimeToUtc(localStart, VietnamTimeZone);
                 var toDateUtc = fromDateUtc.AddDays(1);
 
                 var rawLogs = await _punchLogRepo.GetByEmployeeAndDateRangeAsync(employee.Id, fromDateUtc, toDateUtc);
@@ -265,7 +266,16 @@ namespace SMEFLOWSystem.Application.Services
         public async Task RecalculateAttendanceAsync(Guid employeeId, DateOnly fromDate, DateOnly toDate)
         {
             // Set IsProcessed = false cho toàn bộ log trong dải thời gian này để Background job chạy lại
-            await _punchLogRepo.MarkUnprocessedForRecalculateAsync(employeeId, fromDate.ToDateTime(TimeOnly.MinValue), toDate.ToDateTime(TimeOnly.MaxValue));
+            var setting = await _attendanceSettingRepository.GetByTenantIdAsync(_currentTenantService.TenantId ?? throw new UnauthorizedAccessException());
+            var cutOff = setting?.DayStartCutOffTime ?? new TimeSpan(4, 0, 0);
+
+            var localFrom = fromDate.ToDateTime(TimeOnly.FromTimeSpan(cutOff));
+            var localTo = toDate.AddDays(1).ToDateTime(TimeOnly.FromTimeSpan(cutOff));
+
+            var utcFrom = TimeZoneInfo.ConvertTimeToUtc(localFrom, VietnamTimeZone);
+            var utcTo = TimeZoneInfo.ConvertTimeToUtc(localTo, VietnamTimeZone);
+
+            await _punchLogRepo.MarkUnprocessedForRecalculateAsync(employeeId, utcFrom, utcTo);
         }
         public async Task<TimesheetAppealDto> SubmitAppealAsync(Guid userId, SubmitAppealRequestDto request)
         {
@@ -390,11 +400,17 @@ namespace SMEFLOWSystem.Application.Services
                 }
 
                 // Force recalculation for that day
+                var attendanceSetting = await _attendanceSettingRepository.GetByTenantIdAsync(tenantId.Value);
+                var cutOff = attendanceSetting?.DayStartCutOffTime ?? new TimeSpan(4, 0, 0);
+                var appealLocalFrom = appeal.WorkDate.ToDateTime(TimeOnly.FromTimeSpan(cutOff));
+                var appealLocalTo = appeal.WorkDate.AddDays(1).ToDateTime(TimeOnly.FromTimeSpan(cutOff));
+
+                var appealUtcFrom = TimeZoneInfo.ConvertTimeToUtc(appealLocalFrom, VietnamTimeZone);
+                var appealUtcTo = TimeZoneInfo.ConvertTimeToUtc(appealLocalTo, VietnamTimeZone);
+
                 await _punchLogRepo.MarkUnprocessedForRecalculateAsync(
-                    appeal.EmployeeId, 
-                    appeal.WorkDate.ToDateTime(TimeOnly.MinValue), 
-                    appeal.WorkDate.ToDateTime(TimeOnly.MaxValue)
-                );
+                    appeal.EmployeeId, appealUtcFrom, appealUtcTo);
+
             }
             else
             {

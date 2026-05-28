@@ -142,30 +142,33 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                 {
                     await _transaction.ExecuteAsync(async () =>
                     {
-                        var orderedLogs = group.OrderBy(x => x.LocalTime).ThenBy(x => x.Log.Id).ToList();
-                        var rawLogsForDay = orderedLogs.Select(x => x.Log).ToList();
+                        var localStart = group.Key.WorkDate.ToDateTime(TimeOnly.FromTimeSpan(cutOffTime));
+                        var utcStart = TimeZoneInfo.ConvertTimeToUtc(localStart, VietnamTimeZone);
+                        var utcEnd = utcStart.AddDays(1);
+
+                        // Lấy all log trong ngày (cả đã xử lý và chưa xử lý)
+                        var allLogsForDay = await _rawPunchLogRepository
+                            .GetByEmployeeAndDateRangeAsync(group.Key.EmployeeId, utcStart, utcEnd);
 
                         await UpsertDailyTimesheetAsync(
                             group.Key.EmployeeId,
                             group.Key.WorkDate,
-                            rawLogsForDay,
+                            allLogsForDay, 
                             attendanceSetting,
                             shiftCache);
 
-                        // Chỉ mark processed cho những log của nhóm đã xử lý thành công
+                        // Mark processed cho log batch hiện tại
                         var processedLogIds = rawLogs
-                        .Where(x => x.EmployeeId == group.Key.EmployeeId)
-                        .Select(x => x.Id)
-                        .ToList(); 
+                            .Where(x => x.EmployeeId == group.Key.EmployeeId)
+                            .Select(x => x.Id)
+                            .ToList();
+
                         await _rawPunchLogRepository.MarkProcessedAsync(processedLogIds);
                     });
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Thất bại khi xử lý chấm công cho EmployeeId: {EmployeeId}, Ngày: {WorkDate}. Sẽ thử lại ở lô tiếp theo.", group.Key.EmployeeId, group.Key.WorkDate);
-
-                    var errorLogIds = rawLogs.Where(x => x.EmployeeId == group.Key.EmployeeId).Select(x => x.Id).ToList();
-                    await _rawPunchLogRepository.MarkProcessedAsync(errorLogIds);    
+                    _logger.LogError(ex, "Thất bại khi xử lý chấm công cho EmployeeId: {EmployeeId}, Ngày: {WorkDate}. Sẽ thử lại ở lô tiếp theo.", group.Key.EmployeeId, group.Key.WorkDate);  
                 }
             }
 
