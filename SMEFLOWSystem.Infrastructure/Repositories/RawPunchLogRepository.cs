@@ -20,6 +20,15 @@ public class RawPunchLogRepository : IRawPunchLogRepository
         await _context.SaveChangesAsync();
     }
 
+    public async Task<List<RawPunchLog>> GetByEmployeeAndDateRangeAsync(Guid employeeId, DateTime fromDate, DateTime toDate)
+    {
+        return await _context.RawPunchLogs
+            .AsNoTracking()
+            .Where(x => x.EmployeeId == employeeId && x.Timestamp >= fromDate && x.Timestamp <= toDate)
+            .OrderBy(x  => x.Timestamp)
+            .ToListAsync();
+    }
+
     public async Task<List<RawPunchLog>> GetUnprocessedBatchAsync(int batchSize)
     {
         if (batchSize <= 0) batchSize = 500;

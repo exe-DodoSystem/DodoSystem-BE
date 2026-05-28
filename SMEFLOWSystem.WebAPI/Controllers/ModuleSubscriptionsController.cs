@@ -66,4 +66,23 @@ public class ModuleSubscriptionsController : ControllerBase
             return NotFound(new { error = ex.Message });
         }
     }
+
+    /// <summary>Hủy gói đăng ký Module của Tenant</summary>
+    [HttpDelete("me/cancel/{moduleId:int}")]
+    public async Task<IActionResult> CancelMyModuleSubscription([FromRoute] int moduleId)
+    {
+        try
+        {
+            await _service.CancelMyModuleSubscriptionAsync(moduleId);
+            return Ok(new { message = "Hủy module thành công" });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Unauthorized();
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
 }

@@ -62,7 +62,7 @@ namespace SMEFLOWSystem.Application.Services
         public Task<string> BuildSimulatedVNPaySuccessQueryStringAsync(Guid orderId, string? gatewayTransactionId = null)
             => _paymentService.BuildSimulatedVNPaySuccessQueryStringAsync(orderId, gatewayTransactionId);
 
-        public async Task EnqueuePaymentLinkEmailAsync(Guid orderId, string adminEmail, string companyName, string? clientIp = null)
+        public async Task EnqueuePaymentLinkEmailAsync(Guid orderId, string adminEmail, string companyName, string? clientIp = null, string emailType = StatusEnum.EmailTypeNew)
         {
             var paymentUrl = await _paymentService.CreatePaymentUrlAsync(orderId, clientIp);
 
@@ -89,7 +89,13 @@ namespace SMEFLOWSystem.Application.Services
                 linesHtml.Append("</ul>");
             }
 
-            string emailBody = $@"
+            string emailBody;
+            string emailSubject;
+
+            if (emailType == StatusEnum.EmailTypeTrialOptional)
+            {
+                emailSubject = "DodoSystem - Link thanh toán (tuỳ chọn)";
+                emailBody = $@"
                     <h3>Chào mừng {companyName} đến với SMEFLOW!</h3>
                     <p>Bạn đã đăng ký thành công và đang được dùng <b>miễn phí 14 ngày</b> (Free Trial).</p>
                     <p><b>Bạn có thể đăng nhập và sử dụng ngay</b> trong thời gian dùng thử — không cần thanh toán để bắt đầu.</p>
@@ -109,35 +115,92 @@ namespace SMEFLOWSystem.Application.Services
                     <p>Nếu bạn muốn thanh toán ngay, vui lòng bấm vào link dưới đây:</p>
                     <a href='{paymentUrl}' style='padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none;'>THANH TOÁN (TUỲ CHỌN)</a>
                     <p>Hoặc copy link: {paymentUrl}</p>";
-
-            var currentTenant = await _tenantRepository.GetByIdIgnoreTenantAsync(order.TenantId);
-            var ownerEmail = string.Empty;
-            if(currentTenant == null)
+            }
+            else if (emailType == StatusEnum.EmailTypeAdditional)
             {
-                return;           
+                emailSubject = "DodoSystem - Link thanh toán mua thêm Module";
+                emailBody = $@"
+                    <h3>Xin chào {companyName},</h3>
+                    <p>Bạn vừa tạo thành công đơn hàng <b>mua thêm Module</b> trên hệ thống SMEFLOW.</p>
+                    <p>Chi phí cho đơn hàng này được tính toán tự động dựa trên số ngày còn lại của gói dịch vụ hiện tại.</p>
+                    <hr/>
+                    <p><b>Thông tin đơn hàng mua thêm</b></p>
+                    <p>Mã đơn: <b>{order.BillingOrderNumber}</b></p>
+                    {linesHtml}
+                    <p>Tổng tiền: <b>{order.TotalAmount.ToString("N0", vi)} VND</b></p>
+                    <p>Giảm giá: <b>{discount.ToString("N0", vi)} VND</b></p>
+                    <p>Cần thanh toán: <b>{payable.ToString("N0", vi)} VND</b></p>
+                    <hr/>
+                    <p>Vui lòng bấm vào link dưới đây để tiến hành thanh toán và kích hoạt ngay module mới:</p>
+                    <a href='{paymentUrl}' style='padding: 10px 20px; background-color: #17a2b8; color: white; text-decoration: none;'>THANH TOÁN ĐƠN HÀNG MUA THÊM</a>
+                    <p>Hoặc copy link: {paymentUrl}</p>";
+            }
+            else if (emailType == StatusEnum.EmailTypeRenewal)
+            {
+                emailSubject = "DodoSystem - Link thanh toán gia hạn dịch vụ";
+                emailBody = $@"
+                    <h3>Xin chào {companyName},</h3>
+                    <p>Hệ thống vừa tạo đơn hàng <b>gia hạn dịch vụ</b> định kỳ cho tài khoản của bạn.</p>
+                    <hr/>
+                    <p><b>Thông tin đơn hàng gia hạn</b></p>
+                    <p>Mã đơn: <b>{order.BillingOrderNumber}</b></p>
+                    {linesHtml}
+                    <p>Tổng tiền: <b>{order.TotalAmount.ToString("N0", vi)} VND</b></p>
+                    <p>Giảm giá: <b>{discount.ToString("N0", vi)} VND</b></p>
+                    <p>Cần thanh toán: <b>{payable.ToString("N0", vi)} VND</b></p>
+                    <hr/>
+                    <p>Vui lòng bấm vào link dưới đây để tiến hành thanh toán và duy trì dịch vụ:</p>
+                    <a href='{paymentUrl}' style='padding: 10px 20px; background-color: #ffc107; color: black; text-decoration: none;'>THANH TOÁN GIA HẠN</a>
+                    <p>Hoặc copy link: {paymentUrl}</p>";
+            }
+            else // emailType == StatusEnum.EmailTypeNew or default
+            {
+                emailSubject = "DodoSystem - Link thanh toán đơn hàng";
+                emailBody = $@"
+                    <h3>Xin chào {companyName},</h3>
+                    <p>Bạn đã tạo thành công đơn hàng khởi tạo dịch vụ trên SMEFLOW.</p>
+                    <hr/>
+                    <p><b>Thông tin đơn hàng</b></p>
+                    <p>Mã đơn: <b>{order.BillingOrderNumber}</b></p>
+                    {linesHtml}
+                    <p>Tổng tiền: <b>{order.TotalAmount.ToString("N0", vi)} VND</b></p>
+                    <p>Giảm giá: <b>{discount.ToString("N0", vi)} VND</b></p>
+                    <p>Cần thanh toán: <b>{payable.ToString("N0", vi)} VND</b></p>
+                    <hr/>
+                    <p>Vui lòng bấm vào link dưới đây để tiến hành thanh toán (Thanh toán để được kích hoạt sử dụng dịch vụ):</p>
+                    <a href='{paymentUrl}' style='padding: 10px 20px; background-color: #28a745; color: white; text-decoration: none;'>THANH TOÁN ĐƠN HÀNG</a>
+                    <p>Hoặc copy link: {paymentUrl}</p>";
             }
 
-            if (currentTenant.OwnerUserId.HasValue)
+            var currentTenant = await _tenantRepository.GetByIdIgnoreTenantAsync(order.TenantId);
+            if (currentTenant == null)
+            {
+                return;
+            }
+
+            var targetEmail = adminEmail; 
+
+            if (string.IsNullOrWhiteSpace(targetEmail) && currentTenant.OwnerUserId.HasValue)
             {
                 var ownerUser = await _userRepository.GetByIdIgnoreTenantAsync(currentTenant.OwnerUserId.Value);
                 if (ownerUser != null)
                 {
-                    ownerEmail = ownerUser.Email ?? string.Empty;
+                    targetEmail = ownerUser.Email ?? string.Empty;
                 }
             }
 
-            if (string.IsNullOrWhiteSpace(ownerEmail))
+            if (string.IsNullOrWhiteSpace(targetEmail))
                 return;
 
-            //await _emailService.SendEmailAsync(ownerEmail, $"DodoSystem - Link thanh toán (tuỳ chọn)", emailBody, CancellationToken.None);
+            //await _emailService.SendEmailAsync(targetEmail, emailSubject, emailBody, CancellationToken.None);
 
             var emailEvent = new EmailNotificationRequestedEvent
             {
                 EventId = Guid.NewGuid(),
                 OccurredAtUtc = DateTime.UtcNow,
                 TenantId = currentTenant.Id,
-                ToEmail = ownerEmail,
-                Subject = $"DodoSystem - Link thanh toán (tuỳ chọn)",
+                ToEmail = targetEmail,
+                Subject = emailSubject,
                 Body = emailBody,
                 CorrelationId = orderId.ToString()
             };

@@ -125,7 +125,7 @@ public class TenantExpirationRecurringJob
 
             if (createdOrderId != Guid.Empty && !string.IsNullOrWhiteSpace(ownerEmail))
             {
-                await _billingService.EnqueuePaymentLinkEmailAsync(createdOrderId, ownerEmail, tenantName);
+                await _billingService.EnqueuePaymentLinkEmailAsync(createdOrderId, ownerEmail, tenantName, null, StatusEnum.EmailTypeRenewal);
             }
         }
     }

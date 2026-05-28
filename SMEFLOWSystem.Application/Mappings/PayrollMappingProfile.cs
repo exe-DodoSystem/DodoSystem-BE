@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using SMEFLOWSystem.Application.DTOs.PayrollDtos;
 using SMEFLOWSystem.Core.Entities;
 using System;
@@ -19,8 +19,8 @@ namespace SMEFLOWSystem.Application.Mappings
                 .ForMember(dest => dest.DepartmentName, opt => opt.MapFrom(src => (src.Employee != null && src.Employee.Department != null) ? src.Employee.Department.Name : string.Empty));
 
             CreateMap<UpdatePayrollDto, Payroll>()
-                .ForMember(dest => dest.Bonus, opt => opt.Condition(src => src.Bonus.HasValue))
-                .ForMember(dest => dest.Deduction, opt => opt.Condition(src => src.Deduction.HasValue))
+                .ForMember(dest => dest.CustomBonus, opt => opt.Condition(src => src.CustomBonus.HasValue))
+                .ForMember(dest => dest.CustomDeduction, opt => opt.Condition(src => src.CustomDeduction.HasValue))
                 // Gán Reason từ Dto vào Notes của Payroll
                 .ForMember(dest => dest.Notes, opt => opt.MapFrom(src => src.Reason));
         }

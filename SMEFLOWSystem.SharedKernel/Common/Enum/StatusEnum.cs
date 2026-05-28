@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -51,12 +51,6 @@ namespace ShareKernel.Common.Enum
         public const string ApprovalApproved = "Approved";
         public const string ApprovalRejected = "Rejected";
 
-        // Payroll Status
-        public const string PayrollDraft = "Draft";
-        public const string PayrollApproved = "Approved";
-        public const string PayrollPaid = "Paid";
-        public const string PayrollRejected = "Rejected";
-
         // Outbox Message Status
         public const string OutboxPending = "Pending";
         public const string OutboxProcessed = "Processed";
@@ -66,5 +60,11 @@ namespace ShareKernel.Common.Enum
         //PunchKind
         public const string PunchIn = "In";
         public const string PunchOut = "Out";
+
+        // Email Template Types
+        public const string EmailTypeNew = "NEW";
+        public const string EmailTypeAdditional = "ADDITIONAL";
+        public const string EmailTypeRenewal = "RENEWAL";
+        public const string EmailTypeTrialOptional = "TRIAL_OPTIONAL";
     }
 }

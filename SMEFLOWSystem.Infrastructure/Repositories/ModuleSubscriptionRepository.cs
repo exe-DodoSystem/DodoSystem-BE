@@ -17,7 +17,7 @@ public class ModuleSubscriptionRepository : IModuleSubscriptionRepository
     public Task<ModuleSubscription?> GetByTenantAndModuleIgnoreTenantAsync(Guid tenantId, int moduleId)
         => _context.ModuleSubscriptions
             .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.ModuleId == moduleId && !x.IsDeleted);
+            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.ModuleId == moduleId);
 
     public async Task AddAsync(ModuleSubscription subscription)
     {

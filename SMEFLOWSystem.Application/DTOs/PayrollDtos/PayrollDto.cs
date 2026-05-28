@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -23,15 +23,19 @@ namespace SMEFLOWSystem.Application.DTOs.PayrollDtos
         public int AbsentDays { get; set; }
 
 
+        public decimal TotalOTHours { get; set; }
+
         public decimal BaseSalarySnapshot { get; set; } // Lương cứng lúc tính
         public decimal BasePay { get; set; }            // Lương theo ngày công (BaseSalary * (Actual/Standard))
+        public decimal OTPay { get; set; }              // Lương OT
+        public decimal PenaltyFee { get; set; }         // Phạt
 
-        public decimal? Bonus { get; set; }             // Tiền thưởng
-        public decimal Deduction { get; set; }          // Tiền phạt (Đi trễ, về sớm, vắng...)
+        public decimal? CustomBonus { get; set; }       // Tiền thưởng
+        public decimal CustomDeduction { get; set; }    // Khấu trừ khác
 
-        public decimal TotalSalary { get; set; }        // Thực nhận: BasePay + Bonus - Deduction
+        public decimal NetSalary { get; set; }          // Thực nhận
 
-        public string Status { get; set; } = string.Empty;
+        public ShareKernel.Common.Enum.PayrollStatus Status { get; set; } = ShareKernel.Common.Enum.PayrollStatus.Draft;
 
         // Ghi chú & Ngày tháng
         public string? Notes { get; set; }

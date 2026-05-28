@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using SMEFLOWSystem.Application.DTOs.PayrollDtos;
 using SMEFLOWSystem.Application.Interfaces.IServices;
 using SMEFLOWSystem.SharedKernel.Interfaces;
@@ -13,11 +14,16 @@ namespace SMEFLOWSystem.WebAPI.Controllers
     {
         private readonly IPayrollService _payrollService;
         private readonly ICurrentTenantService _currentTenant;
+        private readonly ICurrentUserService _currentUser;
 
-        public PayrollController(IPayrollService payrollService, ICurrentTenantService currentTenant)
+        public PayrollController(
+            IPayrollService payrollService, 
+            ICurrentTenantService currentTenant,
+            ICurrentUserService currentUser)
         {
             _payrollService = payrollService;
             _currentTenant = currentTenant;
+            _currentUser = currentUser;
         }
 
         /// <summary>[TenantAdmin] Tạo bảng lương nháp (Draft) hàng tháng cho tất cả nhân viên</summary>
@@ -52,7 +58,10 @@ namespace SMEFLOWSystem.WebAPI.Controllers
         [Authorize(Roles = "TenantAdmin,HRManager,Manager")]
         public async Task<IActionResult> GetPaged([FromQuery] PayrollQueryDto query)
         {
-            var result = await _payrollService.GetPagedAsync(query);
+            var tenantId = _currentTenant.TenantId
+                ?? throw new UnauthorizedAccessException("Không xác định được công ty.");
+
+            var result = await _payrollService.GetPagedAsync(tenantId, query);
             return Ok(result);
         }
 
@@ -60,43 +69,31 @@ namespace SMEFLOWSystem.WebAPI.Controllers
         [HttpGet("my")]
         public async Task<IActionResult> GetMyPayroll([FromQuery] int? month, [FromQuery] int? year)
         {
-            var result = await _payrollService.GetMyPayrollAsync(month, year);
+            var tenantId = _currentTenant.TenantId
+                ?? throw new UnauthorizedAccessException("Không xác định được công ty.");
+
+            var userId = _currentUser.UserId
+                ?? throw new UnauthorizedAccessException("Không thể xác định danh tính người dùng.");
+
+            var result = await _payrollService.GetMyPayrollAsync(tenantId, userId, month, year);
             return Ok(result);
         }
 
-        /// <summary>[TenantAdmin] Phê duyệt phiếu lương</summary>
-        [HttpPut("{payrollId}/approve")]
-        [Authorize(Roles = "TenantAdmin")]
-        public async Task<IActionResult> Approve(Guid payrollId)
+        /// <summary>[TenantAdmin, HRManager] Chốt phiếu lương (Publish)</summary>
+        [HttpPut("{payrollId}/publish")]
+        [Authorize(Roles = "TenantAdmin,HRManager")]
+        public async Task<IActionResult> Publish(Guid payrollId)
         {
-            var result = await _payrollService.ApproveAsync(payrollId);
-            return Ok(new { approved = result });
+            var result = await _payrollService.PublishPayrollAsync(payrollId);
+            return Ok(new { published = result });
         }
 
-        /// <summary>[TenantAdmin] Từ chối phiếu lương</summary>
-        [HttpPut("{payrollId}/reject")]
-        [Authorize(Roles = "TenantAdmin")]
-        public async Task<IActionResult> Reject(Guid payrollId, [FromBody] RejectPayrollRequest request)
-        {
-            var result = await _payrollService.RejectAsync(payrollId, request.Reason);
-            return Ok(new { rejected = result });
-        }
-
-        /// <summary>[TenantAdmin] Đánh dấu phiếu lương đã được thanh toán</summary>
-        [HttpPut("{payrollId}/mark-paid")]
-        [Authorize(Roles = "TenantAdmin")]
-        public async Task<IActionResult> MarkPaid(Guid payrollId)
-        {
-            var result = await _payrollService.MarkPaidAsync(payrollId);
-            return Ok(new { paid = result });
-        }
-
-        /// <summary>[TenantAdmin, HRManager, Manager] Cập nhật tiền thưởng/phạt cho phiếu lương</summary>
-        [HttpPut("{payrollId}/bonus-deduction")]
+        /// <summary>[TenantAdmin, HRManager, Manager] Cập nhật tiền thưởng/phạt nhập tay cho phiếu lương</summary>
+        [HttpPut("{payrollId}/manual-fields")]
         [Authorize(Roles = "TenantAdmin,HRManager,Manager")]
-        public async Task<IActionResult> UpdateBonusDeduction(Guid payrollId, [FromBody] UpdatePayrollDto dto)
+        public async Task<IActionResult> UpdateManualFields(Guid payrollId, [FromBody] UpdatePayrollDto dto)
         {
-            var result = await _payrollService.UpdateBonusDeductionAsync(payrollId, dto);
+            var result = await _payrollService.UpdateManualFieldsAsync(payrollId, dto);
             return Ok(result);
         }
     }

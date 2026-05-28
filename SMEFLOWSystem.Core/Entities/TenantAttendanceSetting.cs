@@ -19,7 +19,7 @@ public class TenantAttendanceSetting : ITenantEntity
     /// <summary>Giờ vào chuẩn.</summary>
     public TimeOnly? WorkStartTime { get; set; }
     public TimeOnly? WorkEndTime { get; set; }
-    public TimeSpan DayStartCutOffTime { get; set; } = new TimeSpan(12, 1, 0);
+    public TimeSpan DayStartCutOffTime { get; set; } = new TimeSpan(4, 0, 0);
     /// <summary>Số phút cho phép trễ mà không bị phạt.</summary>
     public int LateThresholdMinutes { get; set; } = 10;
     public int EarlyLeaveThresholdMinutes { get; set; } = 10;

@@ -60,6 +60,16 @@ public class PostPaymentSubscriptionService : IPostPaymentSubscriptionService
             var now = DateTime.UtcNow;
             DateTime maxEndDate = now;
 
+            DateTime? prorateUntilDate = null;
+            if (!string.IsNullOrWhiteSpace(order.Notes) && order.Notes.StartsWith("PRORATE_UNTIL:"))
+            {
+                var dateStr = order.Notes.Substring("PRORATE_UNTIL:".Length);
+                if (DateTime.TryParse(dateStr, out var parsedDate))
+                {
+                    prorateUntilDate = parsedDate;
+                }
+            }
+
             foreach (var line in orderModules)
             {
                 var existingSub = await _moduleSubscriptionRepo.GetByTenantAndModuleIgnoreTenantAsync(tenant.Id, line.ModuleId);
@@ -71,7 +81,7 @@ public class PostPaymentSubscriptionService : IPostPaymentSubscriptionService
                         TenantId = tenant.Id,
                         ModuleId = line.ModuleId,
                         StartDate = now,
-                        EndDate = now.AddMonths(1),
+                        EndDate = prorateUntilDate.HasValue ? prorateUntilDate.Value : now.AddMonths(1),
                         Status = StatusEnum.ModuleActive,
                         CreatedAt = now,
                         IsDeleted = false
@@ -80,9 +90,17 @@ public class PostPaymentSubscriptionService : IPostPaymentSubscriptionService
                 }
                 else
                 {
-                    var baseDate = existingSub.EndDate > now ? existingSub.EndDate : now;
-                    existingSub.EndDate = baseDate.AddMonths(1);
+                    if (prorateUntilDate.HasValue)
+                    {
+                        existingSub.EndDate = prorateUntilDate.Value;
+                    }
+                    else
+                    {
+                        var baseDate = existingSub.EndDate > now ? existingSub.EndDate : now;
+                        existingSub.EndDate = baseDate.AddMonths(1);
+                    }
                     existingSub.Status = StatusEnum.ModuleActive;
+                    existingSub.IsDeleted = false;
                     await _moduleSubscriptionRepo.UpdateIgnoreTenantAsync(existingSub);
                 }
 

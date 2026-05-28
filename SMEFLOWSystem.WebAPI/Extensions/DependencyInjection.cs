@@ -8,6 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using SMEFLOWSystem.Core.Config;
 using SMEFLOWSystem.Application.Options;
+using SMEFLOWSystem.WebAPI.Converters;
 using SMEFLOWSystem.WebAPI.BackgroundServices;
 using System.Security.Claims;
 using System.Text;
@@ -23,7 +24,11 @@ public static class DependencyInjection
         services.AddMemoryCache();
         services.AddHostedService<OutboxPublisherHostedService>();
         services.AddHostedService<RabbitMqSubscriberHostedService>();
-        services.AddControllers();
+        services.AddControllers()
+            .AddJsonOptions(options =>
+            {
+                options.JsonSerializerOptions.Converters.Add(new TimeSpanJsonConverter());
+            });
         services.AddFluentValidationAutoValidation();
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen(c =>
@@ -164,7 +169,6 @@ public static class DependencyInjection
                       .AllowAnyMethod();
             });
         });
-
         return services;
     }
 

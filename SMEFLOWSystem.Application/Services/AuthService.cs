@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using Hangfire;
 using Microsoft.Extensions.Configuration;
 using ShareKernel.Common.Enum;
@@ -171,7 +171,7 @@ namespace SMEFLOWSystem.Application.Services
 
             if (createdOrderId != Guid.Empty)
             {
-                await _billingService.EnqueuePaymentLinkEmailAsync(createdOrderId, adminEmail, companyName);
+                await _billingService.EnqueuePaymentLinkEmailAsync(createdOrderId, adminEmail, companyName, null, StatusEnum.EmailTypeNew);
             }
 
             return true;

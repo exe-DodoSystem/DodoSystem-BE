@@ -68,4 +68,76 @@ public class ShiftPatternRepository : IShiftPatternRepository
             .FirstOrDefaultAsync(spd => spd.ShiftPatternId == shiftPatternId
                                         && spd.DayIndex == dayIndex);
     }
+
+    public async Task<(List<ShiftPattern> Items, int TotalCount)> GetPagedAsync(
+        string? search,
+        bool includeDeleted,
+        int pageNumber,
+        int pageSize)
+    {
+        if (pageNumber < 1) pageNumber = 1;
+        if (pageSize < 1) pageSize = 10;
+
+        var query = _context.ShiftPatterns
+            .AsNoTracking()
+            .Include(sp => sp.Days)
+                .ThenInclude(d => d.ScheduledShift)
+                    .ThenInclude(s => s.Segments)
+            .AsQueryable();
+
+        if (includeDeleted)
+            query = query.IgnoreQueryFilters();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var s = search.Trim();
+            query = query.Where(x => x.Name.Contains(s));
+        }
+
+        var total = await query.CountAsync();
+        query = query.OrderBy(x => x.Name);
+
+        var skip = (pageNumber - 1) * pageSize;
+        var items = await query.Skip(skip).Take(pageSize).ToListAsync();
+        return (items, total);
+    }
+
+    public Task<ShiftPattern?> GetByIdWithDaysAsync(Guid id)
+    {
+        return _context.ShiftPatterns
+            .Include(sp => sp.Days)
+                .ThenInclude(d => d.ScheduledShift)
+                    .ThenInclude(s => s.Segments)
+            .FirstOrDefaultAsync(sp => sp.Id == id);
+    }
+
+    public async Task AddAsync(ShiftPattern pattern)
+    {
+        await _context.ShiftPatterns.AddAsync(pattern);
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task<ShiftPattern> UpdateAsync(ShiftPattern pattern)
+    {
+        _context.ShiftPatterns.Update(pattern);
+        await _context.SaveChangesAsync();
+        return pattern;
+    }
+
+    public async Task SoftDeleteAsync(ShiftPattern pattern)
+    {
+        pattern.IsDeleted = true;
+        _context.ShiftPatterns.Update(pattern);
+        await _context.SaveChangesAsync();
+    }
+
+    public Task<bool> HasUsageAsync(Guid shiftPatternId)
+    {
+        return _context.EmployeeShiftPatterns.AnyAsync(x => x.ShiftPatternId == shiftPatternId);
+    }
+
+    public Task<bool> ShiftExistsAsync(Guid shiftId)
+    {
+        return _context.Shifts.AnyAsync(x => x.Id == shiftId);
+    }
 }

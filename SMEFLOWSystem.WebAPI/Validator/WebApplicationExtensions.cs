@@ -26,7 +26,6 @@ public static class WebApplicationExtensions
         }
 
         app.UseCors("AllowFE");
-
         app.UseAuthentication();
         app.UseAuthorization();
 

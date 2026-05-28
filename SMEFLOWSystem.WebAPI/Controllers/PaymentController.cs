@@ -4,6 +4,7 @@ using SMEFLOWSystem.Application.Interfaces.IServices;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.WebUtilities;
 using SMEFLOWSystem.SharedKernel.Interfaces;
 
 namespace SMEFLOWSystem.WebAPI.Controllers
@@ -75,7 +76,15 @@ namespace SMEFLOWSystem.WebAPI.Controllers
 
             var queryString = await _billingService.BuildSimulatedVNPaySuccessQueryStringAsync(orderId, vnp_TransactionNo);
             var callbackUrl = $"{Request.Scheme}://{Request.Host}/api/payment/callback/vnpay?{queryString}";
-            return Ok($"Thanh toán thành công cho {orderId}");
+            var parsed = QueryHelpers.ParseQuery(queryString);
+            var status = await _billingService.ProcessVNPayCallbackAsync(new QueryCollection(parsed));
+
+            return Ok(new
+            {
+                OrderId = orderId,
+                Status = status,
+                CallbackUrl = callbackUrl
+            });
         }
     }
 }
