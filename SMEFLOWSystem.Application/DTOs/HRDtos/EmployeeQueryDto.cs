@@ -10,6 +10,7 @@ public class EmployeeQueryDto : PagingRequestDto
 
     public Guid? DepartmentId { get; init; }
     public Guid? PositionId { get; init; }
+    public int? RoleId { get; init; }
     public string? Status { get; init; }
     public string? Search { get; init; }
 

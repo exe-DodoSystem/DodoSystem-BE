@@ -54,6 +54,7 @@ public class EmployeeRepository : IEmployeeRepository
     public async Task<(List<Employee> Items, int TotalCount)> GetPagedAsync(
         Guid? departmentId,
         Guid? positionId,
+        int? roleId,
         string? status,
         bool includeResigned,
         string? search,
@@ -69,12 +70,17 @@ public class EmployeeRepository : IEmployeeRepository
             .AsNoTracking()
             .Include(e => e.Department)
             .Include(e => e.Position)
+            .Include(e => e.User)
+                .ThenInclude(u => u.UserRoles)
+                    .ThenInclude(ur => ur.Role)
             .AsQueryable();
 
         if (departmentId.HasValue)
             query = query.Where(e => e.DepartmentId == departmentId.Value);
         if (positionId.HasValue)
             query = query.Where(e => e.PositionId == positionId.Value);
+        if (roleId.HasValue)
+            query = query.Where(e => e.User != null && e.User.UserRoles.Any(ur => ur.RoleId == roleId.Value));
         if (!string.IsNullOrWhiteSpace(status))
             query = query.Where(e => e.Status == status);
         if (!includeResigned)
