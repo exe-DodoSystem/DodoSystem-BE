@@ -21,6 +21,7 @@ namespace SMEFLOWSystem.Application.Services
         private readonly IAttendanceSettingRepository _attendanceSettingRepository;
         private readonly ICurrentTenantService _currentTenantService;
         private readonly ITimesheetAppealRepository _appealRepository;
+        private readonly ICloudinaryService _cloudinary;
 
         private static readonly TimeZoneInfo VietnamTimeZone = GetVietnamTimeZone();
 
@@ -39,7 +40,8 @@ namespace SMEFLOWSystem.Application.Services
             IDailyTimesheetRepository dailyTimesheetRepository,
             IAttendanceSettingRepository attendanceSettingRepository,
             ICurrentTenantService currentTenantService,
-            ITimesheetAppealRepository appealRepository)
+            ITimesheetAppealRepository appealRepository,
+            ICloudinaryService cloudinary)
         {
             _punchLogRepo = punchLogRepo;
             _employeeRepository = employeeRepository;
@@ -47,6 +49,7 @@ namespace SMEFLOWSystem.Application.Services
             _attendanceSettingRepository = attendanceSettingRepository;
             _currentTenantService = currentTenantService;
             _appealRepository = appealRepository;
+            _cloudinary = cloudinary;
         }
 
         public async Task<RawPunchLogDto> SubmitPunchAsync(Guid userId, SubmitPunchRequestDto request)
@@ -81,6 +84,11 @@ namespace SMEFLOWSystem.Application.Services
                 {
                     throw new InvalidOperationException($"NgoaiVung: Bạn đang ở ngoài vùng chấm công cho phép (Cách {Math.Round(distance)}m). Bán kính cho phép là {attendanceSetting.CheckInRadiusMeters}m.");
                 }
+            }
+
+            if (string.IsNullOrWhiteSpace(request.SelfieUrl) && !string.IsNullOrWhiteSpace(request.SelfieBase64))
+            {
+                request.SelfieUrl = await _cloudinary.UploadBase64Async(request.SelfieBase64, "attendance/selfies");
             }
 
             var punch = new RawPunchLog()

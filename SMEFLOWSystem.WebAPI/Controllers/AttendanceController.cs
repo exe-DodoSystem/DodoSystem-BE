@@ -2,9 +2,11 @@ using System;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using SMEFLOWSystem.Application.DTOs.AttendanceDtos;
 using SMEFLOWSystem.Application.Interfaces.IServices;
+using SMEFLOWSystem.WebAPI.Helpers;
 
 namespace SMEFLOWSystem.WebAPI.Controllers;
 
@@ -29,6 +31,30 @@ public class AttendanceController : ControllerBase
         {
             return Unauthorized(new { Error = "User is not authenticated correctly." });
         }
+
+        try
+        {
+            var result = await _service.SubmitPunchAsync(userId, request);
+            return Ok(new { Data = result, Message = "Punch submitted successfully" });
+        }
+        catch (InvalidOperationException)
+        {
+            return NotFound(new { Error = "Employee not found for current user." });
+        }
+    }
+
+    /// <summary>Gửi yêu cầu chấm công (multipart/form-data) kèm ảnh selfie</summary>
+    [HttpPost("submit-punch-form")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> SubmitPunchForm([FromForm] SubmitPunchRequestDto request, IFormFile? selfie)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new { Error = "User is not authenticated correctly." });
+        }
+
+        request.SelfieBase64 ??= await FormFileHelper.ToBase64DataUriAsync(selfie);
 
         try
         {
