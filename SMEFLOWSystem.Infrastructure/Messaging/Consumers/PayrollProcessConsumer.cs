@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using SMEFLOWSystem.Application.Events.Payments;
 using SMEFLOWSystem.Application.Events.Payroll;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
@@ -16,12 +16,12 @@ namespace SMEFLOWSystem.Infrastructure.Messaging.Consumers
     {
         private const string ConsumerName = "PayrollProcessConsumer";
 
-        private readonly ILogger<PaymentSucceededConsumer> _logger;
+        private readonly ILogger<PayrollProcessConsumer> _logger;
         private readonly IProcessedEventRepository _processedEventRepository;
         private readonly IPayrollService _payrollService;
 
         public PayrollProcessConsumer(
-            ILogger<PaymentSucceededConsumer> logger,
+            ILogger<PayrollProcessConsumer> logger,
             IProcessedEventRepository processedEventRepository,
             IPayrollService payrollService)
         {
@@ -36,7 +36,7 @@ namespace SMEFLOWSystem.Infrastructure.Messaging.Consumers
         {
             var message = JsonSerializer.Deserialize<PayrollProcessEvent>(payload, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             if (message == null)
-                throw new InvalidOperationException("Invalid PaymentSucceededEvent payload.");
+                throw new InvalidOperationException("Invalid PayrollProcessEvent payload.");
 
             var shouldProcess = await _processedEventRepository.TryMarkProcessedAsync(
             eventId: message.EventId,

@@ -398,10 +398,10 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                 employeeId, workDate);
 
             var holidayStatus = StatusEnum.AttendanceHoliday;
-            var existing = bulkData.ExistingTimesheets
+            var existingHolidayTimesheet = bulkData.ExistingTimesheets
                 .FirstOrDefault(d => d.EmployeeId == employeeId && d.WorkDate == workDate);
 
-            var resolutionLog = new
+            var holidayResolutionLog = new
             {
                 TotalRawLogs = 0,
                 MissingOutCount = 0,
@@ -422,7 +422,7 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                 TotalActualWorkedMinutes = 0
             };
 
-            if (existing == null)
+            if (existingHolidayTimesheet == null)
             {
                 var holidayTimesheet = new DailyTimesheet
                 {
@@ -442,30 +442,30 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                     EarlyLeaveMinutes = 0,
                     Status = holidayStatus,
                     SystemAnomalyFlag = string.Empty,
-                    ResolutionLogJson = JsonSerializer.Serialize(resolutionLog),
+                    ResolutionLogJson = JsonSerializer.Serialize(holidayResolutionLog),
                     IsManuallyAdjusted = false,
                     Segments = new List<DailyTimesheetSegment>()
                 };
                 await _dailyTimesheetRepository.AddAsync(holidayTimesheet);
                 bulkData.ExistingTimesheets.Add(holidayTimesheet);
             }
-            else if (!existing.IsManuallyAdjusted)
+            else if (!existingHolidayTimesheet.IsManuallyAdjusted)
             {
-                existing.ExpectedShiftId = shift?.Id;
-                existing.ExpectedShiftSource = shift == null ? "None" : "ShiftPattern";
-                existing.Status = holidayStatus;
-                existing.StandardWorkingHours = 0;
-                existing.TotalActualWorkedMinutes = 0;
-                existing.ActualWorkHours = 0;
-                existing.OTHours = 0;
-                existing.TotalLateMinutes = 0;
-                existing.LateMinutes = 0;
-                existing.TotalEarlyLeaveMinutes = 0;
-                existing.EarlyLeaveMinutes = 0;
-                existing.SystemAnomalyFlag = string.Empty;
-                existing.ResolutionLogJson = JsonSerializer.Serialize(resolutionLog);
-                existing.Segments.Clear();
-                await _dailyTimesheetRepository.UpdateAsync(existing);
+                existingHolidayTimesheet.ExpectedShiftId = shift?.Id;
+                existingHolidayTimesheet.ExpectedShiftSource = shift == null ? "None" : "ShiftPattern";
+                existingHolidayTimesheet.Status = holidayStatus;
+                existingHolidayTimesheet.StandardWorkingHours = 0;
+                existingHolidayTimesheet.TotalActualWorkedMinutes = 0;
+                existingHolidayTimesheet.ActualWorkHours = 0;
+                existingHolidayTimesheet.OTHours = 0;
+                existingHolidayTimesheet.TotalLateMinutes = 0;
+                existingHolidayTimesheet.LateMinutes = 0;
+                existingHolidayTimesheet.TotalEarlyLeaveMinutes = 0;
+                existingHolidayTimesheet.EarlyLeaveMinutes = 0;
+                existingHolidayTimesheet.SystemAnomalyFlag = string.Empty;
+                existingHolidayTimesheet.ResolutionLogJson = JsonSerializer.Serialize(holidayResolutionLog);
+                existingHolidayTimesheet.Segments.Clear();
+                await _dailyTimesheetRepository.UpdateAsync(existingHolidayTimesheet);
             }
             return;
         }
