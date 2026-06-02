@@ -5,6 +5,7 @@ namespace SMEFLOWSystem.Application.Interfaces.IRepositories;
 public interface IDailyTimesheetRepository
 {
     Task<DailyTimesheet?> GetByEmployeeDateAsync(Guid employeeId, DateOnly workDate);
+    Task<List<DailyTimesheet>> GetWithSegmentsForEmployeesAsync(List<Guid> employeeIds, DateOnly minDate, DateOnly maxDate);
     Task<List<DailyTimesheet>> GetByEmployeeMonthAsync(Guid employeeId, int month, int year);
     Task<List<DailyTimesheet>> GetByTenantMonthAsync(Guid tenantId, int month, int year);
     Task AddAsync(DailyTimesheet timesheet);

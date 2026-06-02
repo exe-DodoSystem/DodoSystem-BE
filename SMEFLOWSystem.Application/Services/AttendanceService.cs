@@ -22,6 +22,7 @@ namespace SMEFLOWSystem.Application.Services
         private readonly ICurrentTenantService _currentTenantService;
         private readonly ITimesheetAppealRepository _appealRepository;
         private readonly ITransaction _transaction;
+        private readonly IPublicHolidayRepository _publicHolidayRepository;
 
         private static readonly TimeZoneInfo VietnamTimeZone = GetVietnamTimeZone();
 
@@ -41,7 +42,8 @@ namespace SMEFLOWSystem.Application.Services
             IAttendanceSettingRepository attendanceSettingRepository,
             ICurrentTenantService currentTenantService,
             ITimesheetAppealRepository appealRepository,
-            ITransaction transaction)
+            ITransaction transaction,
+            IPublicHolidayRepository publicHolidayRepository)
         {
             _punchLogRepo = punchLogRepo;
             _employeeRepository = employeeRepository;
@@ -50,6 +52,7 @@ namespace SMEFLOWSystem.Application.Services
             _currentTenantService = currentTenantService;
             _appealRepository = appealRepository;
             _transaction = transaction;
+            _publicHolidayRepository = publicHolidayRepository;
         }
 
         public async Task<RawPunchLogDto> SubmitPunchAsync(Guid userId, SubmitPunchRequestDto request)
@@ -388,7 +391,8 @@ namespace SMEFLOWSystem.Application.Services
                                 EmployeeId = appeal.EmployeeId,
                                 Timestamp = appeal.RequestedCheckIn.Value,
                                 PunchType = "In",
-                                DeviceId = "HR_Manual"
+                                DeviceId = "HR_Manual",
+                                IsProcessed = false
                             });
                         }
                     }
@@ -404,7 +408,8 @@ namespace SMEFLOWSystem.Application.Services
                                 EmployeeId = appeal.EmployeeId,
                                 Timestamp = appeal.RequestedCheckOut.Value,
                                 PunchType = "Out",
-                                DeviceId = "HR_Manual"
+                                DeviceId = "HR_Manual",
+                                IsProcessed = false
                             });
                         }
                     }
@@ -570,6 +575,63 @@ namespace SMEFLOWSystem.Application.Services
                 .ToList();
 
             return report;
+        }
+
+        public async Task<PublicHolidayDto> CreatePublicHolidayAsync(CreatePublicHolidayDto dto)
+        {
+            var tenantId = _currentTenantService.TenantId;
+            if (tenantId == null) throw new UnauthorizedAccessException("Tenant ID is missing.");
+
+            var holiday = new PublicHoliday
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId.Value,
+                Date = dto.Date,
+                Name = dto.Name,
+                IsRecurringYearly = dto.IsRecurringYearly
+            };
+
+            await _publicHolidayRepository.AddAsync(holiday);
+
+            return new PublicHolidayDto
+            {
+                Id = holiday.Id,
+                TenantId = holiday.TenantId,
+                Date = holiday.Date,
+                Name = holiday.Name,
+                IsRecurringYearly = holiday.IsRecurringYearly
+            };
+        }
+
+        public async Task<List<PublicHolidayDto>> GetPublicHolidaysAsync()
+        {
+            var tenantId = _currentTenantService.TenantId;
+            if (tenantId == null) throw new UnauthorizedAccessException("Tenant ID is missing.");
+
+            var holidays = await _publicHolidayRepository.GetAllAsync(tenantId.Value);
+
+            return holidays.Select(h => new PublicHolidayDto
+            {
+                Id = h.Id,
+                TenantId = h.TenantId,
+                Date = h.Date,
+                Name = h.Name,
+                IsRecurringYearly = h.IsRecurringYearly
+            }).ToList();
+        }
+
+        public async Task DeletePublicHolidayAsync(Guid id)
+        {
+            var tenantId = _currentTenantService.TenantId;
+            if (tenantId == null) throw new UnauthorizedAccessException("Tenant ID is missing.");
+
+            var holiday = await _publicHolidayRepository.GetByIdAsync(id);
+            if (holiday == null || holiday.TenantId != tenantId.Value)
+            {
+                throw new InvalidOperationException("Holiday not found or unauthorized.");
+            }
+
+            await _publicHolidayRepository.DeleteAsync(holiday);
         }
     }
 }

@@ -23,6 +23,17 @@ public class DailyTimesheetRepository : IDailyTimesheetRepository
             .FirstOrDefaultAsync(d => d.EmployeeId == employeeId && d.WorkDate == workDate);
     }
 
+    public async Task<List<DailyTimesheet>> GetWithSegmentsForEmployeesAsync(List<Guid> employeeIds, DateOnly minDate, DateOnly maxDate)
+    {
+        return await _context.DailyTimesheets
+            .Include(d => d.Segments)
+            .Include(d => d.AuditLogs)
+            .AsSplitQuery()
+            .Where(d => employeeIds.Contains(d.EmployeeId)
+                        && d.WorkDate >= minDate && d.WorkDate <= maxDate)
+            .ToListAsync();
+    }
+
     public async Task<List<DailyTimesheet>> GetByEmployeeMonthAsync(Guid employeeId, int month, int year)
     {
         return await _context.DailyTimesheets

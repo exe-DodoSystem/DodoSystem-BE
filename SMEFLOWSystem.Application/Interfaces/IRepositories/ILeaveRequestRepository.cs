@@ -9,4 +9,6 @@ public interface ILeaveRequestRepository
     /// Join qua LeaveRequest để filter theo Status = "Approved".
     /// </summary>
     Task<List<LeaveRequestSegment>> GetApprovedSegmentsByEmployeeDateAsync(Guid employeeId, DateOnly leaveDate);
+
+    Task<List<LeaveRequestSegment>> GetApprovedSegmentsForEmployeesAsync(List<Guid> employeeIds, DateOnly minDate, DateOnly maxDate);
 }

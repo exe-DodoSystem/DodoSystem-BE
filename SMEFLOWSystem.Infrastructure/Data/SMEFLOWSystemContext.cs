@@ -13,12 +13,10 @@ namespace SMEFLOWSystem.Infrastructure.Data;
 public partial class SMEFLOWSystemContext : DbContext
 {
     private readonly ICurrentTenantService _currentTenantService;
-    private readonly Guid? _currentTenantId;
     public SMEFLOWSystemContext(DbContextOptions<SMEFLOWSystemContext> options, ICurrentTenantService currentTenantService)
         : base(options)
     {
         _currentTenantService = currentTenantService;
-        _currentTenantId = currentTenantService.TenantId;
     }
 
     // ĐÃ BỊ TỬ HÌNH: public virtual DbSet<Attendance> Attendances { get; set; }
@@ -65,46 +63,50 @@ public partial class SMEFLOWSystemContext : DbContext
     // HR Authorization: Manager-Department assignment (N:N)
     public virtual DbSet<ManagerDepartment> ManagerDepartments { get; set; }
 
+    public virtual DbSet<PublicHoliday> PublicHolidays { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // ĐÃ XÓA: modelBuilder.Entity<Attendance>().HasQueryFilter(e => e.TenantId == _currentTenantId);
-        modelBuilder.Entity<Customer>().HasQueryFilter(e => e.TenantId == _currentTenantId);
-        modelBuilder.Entity<Department>().HasQueryFilter(e => e.TenantId == _currentTenantId);
-        modelBuilder.Entity<Employee>().HasQueryFilter(e => e.TenantId == _currentTenantId);
-        modelBuilder.Entity<RefreshToken>().HasQueryFilter(e => e.TenantId == _currentTenantId);
-        modelBuilder.Entity<Invite>().HasQueryFilter(e => e.TenantId == _currentTenantId);
-        modelBuilder.Entity<BillingOrder>().HasQueryFilter(e => e.TenantId == _currentTenantId);
-        modelBuilder.Entity<BillingOrderModule>().HasQueryFilter(e => e.TenantId == _currentTenantId);
-        modelBuilder.Entity<ModuleSubscription>().HasQueryFilter(e => e.TenantId == _currentTenantId);
-        modelBuilder.Entity<Order>().HasQueryFilter(e => e.TenantId == _currentTenantId);
-        modelBuilder.Entity<OrderItem>().HasQueryFilter(e => e.TenantId == _currentTenantId);
-        modelBuilder.Entity<PaymentTransaction>().HasQueryFilter(e => e.TenantId == _currentTenantId);
-        modelBuilder.Entity<Payroll>().HasQueryFilter(e => e.TenantId == _currentTenantId);
-        modelBuilder.Entity<Position>().HasQueryFilter(e => e.TenantId == _currentTenantId);
-        modelBuilder.Entity<User>().HasQueryFilter(e => e.TenantId == _currentTenantId);
-        modelBuilder.Entity<UserRole>().HasQueryFilter(e => e.TenantId == _currentTenantId);
-        modelBuilder.Entity<TenantAttendanceSetting>().HasQueryFilter(e => e.TenantId == _currentTenantId);
-        modelBuilder.Entity<Notification>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        // ĐÃ XÓA: modelBuilder.Entity<Attendance>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<Customer>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<Department>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<Employee>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<RefreshToken>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<Invite>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<BillingOrder>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<BillingOrderModule>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<ModuleSubscription>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<Order>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<OrderItem>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<PaymentTransaction>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<Payroll>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<Position>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<User>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<UserRole>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<TenantAttendanceSetting>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<Notification>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
 
         // Cập nhật Query Filter cho nhóm Shift & Timesheet mới
-        modelBuilder.Entity<Shift>().HasQueryFilter(e => e.TenantId == _currentTenantId);
-        modelBuilder.Entity<ShiftSegment>().HasQueryFilter(e => e.TenantId == _currentTenantId);
-        modelBuilder.Entity<ShiftPattern>().HasQueryFilter(e => e.TenantId == _currentTenantId);
-        modelBuilder.Entity<ShiftPatternDay>().HasQueryFilter(e => e.TenantId == _currentTenantId);
-        modelBuilder.Entity<EmployeeShiftPattern>().HasQueryFilter(e => e.TenantId == _currentTenantId);
-        modelBuilder.Entity<OvertimeRequest>().HasQueryFilter(e => e.TenantId == _currentTenantId);
-        modelBuilder.Entity<DailyTimesheet>().HasQueryFilter(e => e.TenantId == _currentTenantId);
-        modelBuilder.Entity<DailyTimesheetSegment>().HasQueryFilter(e => e.TenantId == _currentTenantId);
-        modelBuilder.Entity<DailyTimesheetAuditLog>().HasQueryFilter(e => e.TenantId == _currentTenantId);
-        modelBuilder.Entity<TimesheetPeriod>().HasQueryFilter(e => e.TenantId == _currentTenantId);
-        modelBuilder.Entity<LeaveRequest>().HasQueryFilter(e => e.TenantId == _currentTenantId);
-        modelBuilder.Entity<LeaveRequestSegment>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<Shift>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<ShiftSegment>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<ShiftPattern>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<ShiftPatternDay>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<EmployeeShiftPattern>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<OvertimeRequest>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<DailyTimesheet>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<DailyTimesheetSegment>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<DailyTimesheetAuditLog>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<TimesheetPeriod>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<LeaveRequest>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<LeaveRequestSegment>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
         
         // Quá trình chia Tenant an toàn cho Raw logs
-        modelBuilder.Entity<RawPunchLog>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<RawPunchLog>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
 
         // HR Authorization: Manager-Department N:N
-        modelBuilder.Entity<ManagerDepartment>().HasQueryFilter(e => e.TenantId == _currentTenantId);
+        modelBuilder.Entity<ManagerDepartment>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+
+        modelBuilder.Entity<PublicHoliday>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
 
         ApplySoftDeleteQueryFilters(modelBuilder);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(SMEFLOWSystemContext).Assembly);

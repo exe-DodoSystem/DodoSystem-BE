@@ -14,6 +14,11 @@ public interface IShiftPatternRepository
     // Lấy EmployeeShiftPattern và ShiftPattern cho một nhân viên tại ngày chỉ định
     Task<(EmployeeShiftPattern? Pattern, ShiftPattern? Definition)> GetActivePatternDetailsAsync(Guid employeeId, DateOnly targetDate);
 
+    // Bulk Load
+    Task<List<EmployeeShiftPattern>> GetActivePatternsForEmployeesAsync(List<Guid> employeeIds, DateOnly minDate, DateOnly maxDate);
+    Task<List<ShiftPattern>> GetPatternsWithDaysAsync(List<Guid> patternIds);
+    Task<List<Shift>> GetShiftsWithSegmentsAsync(List<Guid> shiftIds);
+
     // Lấy Shift kèm Segments theo ShiftId
     Task<Shift?> GetShiftWithSegmentsAsync(Guid shiftId);
 

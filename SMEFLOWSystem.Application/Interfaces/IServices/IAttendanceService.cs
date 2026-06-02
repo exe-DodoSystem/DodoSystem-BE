@@ -27,4 +27,9 @@ public interface IAttendanceService
 
     // Reports
     Task<List<HRMonthlyReportItemDto>> GetHRMonthlyReportAsync(int month, int year);
+
+    // Public Holidays
+    Task<PublicHolidayDto> CreatePublicHolidayAsync(CreatePublicHolidayDto dto);
+    Task<List<PublicHolidayDto>> GetPublicHolidaysAsync();
+    Task DeletePublicHolidayAsync(Guid id);
 }

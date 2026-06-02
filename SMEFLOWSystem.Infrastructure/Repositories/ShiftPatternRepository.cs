@@ -34,6 +34,34 @@ public class ShiftPatternRepository : IShiftPatternRepository
             .FirstOrDefaultAsync();
     }
 
+    public async Task<List<EmployeeShiftPattern>> GetActivePatternsForEmployeesAsync(List<Guid> employeeIds, DateOnly minDate, DateOnly maxDate)
+    {
+        return await _context.EmployeeShiftPatterns
+            .AsNoTracking()
+            .Where(e => employeeIds.Contains(e.EmployeeId)
+                        && e.EffectiveStartDate <= maxDate
+                        && (e.EffectiveEndDate == null || e.EffectiveEndDate >= minDate))
+            .ToListAsync();
+    }
+
+    public async Task<List<ShiftPattern>> GetPatternsWithDaysAsync(List<Guid> patternIds)
+    {
+        return await _context.ShiftPatterns
+            .AsNoTracking()
+            .Include(sp => sp.Days)
+            .Where(sp => patternIds.Contains(sp.Id))
+            .ToListAsync();
+    }
+
+    public async Task<List<Shift>> GetShiftsWithSegmentsAsync(List<Guid> shiftIds)
+    {
+        return await _context.Shifts
+            .AsNoTracking()
+            .Include(s => s.Segments)
+            .Where(s => shiftIds.Contains(s.Id))
+            .ToListAsync();
+    }
+
     // Viết lại hàm này để lấy rõ hơn
     public async Task<(EmployeeShiftPattern? Pattern, ShiftPattern? Definition)> GetActivePatternDetailsAsync(Guid employeeId, DateOnly targetDate)
     {

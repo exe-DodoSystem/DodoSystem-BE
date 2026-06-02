@@ -22,4 +22,14 @@ public class OvertimeRequestRepository : IOvertimeRequestRepository
                                       && x.OvertimeDate == overtimeDate
                                       && x.Status == "Approved");
     }
+
+    public async Task<List<OvertimeRequest>> GetApprovedRequestsForEmployeesAsync(List<Guid> employeeIds, DateOnly minDate, DateOnly maxDate)
+    {
+        return await _context.OvertimeRequests
+            .AsNoTracking()
+            .Where(x => employeeIds.Contains(x.EmployeeId)
+                        && x.OvertimeDate >= minDate && x.OvertimeDate <= maxDate
+                        && x.Status == "Approved")
+            .ToListAsync();
+    }
 }

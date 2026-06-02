@@ -49,6 +49,7 @@ public static class DependencyInjection
         services.AddScoped<INotificationRepository, NotificationRepository>();
 
         services.AddScoped<IRawPunchLogRepository, RawPunchLogRepository>();
+        services.AddScoped<IPublicHolidayRepository, PublicHolidayRepository>();
         // services.AddScoped<IAttendanceRepository, AttendanceRepository>();
         services.AddScoped<IAttendanceSettingRepository, AttendanceSettingRepository>();
         services.AddScoped<IOvertimeRequestRepository, OvertimeRequestRepository>();
