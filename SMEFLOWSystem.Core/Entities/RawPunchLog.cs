@@ -39,5 +39,8 @@ public partial class RawPunchLog : ITenantEntity
     /// <summary>Trạng thái đã được xử lý thành bảng chấm công phân đoạn.</summary>
     public bool IsProcessed { get; set; } = false;
 
+    /// <summary>Số lần thử lại khi xử lý gặp lỗi.</summary>
+    public int RetryCount { get; set; } = 0;
+
     public virtual Employee? Employee { get; set; }
 }

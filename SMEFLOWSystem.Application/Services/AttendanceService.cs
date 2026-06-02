@@ -21,6 +21,7 @@ namespace SMEFLOWSystem.Application.Services
         private readonly IAttendanceSettingRepository _attendanceSettingRepository;
         private readonly ICurrentTenantService _currentTenantService;
         private readonly ITimesheetAppealRepository _appealRepository;
+        private readonly ITransaction _transaction;
 
         private static readonly TimeZoneInfo VietnamTimeZone = GetVietnamTimeZone();
 
@@ -39,7 +40,8 @@ namespace SMEFLOWSystem.Application.Services
             IDailyTimesheetRepository dailyTimesheetRepository,
             IAttendanceSettingRepository attendanceSettingRepository,
             ICurrentTenantService currentTenantService,
-            ITimesheetAppealRepository appealRepository)
+            ITimesheetAppealRepository appealRepository,
+            ITransaction transaction)
         {
             _punchLogRepo = punchLogRepo;
             _employeeRepository = employeeRepository;
@@ -47,6 +49,7 @@ namespace SMEFLOWSystem.Application.Services
             _attendanceSettingRepository = attendanceSettingRepository;
             _currentTenantService = currentTenantService;
             _appealRepository = appealRepository;
+            _transaction = transaction;
         }
 
         public async Task<RawPunchLogDto> SubmitPunchAsync(Guid userId, SubmitPunchRequestDto request)
@@ -160,7 +163,8 @@ namespace SMEFLOWSystem.Application.Services
             }
             else
             {
-                var fromDateUtc = TimeZoneInfo.ConvertTimeFromUtc(workDate.ToDateTime(TimeOnly.FromTimeSpan(cutOffTime)), VietnamTimeZone);
+                var localDayStart = workDate.ToDateTime(TimeOnly.FromTimeSpan(cutOffTime));
+                var fromDateUtc = TimeZoneInfo.ConvertTimeToUtc(localDayStart, VietnamTimeZone);
                 var toDateUtc = fromDateUtc.AddDays(1);
 
                 var rawLogs = await _punchLogRepo.GetByEmployeeAndDateRangeAsync(employee.Id, fromDateUtc, toDateUtc);
@@ -256,8 +260,15 @@ namespace SMEFLOWSystem.Application.Services
 
         public async Task RecalculateAttendanceAsync(Guid employeeId, DateOnly fromDate, DateOnly toDate)
         {
+            var tenantId = _currentTenantService.TenantId ?? throw new UnauthorizedAccessException("Tenant ID is missing.");
+            var setting = await _attendanceSettingRepository.GetByTenantIdAsync(tenantId);
+            var cutOffTime = setting?.DayStartCutOffTime ?? new TimeSpan(4, 0, 0);
+
+            var utcFrom = TimeZoneInfo.ConvertTimeToUtc(fromDate.ToDateTime(TimeOnly.FromTimeSpan(cutOffTime)), VietnamTimeZone);
+            var utcTo = TimeZoneInfo.ConvertTimeToUtc(toDate.ToDateTime(TimeOnly.FromTimeSpan(cutOffTime)), VietnamTimeZone).AddDays(1);
+
             // Set IsProcessed = false cho toàn bộ log trong dải thời gian này để Background job chạy lại
-            await _punchLogRepo.MarkUnprocessedForRecalculateAsync(employeeId, fromDate.ToDateTime(TimeOnly.MinValue), toDate.ToDateTime(TimeOnly.MaxValue));
+            await _punchLogRepo.MarkUnprocessedForRecalculateAsync(employeeId, utcFrom, utcTo);
         }
         public async Task<TimesheetAppealDto> SubmitAppealAsync(Guid userId, SubmitAppealRequestDto request)
         {
@@ -266,6 +277,18 @@ namespace SMEFLOWSystem.Application.Services
 
             var employee = await _employeeRepository.GetByUserIdAsync(userId);
             if (employee == null) throw new Exception("Employee not found");
+
+            // GAP-05: Validation ngày giải trình
+            var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, VietnamTimeZone));
+            if (request.WorkDate >= today) 
+                throw new InvalidOperationException("Không thể giải trình cho ngày hôm nay hoặc tương lai.");
+            if (today.DayNumber - request.WorkDate.DayNumber > 30) 
+                throw new InvalidOperationException("Không thể giải trình cho ngày quá hạn 30 ngày.");
+
+            // GAP-04: Tránh trùng đơn đang chờ duyệt
+            var existingPending = await _appealRepository.GetPendingByEmployeeDateAsync(employee.Id, request.WorkDate);
+            if (existingPending != null) 
+                throw new InvalidOperationException("Đã có đơn giải trình đang chờ duyệt cho ngày này.");
 
             var appeal = new TimesheetAppeal
             {
@@ -342,61 +365,75 @@ namespace SMEFLOWSystem.Application.Services
             var hrUser = await _employeeRepository.GetByUserIdAsync(hrUserId);
             if (hrUser == null) throw new Exception("HR Employee record not found.");
 
-            if (request.IsApproved)
-            {
-                appeal.Status = "Approved";
-                appeal.ApprovedBy = hrUser.Id;
-                appeal.ApprovedAt = DateTime.UtcNow;
+            var setting = await _attendanceSettingRepository.GetByTenantIdAsync(tenantId.Value);
+            var cutOffTime = setting?.DayStartCutOffTime ?? new TimeSpan(4, 0, 0);
 
-                // Create HR_Manual punches
-                if (appeal.AppealType == "In" || appeal.AppealType == "Both")
+            await _transaction.ExecuteAsync(async () =>
+            {
+                if (request.IsApproved)
                 {
-                    if (appeal.RequestedCheckIn.HasValue)
+                    appeal.Status = "Approved";
+                    appeal.ApprovedBy = hrUser.Id;
+                    appeal.ApprovedAt = DateTime.UtcNow;
+
+                    // Create HR_Manual punches
+                    if (appeal.AppealType == "In" || appeal.AppealType == "Both")
                     {
-                        await _punchLogRepo.AddAsync(new RawPunchLog
+                        if (appeal.RequestedCheckIn.HasValue)
                         {
-                            Id = Guid.NewGuid(),
-                            TenantId = tenantId.Value,
-                            EmployeeId = appeal.EmployeeId,
-                            Timestamp = appeal.RequestedCheckIn.Value,
-                            PunchType = "In",
-                            DeviceId = "HR_Manual"
-                        });
+                            await _punchLogRepo.AddAsync(new RawPunchLog
+                            {
+                                Id = Guid.NewGuid(),
+                                TenantId = tenantId.Value,
+                                EmployeeId = appeal.EmployeeId,
+                                Timestamp = appeal.RequestedCheckIn.Value,
+                                PunchType = "In",
+                                DeviceId = "HR_Manual"
+                            });
+                        }
                     }
+
+                    if (appeal.AppealType == "Out" || appeal.AppealType == "Both")
+                    {
+                        if (appeal.RequestedCheckOut.HasValue)
+                        {
+                            await _punchLogRepo.AddAsync(new RawPunchLog
+                            {
+                                Id = Guid.NewGuid(),
+                                TenantId = tenantId.Value,
+                                EmployeeId = appeal.EmployeeId,
+                                Timestamp = appeal.RequestedCheckOut.Value,
+                                PunchType = "Out",
+                                DeviceId = "HR_Manual"
+                            });
+                        }
+                    }
+
+                    // GAP-02: Reset IsManuallyAdjusted to false on daily timesheet
+                    var existingTimesheet = await _dailyTimesheetRepository.GetByEmployeeDateAsync(
+                        appeal.EmployeeId, appeal.WorkDate);
+                    if (existingTimesheet != null && existingTimesheet.IsManuallyAdjusted)
+                    {
+                        existingTimesheet.IsManuallyAdjusted = false;
+                        await _dailyTimesheetRepository.UpdateAsync(existingTimesheet);
+                    }
+
+                    // BUG-05: Force recalculation for that day with accurate UTC times
+                    var utcFrom = TimeZoneInfo.ConvertTimeToUtc(appeal.WorkDate.ToDateTime(TimeOnly.FromTimeSpan(cutOffTime)), VietnamTimeZone);
+                    var utcTo = utcFrom.AddDays(1);
+
+                    await _punchLogRepo.MarkUnprocessedForRecalculateAsync(appeal.EmployeeId, utcFrom, utcTo);
+                }
+                else
+                {
+                    appeal.Status = "Rejected";
+                    appeal.ApprovedBy = hrUser.Id;
+                    appeal.ApprovedAt = DateTime.UtcNow;
+                    appeal.RejectReason = request.RejectReason;
                 }
 
-                if (appeal.AppealType == "Out" || appeal.AppealType == "Both")
-                {
-                    if (appeal.RequestedCheckOut.HasValue)
-                    {
-                        await _punchLogRepo.AddAsync(new RawPunchLog
-                        {
-                            Id = Guid.NewGuid(),
-                            TenantId = tenantId.Value,
-                            EmployeeId = appeal.EmployeeId,
-                            Timestamp = appeal.RequestedCheckOut.Value,
-                            PunchType = "Out",
-                            DeviceId = "HR_Manual"
-                        });
-                    }
-                }
-
-                // Force recalculation for that day
-                await _punchLogRepo.MarkUnprocessedForRecalculateAsync(
-                    appeal.EmployeeId, 
-                    appeal.WorkDate.ToDateTime(TimeOnly.MinValue), 
-                    appeal.WorkDate.ToDateTime(TimeOnly.MaxValue)
-                );
-            }
-            else
-            {
-                appeal.Status = "Rejected";
-                appeal.ApprovedBy = hrUser.Id;
-                appeal.ApprovedAt = DateTime.UtcNow;
-                appeal.RejectReason = request.RejectReason;
-            }
-
-            await _appealRepository.UpdateAsync(appeal);
+                await _appealRepository.UpdateAsync(appeal);
+            });
 
             return new TimesheetAppealDto
             {
@@ -527,7 +564,7 @@ namespace SMEFLOWSystem.Application.Services
                     TotalOTHours = g.Sum(x => x.OTHours),
                     TotalLateMinutes = g.Sum(x => x.TotalLateMinutes),
                     TotalEarlyLeaveMinutes = g.Sum(x => x.TotalEarlyLeaveMinutes),
-                    MissingPunches = g.Count(x => x.Status == StatusEnum.AttendanceMissingOut || x.Status == StatusEnum.AttendanceNoShift)
+                    MissingPunches = g.Count(x => x.Status == StatusEnum.AttendanceMissingOut)
                 })
                 .OrderBy(x => x.EmployeeName)
                 .ToList();

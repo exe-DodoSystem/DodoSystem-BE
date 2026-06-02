@@ -76,4 +76,23 @@ public class RawPunchLogRepository : IRawPunchLogRepository
 
         await _context.SaveChangesAsync();
     }
+
+    public async Task IncrementRetryCountAsync(IEnumerable<Guid> logIds)
+    {
+        var ids = logIds?.Distinct().ToList() ?? new List<Guid>();
+        if (ids.Count == 0) return;
+
+        var logs = await _context.RawPunchLogs
+            .Where(x => ids.Contains(x.Id))
+            .ToListAsync();
+
+        if (logs.Count == 0) return;
+
+        foreach (var log in logs)
+        {
+            log.RetryCount++;
+        }
+
+        await _context.SaveChangesAsync();
+    }
 }

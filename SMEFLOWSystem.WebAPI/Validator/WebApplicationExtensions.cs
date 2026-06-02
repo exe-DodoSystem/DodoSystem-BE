@@ -77,6 +77,7 @@ public static class WebApplicationExtensions
         SeedRoleIfMissing(db, "Manager", "Manager");
         SeedRoleIfMissing(db, "HRManager", "HR Manager");
         SeedRoleIfMissing(db, "SystemAdmin", "System Admin");
+        SeedRoleIfMissing(db, "Employee", "Employee");
 
         db.SaveChanges();
     }

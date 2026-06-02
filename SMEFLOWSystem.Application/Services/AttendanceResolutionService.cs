@@ -24,6 +24,7 @@ public class AttendanceResolutionService : IAttendanceResolutionService
     private readonly ICurrentTenantService _currentTenantService;
     private readonly ITenantRepository _tenantRepository;
 
+    private const int MaxRetryCount = 3;
     private static readonly TimeZoneInfo VietnamTimeZone = GetVietnamTimeZone();
 
     public AttendanceResolutionService(
@@ -142,30 +143,50 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                 {
                     await _transaction.ExecuteAsync(async () =>
                     {
-                        var orderedLogs = group.OrderBy(x => x.LocalTime).ThenBy(x => x.Log.Id).ToList();
-                        var rawLogsForDay = orderedLogs.Select(x => x.Log).ToList();
+                        var localDayStart = group.Key.WorkDate.ToDateTime(TimeOnly.FromTimeSpan(cutOffTime));
+                        var utcDayStart = TimeZoneInfo.ConvertTimeToUtc(localDayStart, VietnamTimeZone);
+                        var utcDayEnd = utcDayStart.AddDays(1);
+
+                        var allLogsForDay = await _rawPunchLogRepository.GetByEmployeeAndDateRangeAsync(
+                            group.Key.EmployeeId, utcDayStart, utcDayEnd);
 
                         await UpsertDailyTimesheetAsync(
                             group.Key.EmployeeId,
                             group.Key.WorkDate,
-                            rawLogsForDay,
+                            allLogsForDay,
                             attendanceSetting,
                             shiftCache);
 
-                        // Chỉ mark processed cho những log của nhóm đã xử lý thành công
-                        var processedLogIds = rawLogs
-                        .Where(x => x.EmployeeId == group.Key.EmployeeId)
-                        .Select(x => x.Id)
-                        .ToList(); 
-                        await _rawPunchLogRepository.MarkProcessedAsync(processedLogIds);
+                        // Chỉ mark processed cho những log CHƯA xử lý thuộc nhóm của batch hiện tại
+                        var newLogIds = group.Select(x => x.Log.Id).ToList();
+                        await _rawPunchLogRepository.MarkProcessedAsync(newLogIds);
                     });
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Thất bại khi xử lý chấm công cho EmployeeId: {EmployeeId}, Ngày: {WorkDate}. Sẽ thử lại ở lô tiếp theo.", group.Key.EmployeeId, group.Key.WorkDate);
+                    _logger.LogError(ex, "Thất bại khi xử lý chấm công cho EmployeeId: {EmployeeId}, Ngày: {WorkDate}.", group.Key.EmployeeId, group.Key.WorkDate);
 
-                    var errorLogIds = rawLogs.Where(x => x.EmployeeId == group.Key.EmployeeId).Select(x => x.Id).ToList();
-                    await _rawPunchLogRepository.MarkProcessedAsync(errorLogIds);    
+                    var failedLogIds = group.Select(x => x.Log.Id).ToList();
+
+                    // Nếu đã vượt quá số lần retry thì mark processed để không làm nghẽn job (dead-letter)
+                    var maxRetriedLogs = group
+                        .Where(x => x.Log.RetryCount >= MaxRetryCount)
+                        .Select(x => x.Log.Id)
+                        .ToList();
+
+                    if (maxRetriedLogs.Count > 0)
+                    {
+                        _logger.LogCritical("Log chấm công EmployeeId: {EmployeeId} ngày {WorkDate} đã thất bại {Max} lần. Cần kiểm tra thủ công.",
+                            group.Key.EmployeeId, group.Key.WorkDate, MaxRetryCount);
+                        await _rawPunchLogRepository.MarkProcessedAsync(maxRetriedLogs);
+                    }
+
+                    // Tăng RetryCount cho các log còn lại để thử lại lần sau
+                    var retryableLogIds = failedLogIds.Except(maxRetriedLogs).ToList();
+                    if (retryableLogIds.Count > 0)
+                    {
+                        await _rawPunchLogRepository.IncrementRetryCountAsync(retryableLogIds);
+                    }
                 }
             }
 
@@ -198,7 +219,9 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                 else
                 {
                     var diffMinutes = Math.Abs((log.Timestamp - lastKept.Timestamp).TotalMinutes);
-                    if (diffMinutes >= dedupWindowMinutes)
+                    var samePunchType = string.Equals(log.PunchType, lastKept.PunchType, StringComparison.OrdinalIgnoreCase);
+
+                    if (!samePunchType || diffMinutes >= dedupWindowMinutes)
                     {
                         result.Add(log);
                         lastKept = log;
@@ -555,10 +578,45 @@ public class AttendanceResolutionService : IAttendanceResolutionService
 
         var absentSegments = segments.Where(s => s.Status == StatusEnum.AttendanceAbsent).ToList();
         var dayStatus = StatusEnum.AttendanceNormal;
-        if (absentSegments.Count > 0) dayStatus = StatusEnum.AttendanceAbsent;
-        else if (segments.Any(s => s.Status == StatusEnum.AttendanceMissingOut)) dayStatus = StatusEnum.AttendanceMissingOut;
-        else if (totalLate > 0) dayStatus = StatusEnum.AttendanceLate;
-        else if (totalEarly > 0) dayStatus = StatusEnum.AttendanceEarlyLeave;
+        if (segments.Count == 0)
+        {
+            if (shiftSegments == null || shiftSegments.Count == 0)
+            {
+                dayStatus = StatusEnum.AttendanceNoShift;
+            }
+            else
+            {
+                dayStatus = StatusEnum.AttendanceAbsent;
+            }
+        }
+        else if (segments.All(s => s.Status == StatusEnum.AttendanceOnLeave))
+        {
+            dayStatus = StatusEnum.AttendanceOnLeave;
+        }
+        else if (segments.All(s => s.Status == StatusEnum.AttendanceNoShift))
+        {
+            dayStatus = StatusEnum.AttendanceNoShift;
+        }
+        else if (segments.Any(s => s.Status == StatusEnum.AttendanceAbsent))
+        {
+            dayStatus = StatusEnum.AttendanceAbsent;
+        }
+        else if (segments.Any(s => s.Status == StatusEnum.AttendanceMissingOut))
+        {
+            dayStatus = StatusEnum.AttendanceMissingOut;
+        }
+        else if (totalLate > 0 && totalEarly > 0)
+        {
+            dayStatus = StatusEnum.AttendanceLate;
+        }
+        else if (totalLate > 0)
+        {
+            dayStatus = StatusEnum.AttendanceLate;
+        }
+        else if (totalEarly > 0)
+        {
+            dayStatus = StatusEnum.AttendanceEarlyLeave;
+        }
 
         var resolutionLog = new
         {
