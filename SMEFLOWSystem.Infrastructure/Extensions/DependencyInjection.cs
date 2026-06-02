@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using RabbitMQ.Client;
 using SMEFLOWSystem.Application.Abstractions.Messaging;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Application.Interfaces.IServices;
@@ -20,6 +22,23 @@ public static class DependencyInjection
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<RabbitMqOptions>(configuration.GetSection("RabbitMQ"));
+
+        services.AddSingleton<IConnection>(sp =>
+        {
+            var options = sp.GetRequiredService<IOptions<RabbitMqOptions>>().Value;
+            var factory = new ConnectionFactory
+            {
+                HostName = options.Host,
+                Port = options.Port,
+                UserName = options.Username,
+                Password = options.Password,
+                VirtualHost = options.VirtualHost,
+                RequestedHeartbeat = TimeSpan.FromSeconds(options.RequestedHeartbeat),
+                AutomaticRecoveryEnabled = options.AutomaticRecoveryEnabled,
+                NetworkRecoveryInterval = TimeSpan.FromSeconds(options.NetworkRecoveryIntervalSeconds)
+            };
+            return factory.CreateConnection();
+        });
 
         services.AddDbContext<SMEFLOWSystemContext>(options =>
             options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
@@ -49,6 +68,7 @@ public static class DependencyInjection
         services.AddScoped<INotificationRepository, NotificationRepository>();
 
         services.AddScoped<IRawPunchLogRepository, RawPunchLogRepository>();
+        services.AddScoped<IPublicHolidayRepository, PublicHolidayRepository>();
         // services.AddScoped<IAttendanceRepository, AttendanceRepository>();
         services.AddScoped<IAttendanceSettingRepository, AttendanceSettingRepository>();
         services.AddScoped<IOvertimeRequestRepository, OvertimeRequestRepository>();
@@ -70,6 +90,7 @@ public static class DependencyInjection
         services.AddScoped<IEventPublisher, RabbitMqEventPublisher>();
         services.AddScoped<IRabbitMessageHandler, PaymentSucceededConsumer>();
         services.AddScoped<IRabbitMessageHandler, EmailSendConsumer>();
+        services.AddScoped<IRabbitMessageHandler, PayrollProcessConsumer>();
 
         return services;
     }

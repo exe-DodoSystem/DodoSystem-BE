@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Hosting;
+using System.Linq;
 using SMEFLOWSystem.WebAPI.Middleware;
 using Hangfire;
 using Hangfire.Common;
@@ -14,13 +15,13 @@ public static class WebApplicationExtensions
 {
     public static WebApplication UseWebApi(this WebApplication app)
     {
-        if (app.Environment.IsDevelopment())
+        if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
         {
             app.UseSwagger();
             app.UseSwaggerUI();
         }
 
-        if (!app.Environment.IsDevelopment())
+        if (!app.Environment.IsDevelopment() && !app.Environment.IsStaging())
         {
             app.UseHttpsRedirection();
         }
@@ -59,7 +60,7 @@ public static class WebApplicationExtensions
             }
             catch when (attempt < maxRetries)
             {
-                Thread.Sleep(delay);
+                Task.Delay(delay).GetAwaiter().GetResult();
             }
         }
 
@@ -73,10 +74,13 @@ public static class WebApplicationExtensions
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SMEFLOWSystemContext>();
 
+        if (db.Roles.Any()) return;
+
         SeedRoleIfMissing(db, "TenantAdmin", "Tenant Admin");
         SeedRoleIfMissing(db, "Manager", "Manager");
         SeedRoleIfMissing(db, "HRManager", "HR Manager");
         SeedRoleIfMissing(db, "SystemAdmin", "System Admin");
+        SeedRoleIfMissing(db, "Employee", "Employee");
 
         db.SaveChanges();
     }
@@ -85,6 +89,9 @@ public static class WebApplicationExtensions
     {
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SMEFLOWSystemContext>();
+
+        if (db.Modules.Any()) return;
+
         SeedModulesIfMissing(db, "HR", "HR", "Human Resource Management", "Module quản lý nhân sự", 150000m, true);
         SeedModulesIfMissing(db, "ATTENDANCE", "ATT", "Attendance Management", "Module quản lý chấm công", 180000m, true);
         SeedModulesIfMissing(db, "PAYROLL", "PAYROLL", "Payroll Management", "Module quản lý bảng lương", 180000m, true);

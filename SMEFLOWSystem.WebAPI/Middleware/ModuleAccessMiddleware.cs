@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Caching.Distributed;
 using ShareKernel.Common.Enum;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.SharedKernel.Interfaces;
@@ -42,7 +42,7 @@ public class ModuleAccessMiddleware
     public async Task InvokeAsync(
         HttpContext context,
         ICurrentTenantService currentTenantService,
-        IMemoryCache cache,
+        IDistributedCache cache,
         IModuleRepository moduleRepo,
         IModuleSubscriptionRepository moduleSubscriptionRepo)
     {
@@ -70,12 +70,17 @@ public class ModuleAccessMiddleware
         }
 
         var moduleCacheKey = $"module:code:{required.ModuleCode}";
-        var moduleEntry = await cache.GetOrCreateAsync(moduleCacheKey, async entry =>
+        var moduleEntry = await GetFromDistributedCacheAsync<ModuleCacheEntry>(cache, moduleCacheKey);
+
+        if (moduleEntry == null)
         {
-            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(ModuleCacheSeconds);
             var m = await moduleRepo.GetByCodeAsync(required.ModuleCode);
-            return m == null ? null : new ModuleCacheEntry(m.Id);
-        });
+            if (m != null)
+            {
+                moduleEntry = new ModuleCacheEntry(m.Id);
+                await SetInDistributedCacheAsync(cache, moduleCacheKey, moduleEntry, TimeSpan.FromSeconds(ModuleCacheSeconds));
+            }
+        }
 
         if (moduleEntry == null)
         {
@@ -84,13 +89,17 @@ public class ModuleAccessMiddleware
         }
 
         var subCacheKey = $"moduleSub:tenant:{tenantId.Value}:module:{moduleEntry.Id}";
-        var subEntry = await cache.GetOrCreateAsync(subCacheKey, async entry =>
+        var subEntry = await GetFromDistributedCacheAsync<SubscriptionCacheEntry>(cache, subCacheKey);
+
+        if (subEntry == null)
         {
-            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(SubscriptionCacheSeconds);
             var sub = await moduleSubscriptionRepo.GetByTenantAndModuleIgnoreTenantAsync(tenantId.Value, moduleEntry.Id);
-            if (sub == null) return null;
-            return new SubscriptionCacheEntry(sub.Status ?? string.Empty, sub.EndDate);
-        });
+            if (sub != null)
+            {
+                subEntry = new SubscriptionCacheEntry(sub.Status ?? string.Empty, sub.EndDate);
+                await SetInDistributedCacheAsync(cache, subCacheKey, subEntry, TimeSpan.FromSeconds(SubscriptionCacheSeconds));
+            }
+        }
 
         if (subEntry == null)
         {
@@ -116,5 +125,22 @@ public class ModuleAccessMiddleware
         context.Response.ContentType = "application/json; charset=utf-8";
         var payload = JsonSerializer.Serialize(new { error = message });
         await context.Response.WriteAsync(payload);
+    }
+
+    private static async Task<T?> GetFromDistributedCacheAsync<T>(IDistributedCache cache, string key)
+    {
+        var cachedString = await cache.GetStringAsync(key);
+        if (string.IsNullOrEmpty(cachedString)) return default;
+        return JsonSerializer.Deserialize<T>(cachedString);
+    }
+
+    private static async Task SetInDistributedCacheAsync<T>(IDistributedCache cache, string key, T value, TimeSpan expiration)
+    {
+        var serialized = JsonSerializer.Serialize(value);
+        var options = new DistributedCacheEntryOptions
+        {
+            AbsoluteExpirationRelativeToNow = expiration
+        };
+        await cache.SetStringAsync(key, serialized, options);
     }
 }

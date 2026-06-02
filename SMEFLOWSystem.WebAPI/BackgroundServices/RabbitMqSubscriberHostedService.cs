@@ -34,7 +34,6 @@ public class RabbitMqSubscriberHostedService : BackgroundService
             UserName = _options.Username,
             Password = _options.Password,
             VirtualHost = _options.VirtualHost,
-            DispatchConsumersAsync = true,
             RequestedHeartbeat = TimeSpan.FromSeconds(_options.RequestedHeartbeat),
             AutomaticRecoveryEnabled = _options.AutomaticRecoveryEnabled,
             NetworkRecoveryInterval = TimeSpan.FromSeconds(_options.NetworkRecoveryIntervalSeconds)
@@ -64,52 +63,55 @@ public class RabbitMqSubscriberHostedService : BackgroundService
                     channel.QueueDeclare(queue: queueName, durable: true, exclusive: false, autoDelete: false);
                     channel.QueueBind(queue: queueName, exchange: _options.Exchange, routingKey: routingKey);
 
-                    var consumer = new AsyncEventingBasicConsumer(channel);
-                    consumer.Received += async (_, ea) =>
+                    var consumer = new EventingBasicConsumer(channel);
+                    consumer.Received += (sender, ea) =>
                     {
-                        var payload = Encoding.UTF8.GetString(ea.Body.ToArray());
-                        var messageRoutingKey = ea.RoutingKey;
-
-                        try
+                        Task.Run(async () =>
                         {
-                            using var scope = _scopeFactory.CreateScope();
-                            var handlers = scope.ServiceProvider.GetServices<IRabbitMessageHandler>();
-                            var handler = handlers.FirstOrDefault(h =>
-                                string.Equals(h.RoutingKey, messageRoutingKey, StringComparison.OrdinalIgnoreCase));
+                            var payload = Encoding.UTF8.GetString(ea.Body.ToArray());
+                            var messageRoutingKey = ea.RoutingKey;
 
-                            if (handler == null)
+                            try
                             {
-                                _logger.LogWarning("No handler found for routing key {RoutingKey}. Message acked.", messageRoutingKey);
+                                using var scope = _scopeFactory.CreateScope();
+                                var handlers = scope.ServiceProvider.GetServices<IRabbitMessageHandler>();
+                                var handler = handlers.FirstOrDefault(h =>
+                                    string.Equals(h.RoutingKey, messageRoutingKey, StringComparison.OrdinalIgnoreCase));
+
+                                if (handler == null)
+                                {
+                                    _logger.LogWarning("No handler found for routing key {RoutingKey}. Message acked.", messageRoutingKey);
+                                    lock (_channelLock)
+                                    {
+                                        channel.BasicAck(ea.DeliveryTag, false);
+                                    }
+                                    return;
+                                }
+
+                                await handler.HandleAsync(payload, stoppingToken);
+
                                 lock (_channelLock)
                                 {
                                     channel.BasicAck(ea.DeliveryTag, false);
                                 }
-                                return;
                             }
-
-                            await handler.HandleAsync(payload, stoppingToken);
-
-                            lock (_channelLock)
+                            catch (Exception ex)
                             {
-                                channel.BasicAck(ea.DeliveryTag, false);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            var requeue = ShouldRequeue(ex);
+                                var requeue = ShouldRequeue(ex);
 
-                            _logger.LogError(
-                                ex,
-                                "Error consuming message. Queue={Queue}, RoutingKey={RoutingKey}, Requeue={Requeue}",
-                                queueName,
-                                messageRoutingKey,
-                                requeue);
+                                _logger.LogError(
+                                    ex,
+                                    "Error consuming message. Queue={Queue}, RoutingKey={RoutingKey}, Requeue={Requeue}",
+                                    queueName,
+                                    messageRoutingKey,
+                                    requeue);
 
-                            lock (_channelLock)
-                            {
-                                channel.BasicNack(ea.DeliveryTag, false, requeue);
+                                lock (_channelLock)
+                                {
+                                    channel.BasicNack(ea.DeliveryTag, false, requeue);
+                                }
                             }
-                        }
+                        });
                     };
 
                     channel.BasicConsume(queue: queueName, autoAck: false, consumer: consumer);

@@ -18,20 +18,9 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
-        
         services.AddAutoMapper(typeof(RoleMappingProfile).Assembly);
-        services.AddAutoMapper(typeof(ModuleDtosMappingProfile).Assembly);
-        services.AddAutoMapper(typeof(UserMappingProfile).Assembly);
-        services.AddAutoMapper(typeof(HrMappingProfile).Assembly);
-
 
         services.AddValidatorsFromAssemblyContaining<RegisterRequestDtoValidator>();
-        services.AddValidatorsFromAssemblyContaining<ChangePasswordRequestDtoValidator>();
-        services.AddValidatorsFromAssemblyContaining<ForgotPasswordRequestDtoValidator>();
-        services.AddValidatorsFromAssemblyContaining<LoginRequestDtoValidator>();
-        services.AddValidatorsFromAssemblyContaining<ResetPasswordWithOtpDtoValidator>();
-
-        services.AddValidatorsFromAssemblyContaining<DepartmentCreateDtoValidator>();
 
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IUserService, UserService>();

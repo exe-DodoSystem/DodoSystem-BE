@@ -13,13 +13,16 @@ public class RabbitMqEventPublisher : IEventPublisher
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly RabbitMqOptions _options;
+    private readonly IConnection _connection;
     private readonly ILogger<RabbitMqEventPublisher> _logger;
 
     public RabbitMqEventPublisher(
         IOptions<RabbitMqOptions> options,
+        IConnection connection,
         ILogger<RabbitMqEventPublisher> logger)
     {
         _options = options.Value;
+        _connection = connection;
         _logger = logger;
     }
 
@@ -46,20 +49,7 @@ public class RabbitMqEventPublisher : IEventPublisher
 
     private void PublishInternal<TEvent>(string routingKey, TEvent message)
     {
-        var factory = new ConnectionFactory
-        {
-            HostName = _options.Host,
-            Port = _options.Port,
-            UserName = _options.Username,
-            Password = _options.Password,
-            VirtualHost = _options.VirtualHost,
-            RequestedHeartbeat = TimeSpan.FromSeconds(_options.RequestedHeartbeat),
-            AutomaticRecoveryEnabled = _options.AutomaticRecoveryEnabled,
-            NetworkRecoveryInterval = TimeSpan.FromSeconds(_options.NetworkRecoveryIntervalSeconds)
-        };
-
-        using var connection = factory.CreateConnection();
-        using var channel = connection.CreateModel();
+        using var channel = _connection.CreateModel();
 
         channel.ExchangeDeclare(
             exchange: _options.Exchange,

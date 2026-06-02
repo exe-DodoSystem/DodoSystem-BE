@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SMEFLOWSystem.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using SMEFLOWSystem.Infrastructure.Data;
 namespace SMEFLOWSystem.Infrastructure.Migrations
 {
     [DbContext(typeof(SMEFLOWSystemContext))]
-    partial class SMEFLOWSystemContextModelSnapshot : ModelSnapshot
+    [Migration("20260602022431_AddRetryCountToRawPunchLogs")]
+    partial class AddRetryCountToRawPunchLogs
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1343,33 +1346,6 @@ namespace SMEFLOWSystem.Infrastructure.Migrations
                         .HasDatabaseName("UX_ProcessedEvents_EventId_Consumer");
 
                     b.ToTable("ProcessedEvents", (string)null);
-                });
-
-            modelBuilder.Entity("SMEFLOWSystem.Core.Entities.PublicHoliday", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateOnly>("Date")
-                        .HasColumnType("date");
-
-                    b.Property<bool>("IsRecurringYearly")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId", "Date");
-
-                    b.ToTable("PublicHolidays", (string)null);
                 });
 
             modelBuilder.Entity("SMEFLOWSystem.Core.Entities.RawPunchLog", b =>

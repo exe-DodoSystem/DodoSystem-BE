@@ -48,32 +48,25 @@ public class RawPunchLogRepository : IRawPunchLogRepository
         if (ids.Count == 0)
             return;
 
-        var logs = await _context.RawPunchLogs
+        await _context.RawPunchLogs
             .Where(x => ids.Contains(x.Id))
-            .ToListAsync();
-
-        if (logs.Count == 0)
-            return;
-
-        foreach (var log in logs)
-        {
-            log.IsProcessed = true;
-        }
-
-        await _context.SaveChangesAsync();
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.IsProcessed, true));
     }
 
     public async Task MarkUnprocessedForRecalculateAsync(Guid employeeId, DateTime fromDate, DateTime toDate)
     {
-        var logs = await _context.RawPunchLogs
+        await _context.RawPunchLogs
             .Where(x => x.EmployeeId == employeeId && x.Timestamp >= fromDate && x.Timestamp <= toDate)
-            .ToListAsync();
-            
-        foreach (var log in logs)
-        {
-            log.IsProcessed = false;
-        }
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.IsProcessed, false));
+    }
 
-        await _context.SaveChangesAsync();
+    public async Task IncrementRetryCountAsync(IEnumerable<Guid> logIds)
+    {
+        var ids = logIds?.Distinct().ToList() ?? new List<Guid>();
+        if (ids.Count == 0) return;
+
+        await _context.RawPunchLogs
+            .Where(x => ids.Contains(x.Id))
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.RetryCount, p => p.RetryCount + 1));
     }
 }

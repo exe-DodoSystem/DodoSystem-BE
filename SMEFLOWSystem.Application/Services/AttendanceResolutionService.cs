@@ -7,6 +7,10 @@ using SMEFLOWSystem.Application.Options;
 using SMEFLOWSystem.Core.Entities;
 using SMEFLOWSystem.SharedKernel.Interfaces;
 using System.Text.Json;
+using System.Collections.Concurrent;
+using System.Threading;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace SMEFLOWSystem.Application.Services;
 
@@ -23,8 +27,11 @@ public class AttendanceResolutionService : IAttendanceResolutionService
     private readonly ITransaction _transaction;
     private readonly ICurrentTenantService _currentTenantService;
     private readonly ITenantRepository _tenantRepository;
+    private readonly IPublicHolidayRepository _publicHolidayRepository;
 
+    private const int MaxRetryCount = 3;
     private static readonly TimeZoneInfo VietnamTimeZone = GetVietnamTimeZone();
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim> Locks = new();
 
     public AttendanceResolutionService(
         ILogger<AttendanceResolutionService> logger,
@@ -37,7 +44,8 @@ public class AttendanceResolutionService : IAttendanceResolutionService
         ILeaveRequestRepository leaveRequestRepository,
         ITransaction transaction,
         ICurrentTenantService currentTenantService,
-        ITenantRepository tenantRepository)
+        ITenantRepository tenantRepository,
+        IPublicHolidayRepository publicHolidayRepository)
     {
         _logger = logger;
         _options = options.Value;
@@ -50,6 +58,7 @@ public class AttendanceResolutionService : IAttendanceResolutionService
         _transaction = transaction;
         _currentTenantService = currentTenantService;
         _tenantRepository = tenantRepository;
+        _publicHolidayRepository = publicHolidayRepository;
     }
 
     public Task ProcessUnresolvedPunchesAsync()
@@ -106,7 +115,6 @@ public class AttendanceResolutionService : IAttendanceResolutionService
         var executedBatches = 0;
 
         var lastProcessedLogs = new Dictionary<Guid, RawPunchLog>();
-        var shiftCache = new Dictionary<string, Shift?>();
         while (true)
         {
             if (maxBatches > 0 && executedBatches >= maxBatches)
@@ -136,39 +144,98 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                 .GroupBy(x => new { x.EmployeeId, x.WorkDate })
                 .ToList();
 
+            // Bulk Load to prevent N+1 Queries
+            var employeeIds = groupedByEmployeeDate.Select(g => g.Key.EmployeeId).Distinct().ToList();
+            var workDates = groupedByEmployeeDate.Select(g => g.Key.WorkDate).Distinct().ToList();
+            var minDate = workDates.Count > 0 ? workDates.Min() : DateOnly.MinValue;
+            var maxDate = workDates.Count > 0 ? workDates.Max() : DateOnly.MaxValue;
+
+            var esps = await _shiftPatternRepository.GetActivePatternsForEmployeesAsync(employeeIds, minDate, maxDate);
+            var patternIds = esps.Select(x => x.ShiftPatternId).Distinct().ToList();
+            var patterns = await _shiftPatternRepository.GetPatternsWithDaysAsync(patternIds);
+
+            var scheduledShiftIds = patterns
+                .SelectMany(p => p.Days)
+                .Where(d => d.ScheduledShiftId.HasValue)
+                .Select(d => d.ScheduledShiftId!.Value)
+                .Distinct()
+                .ToList();
+            var shifts = await _shiftPatternRepository.GetShiftsWithSegmentsAsync(scheduledShiftIds);
+
+            var leaveSegments = await _leaveRequestRepository.GetApprovedSegmentsForEmployeesAsync(employeeIds, minDate, maxDate);
+            var approvedOTs = await _overtimeRequestRepository.GetApprovedRequestsForEmployeesAsync(employeeIds, minDate, maxDate);
+            var existingTimesheets = await _dailyTimesheetRepository.GetWithSegmentsForEmployeesAsync(employeeIds, minDate, maxDate);
+            var publicHolidays = await _publicHolidayRepository.GetAllAsync(tenantId);
+
+            var bulkData = new BulkAttendanceDataContext
+            {
+                EmployeeShiftPatterns = esps,
+                ShiftPatterns = patterns,
+                Shifts = shifts,
+                LeaveSegments = leaveSegments,
+                ApprovedOTs = approvedOTs,
+                ExistingTimesheets = existingTimesheets,
+                PublicHolidays = publicHolidays
+            };
+
             foreach (var group in groupedByEmployeeDate)
             {
+                var lockKey = $"{group.Key.EmployeeId}:{group.Key.WorkDate}";
+                var mySemaphore = Locks.GetOrAdd(lockKey, _ => new SemaphoreSlim(1, 1));
+                await mySemaphore.WaitAsync();
+
                 try
                 {
                     await _transaction.ExecuteAsync(async () =>
                     {
-                        var localStart = group.Key.WorkDate.ToDateTime(TimeOnly.FromTimeSpan(cutOffTime));
-                        var utcStart = TimeZoneInfo.ConvertTimeToUtc(localStart, VietnamTimeZone);
-                        var utcEnd = utcStart.AddDays(1);
+                        var localDayStart = group.Key.WorkDate.ToDateTime(TimeOnly.FromTimeSpan(cutOffTime));
+                        var utcDayStart = TimeZoneInfo.ConvertTimeToUtc(localDayStart, VietnamTimeZone);
+                        var utcDayEnd = utcDayStart.AddDays(1);
 
-                        // Lấy all log trong ngày (cả đã xử lý và chưa xử lý)
-                        var allLogsForDay = await _rawPunchLogRepository
-                            .GetByEmployeeAndDateRangeAsync(group.Key.EmployeeId, utcStart, utcEnd);
+                        var allLogsForDay = await _rawPunchLogRepository.GetByEmployeeAndDateRangeAsync(
+                            group.Key.EmployeeId, utcDayStart, utcDayEnd);
 
                         await UpsertDailyTimesheetAsync(
                             group.Key.EmployeeId,
                             group.Key.WorkDate,
-                            allLogsForDay, 
+                            allLogsForDay,
                             attendanceSetting,
-                            shiftCache);
+                            bulkData);
 
-                        // Mark processed cho log batch hiện tại
-                        var processedLogIds = rawLogs
-                            .Where(x => x.EmployeeId == group.Key.EmployeeId)
-                            .Select(x => x.Id)
-                            .ToList();
-
-                        await _rawPunchLogRepository.MarkProcessedAsync(processedLogIds);
+                        // Chỉ mark processed cho những log CHƯA xử lý thuộc nhóm của batch hiện tại
+                        var newLogIds = group.Select(x => x.Log.Id).ToList();
+                        await _rawPunchLogRepository.MarkProcessedAsync(newLogIds);
                     });
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Thất bại khi xử lý chấm công cho EmployeeId: {EmployeeId}, Ngày: {WorkDate}. Sẽ thử lại ở lô tiếp theo.", group.Key.EmployeeId, group.Key.WorkDate);  
+                    _logger.LogError(ex, "Thất bại khi xử lý chấm công cho EmployeeId: {EmployeeId}, Ngày: {WorkDate}.", group.Key.EmployeeId, group.Key.WorkDate);
+
+                    var failedLogIds = group.Select(x => x.Log.Id).ToList();
+
+                    // Nếu đã vượt quá số lần retry thì mark processed để không làm nghẽn job (dead-letter)
+                    var maxRetriedLogs = group
+                        .Where(x => x.Log.RetryCount >= MaxRetryCount)
+                        .Select(x => x.Log.Id)
+                        .ToList();
+
+                    if (maxRetriedLogs.Count > 0)
+                    {
+                        _logger.LogCritical("Log chấm công EmployeeId: {EmployeeId} ngày {WorkDate} đã thất bại {Max} lần. Cần kiểm tra thủ công.",
+                            group.Key.EmployeeId, group.Key.WorkDate, MaxRetryCount);
+                        await _rawPunchLogRepository.MarkProcessedAsync(maxRetriedLogs);
+                    }
+
+                    // Tăng RetryCount cho các log còn lại để thử lại lần sau
+                    var retryableLogIds = failedLogIds.Except(maxRetriedLogs).ToList();
+                    if (retryableLogIds.Count > 0)
+                    {
+                        await _rawPunchLogRepository.IncrementRetryCountAsync(retryableLogIds);
+                    }
+                }
+                finally
+                {
+                    mySemaphore.Release();
                 }
             }
 
@@ -201,7 +268,9 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                 else
                 {
                     var diffMinutes = Math.Abs((log.Timestamp - lastKept.Timestamp).TotalMinutes);
-                    if (diffMinutes >= dedupWindowMinutes)
+                    var samePunchType = string.Equals(log.PunchType, lastKept.PunchType, StringComparison.OrdinalIgnoreCase);
+
+                    if (!samePunchType || diffMinutes >= dedupWindowMinutes)
                     {
                         result.Add(log);
                         lastKept = log;
@@ -304,25 +373,119 @@ public class AttendanceResolutionService : IAttendanceResolutionService
         DateOnly workDate,
         List<RawPunchLog> orderedLogs,
         TenantAttendanceSetting? attendanceSetting,
-        Dictionary<string, Shift?> shiftCache)
+        BulkAttendanceDataContext bulkData)
     {
         var tenantId = _currentTenantService.TenantId ?? throw new InvalidOperationException("TenantId is not set in the current context.");
-        var shiftInfo = await _shiftPatternRepository.GetActivePatternDetailsAsync(employeeId, workDate);
-        var shift = await ResolveShiftAsync(shiftInfo, workDate, shiftCache);
+        
+        var isPublicHoliday = bulkData.PublicHolidays.Any(h =>
+            h.Date == workDate ||
+            (h.IsRecurringYearly && h.Date.Month == workDate.Month && h.Date.Day == workDate.Day));
+
+        var espForEmployeeAndDate = bulkData.EmployeeShiftPatterns.FirstOrDefault(e => e.EmployeeId == employeeId
+            && e.EffectiveStartDate <= workDate
+            && (e.EffectiveEndDate == null || e.EffectiveEndDate >= workDate));
+        
+        var definition = espForEmployeeAndDate != null
+            ? bulkData.ShiftPatterns.FirstOrDefault(p => p.Id == espForEmployeeAndDate.ShiftPatternId)
+            : null;
+
+        var shift = ResolveShiftInBulk((espForEmployeeAndDate, definition), workDate, bulkData.Shifts);
+
+        if (isPublicHoliday && orderedLogs.Count == 0)
+        {
+            _logger.LogInformation(
+                "Ngày lễ: EmployeeId {EmployeeId}, WorkDate {WorkDate}. Không có log → ghi Holiday.",
+                employeeId, workDate);
+
+            var holidayStatus = StatusEnum.AttendanceHoliday;
+            var existingHolidayTimesheet = bulkData.ExistingTimesheets
+                .FirstOrDefault(d => d.EmployeeId == employeeId && d.WorkDate == workDate);
+
+            var holidayResolutionLog = new
+            {
+                TotalRawLogs = 0,
+                MissingOutCount = 0,
+                OutBeforeInCount = 0,
+                UnmappedLogCount = 0,
+                ProximityWindowMinutes = 0,
+                TotalLateMinutes = 0,
+                TotalEarlyLeaveMinutes = 0,
+                AbsentSegmentCount = 0,
+                AbsentPenaltyMinutes = 0,
+                StayLateMinutes = 0,
+                EarlyInOTMinutes = 0,
+                LateOutOTMinutes = 0,
+                ApprovedOTMinutes = 0,
+                HasApprovedOTRequest = false,
+                LeaveSegmentCount = 0,
+                TotalOTHours = 0m,
+                TotalActualWorkedMinutes = 0
+            };
+
+            if (existingHolidayTimesheet == null)
+            {
+                var holidayTimesheet = new DailyTimesheet
+                {
+                    Id = Guid.NewGuid(),
+                    EmployeeId = employeeId,
+                    TenantId = tenantId,
+                    WorkDate = workDate,
+                    ExpectedShiftId = shift?.Id,
+                    ExpectedShiftSource = shift == null ? "None" : "ShiftPattern",
+                    StandardWorkingHours = 0,
+                    TotalActualWorkedMinutes = 0,
+                    ActualWorkHours = 0,
+                    OTHours = 0,
+                    TotalLateMinutes = 0,
+                    LateMinutes = 0,
+                    TotalEarlyLeaveMinutes = 0,
+                    EarlyLeaveMinutes = 0,
+                    Status = holidayStatus,
+                    SystemAnomalyFlag = string.Empty,
+                    ResolutionLogJson = JsonSerializer.Serialize(holidayResolutionLog),
+                    IsManuallyAdjusted = false,
+                    Segments = new List<DailyTimesheetSegment>()
+                };
+                await _dailyTimesheetRepository.AddAsync(holidayTimesheet);
+                bulkData.ExistingTimesheets.Add(holidayTimesheet);
+            }
+            else if (!existingHolidayTimesheet.IsManuallyAdjusted)
+            {
+                existingHolidayTimesheet.ExpectedShiftId = shift?.Id;
+                existingHolidayTimesheet.ExpectedShiftSource = shift == null ? "None" : "ShiftPattern";
+                existingHolidayTimesheet.Status = holidayStatus;
+                existingHolidayTimesheet.StandardWorkingHours = 0;
+                existingHolidayTimesheet.TotalActualWorkedMinutes = 0;
+                existingHolidayTimesheet.ActualWorkHours = 0;
+                existingHolidayTimesheet.OTHours = 0;
+                existingHolidayTimesheet.TotalLateMinutes = 0;
+                existingHolidayTimesheet.LateMinutes = 0;
+                existingHolidayTimesheet.TotalEarlyLeaveMinutes = 0;
+                existingHolidayTimesheet.EarlyLeaveMinutes = 0;
+                existingHolidayTimesheet.SystemAnomalyFlag = string.Empty;
+                existingHolidayTimesheet.ResolutionLogJson = JsonSerializer.Serialize(holidayResolutionLog);
+                existingHolidayTimesheet.Segments.Clear();
+                await _dailyTimesheetRepository.UpdateAsync(existingHolidayTimesheet);
+            }
+            return;
+        }
+
         var shiftSegments = shift?.Segments
             .OrderBy(s => s.StartDayOffset)
             .ThenBy(s => s.StartTime)
             .ToList();
 
         // Lấy danh sách nghỉ phép đã duyệt (Approved) của nhân viên trong ngày
-        var approvedLeaveSegments = await _leaveRequestRepository
-            .GetApprovedSegmentsByEmployeeDateAsync(employeeId, workDate);
+        var approvedLeaveSegments = bulkData.LeaveSegments
+            .Where(s => s.LeaveDate == workDate && s.LeaveRequest?.EmployeeId == employeeId)
+            .ToList();
+            
         var approvedLeaveSegmentIds = new HashSet<Guid>(
             approvedLeaveSegments.Select(s => s.TargetShiftSegmentId));
 
         // Lấy đơn xin OT đã duyệt (Approved) để tính OT hợp lệ
-        var approvedOT = await _overtimeRequestRepository
-            .GetApprovedByEmployeeDateAsync(employeeId, workDate);
+        var approvedOT = bulkData.ApprovedOTs
+            .FirstOrDefault(x => x.EmployeeId == employeeId && x.OvertimeDate == workDate);
 
         var segments = new List<DailyTimesheetSegment>();
         var totalLate = 0;
@@ -544,7 +707,7 @@ public class AttendanceResolutionService : IAttendanceResolutionService
         }
 
         // Fix: Dùng CombineDateTime để tính đúng cho ca đêm (StartDayOffset/EndDayOffset)
-        var standardHours = shiftSegments == null
+        var standardHours = (isPublicHoliday && orderedLogs.Count == 0) || shiftSegments == null
             ? 0m
             : Math.Round((decimal)shiftSegments.Sum(s =>
             {
@@ -558,10 +721,49 @@ public class AttendanceResolutionService : IAttendanceResolutionService
 
         var absentSegments = segments.Where(s => s.Status == StatusEnum.AttendanceAbsent).ToList();
         var dayStatus = StatusEnum.AttendanceNormal;
-        if (absentSegments.Count > 0) dayStatus = StatusEnum.AttendanceAbsent;
-        else if (segments.Any(s => s.Status == StatusEnum.AttendanceMissingOut)) dayStatus = StatusEnum.AttendanceMissingOut;
-        else if (totalLate > 0) dayStatus = StatusEnum.AttendanceLate;
-        else if (totalEarly > 0) dayStatus = StatusEnum.AttendanceEarlyLeave;
+        if (segments.Count == 0)
+        {
+            if (isPublicHoliday)
+            {
+                dayStatus = StatusEnum.AttendanceHoliday;
+            }
+            else if (shiftSegments == null || shiftSegments.Count == 0)
+            {
+                dayStatus = StatusEnum.AttendanceNoShift;
+            }
+            else
+            {
+                dayStatus = StatusEnum.AttendanceAbsent;
+            }
+        }
+        else if (segments.All(s => s.Status == StatusEnum.AttendanceOnLeave))
+        {
+            dayStatus = StatusEnum.AttendanceOnLeave;
+        }
+        else if (segments.All(s => s.Status == StatusEnum.AttendanceNoShift))
+        {
+            dayStatus = StatusEnum.AttendanceNoShift;
+        }
+        else if (segments.Any(s => s.Status == StatusEnum.AttendanceAbsent))
+        {
+            dayStatus = StatusEnum.AttendanceAbsent;
+        }
+        else if (segments.Any(s => s.Status == StatusEnum.AttendanceMissingOut))
+        {
+            dayStatus = StatusEnum.AttendanceMissingOut;
+        }
+        else if (totalLate > 0 && totalEarly > 0)
+        {
+            dayStatus = StatusEnum.AttendanceLate;
+        }
+        else if (totalLate > 0)
+        {
+            dayStatus = StatusEnum.AttendanceLate;
+        }
+        else if (totalEarly > 0)
+        {
+            dayStatus = StatusEnum.AttendanceEarlyLeave;
+        }
 
         var resolutionLog = new
         {
@@ -593,7 +795,8 @@ public class AttendanceResolutionService : IAttendanceResolutionService
         if (orphanedOutLog != null) anomalyFlags.Add("OrphanedOut");
         var anomalyFlag = anomalyFlags.Count > 0 ? string.Join(",", anomalyFlags) : string.Empty;
 
-        var existing = await _dailyTimesheetRepository.GetByEmployeeDateAsync(employeeId, workDate);
+        var existing = bulkData.ExistingTimesheets
+            .FirstOrDefault(d => d.EmployeeId == employeeId && d.WorkDate == workDate);
         if (existing == null)
         {
 
@@ -621,6 +824,7 @@ public class AttendanceResolutionService : IAttendanceResolutionService
             };
 
             await _dailyTimesheetRepository.AddAsync(timesheet);
+            bulkData.ExistingTimesheets.Add(timesheet);
             return;
         }
         else
@@ -657,7 +861,10 @@ public class AttendanceResolutionService : IAttendanceResolutionService
 
     }
 
-    private async Task<Shift?> ResolveShiftAsync((EmployeeShiftPattern? Pattern, ShiftPattern? Definition) details, DateOnly workDate, Dictionary<string, Shift?> shiftCache)
+    private static Shift? ResolveShiftInBulk(
+        (EmployeeShiftPattern? Pattern, ShiftPattern? Definition) details,
+        DateOnly workDate,
+        List<Shift> bulkShifts)
     {
         if (details.Pattern == null || details.Definition == null)
             return null;
@@ -670,18 +877,12 @@ public class AttendanceResolutionService : IAttendanceResolutionService
         var dayIndex = dayOffset % cycleLength;
         if (dayIndex < 0) dayIndex += cycleLength;
 
-        var cacheKey = $"{details.Definition.Id}_{dayIndex}";
-        if (shiftCache.TryGetValue(cacheKey, out var cachedShift))
-            return cachedShift;
-
-        var patternDay = await _shiftPatternRepository.GetShiftPatternWithDaysAsync(
-            details.Definition.Id, dayIndex);   // Fix: thêm ShiftPatternId để tránh lấy nhầm lịch khác
+        var patternDay = details.Definition.Days
+            .FirstOrDefault(d => d.DayIndex == dayIndex);
         if (patternDay?.ScheduledShiftId == null)
             return null;
 
-        var shift = await _shiftPatternRepository.GetShiftWithSegmentsAsync(patternDay.ScheduledShiftId.Value);
-        shiftCache[cacheKey] = shift;
-        return shift;
+        return bulkShifts.FirstOrDefault(s => s.Id == patternDay.ScheduledShiftId.Value);
     }
 
     private static DateTime CombineDateTime(DateOnly date, TimeSpan time, int dayOffset)
@@ -697,5 +898,16 @@ public class AttendanceResolutionService : IAttendanceResolutionService
         try { return TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh"); }
         catch { /* Linux không có */ }
         return TimeZoneInfo.CreateCustomTimeZone("VN", TimeSpan.FromHours(7), "Vietnam", "Vietnam Standard Time");
+    }
+
+    private sealed class BulkAttendanceDataContext
+    {
+        public List<EmployeeShiftPattern> EmployeeShiftPatterns { get; init; } = new();
+        public List<ShiftPattern> ShiftPatterns { get; init; } = new();
+        public List<Shift> Shifts { get; init; } = new();
+        public List<LeaveRequestSegment> LeaveSegments { get; init; } = new();
+        public List<OvertimeRequest> ApprovedOTs { get; init; } = new();
+        public List<DailyTimesheet> ExistingTimesheets { get; init; } = new();
+        public List<PublicHoliday> PublicHolidays { get; init; } = new();
     }
 }

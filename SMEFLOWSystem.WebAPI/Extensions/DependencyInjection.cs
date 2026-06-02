@@ -10,6 +10,8 @@ using SMEFLOWSystem.Core.Config;
 using SMEFLOWSystem.Application.Options;
 using SMEFLOWSystem.WebAPI.Converters;
 using SMEFLOWSystem.WebAPI.BackgroundServices;
+using System.Collections.Generic;
+using System.Linq;
 using System.Security.Claims;
 using System.Text;
 
@@ -82,46 +84,6 @@ public static class DependencyInjection
         services.Configure<CloudinarySettings>(configuration.GetSection("Cloudinary"));
         services.Configure<FacePlusPlusSettings>(configuration.GetSection("FacePlusPlus"));
         services.AddHttpClient("FacePlusPlus");
-        services.PostConfigure<EmailSettings>(options =>
-        {
-            if (string.IsNullOrWhiteSpace(options.FromName))
-            {
-                options.FromName = configuration["EmailSettings:FromName"]
-                    ?? configuration["EmailSettings:SenderName"]
-                    ?? string.Empty;
-            }
-
-            if (string.IsNullOrWhiteSpace(options.FromEmail))
-            {
-                options.FromEmail = configuration["EmailSettings:FromEmail"]
-                    ?? configuration["EmailSettings:SenderEmail"]
-                    ?? string.Empty;
-            }
-
-            if (string.IsNullOrWhiteSpace(options.SmtpHost))
-            {
-                options.SmtpHost = configuration["EmailSettings:SmtpHost"]
-                    ?? string.Empty;
-            }
-
-            if (options.SmtpPort <= 0)
-            {
-                var smtpPortConfig = configuration["EmailSettings:SmtpPort"];
-                options.SmtpPort = int.TryParse(smtpPortConfig, out var smtpPort) ? smtpPort : 587;
-            }
-
-            if (string.IsNullOrWhiteSpace(options.SmtpUsername))
-            {
-                options.SmtpUsername = configuration["EmailSettings:SmtpUsername"]
-                    ?? string.Empty;
-            }
-
-            if (string.IsNullOrWhiteSpace(options.SmtpPassword))
-            {
-                options.SmtpPassword = configuration["EmailSettings:SmtpPassword"]
-                    ?? string.Empty;
-            }
-        });
 
         services.AddHangfire(cfg =>
         {
@@ -164,9 +126,27 @@ public static class DependencyInjection
         {
             options.AddPolicy("AllowFE", policy =>
             {
-                policy.AllowAnyOrigin()
+                var allowedOriginsConfig = configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
+                var allowedOrigins = new List<string>();
+                if (allowedOriginsConfig != null && allowedOriginsConfig.Length > 0)
+                {
+                    allowedOrigins.AddRange(allowedOriginsConfig);
+                }
+                else
+                {
+                    allowedOrigins.Add("http://localhost:3000");
+                    allowedOrigins.Add("http://localhost:5173");
+                    var frontendUrl = configuration["Payment:FrontendUrl"];
+                    if (!string.IsNullOrWhiteSpace(frontendUrl))
+                    {
+                        allowedOrigins.Add(frontendUrl.TrimEnd('/'));
+                    }
+                }
+
+                policy.WithOrigins(allowedOrigins.Distinct().ToArray())
                       .AllowAnyHeader()
-                      .AllowAnyMethod();
+                      .AllowAnyMethod()
+                      .AllowCredentials();
             });
         });
         return services;
@@ -187,10 +167,10 @@ public static class DependencyInjection
         _ = configuration["EmailSettings:SmtpPassword"]
             ?? throw new InvalidOperationException("Missing config: EmailSettings:SmtpPassword");
 
-        _ = configuration["EmailSettings:FromName"] ?? configuration["EmailSettings:SenderName"]
-            ?? throw new InvalidOperationException("Missing config: EmailSettings:FromName (or legacy EmailSettings:SenderName)");
-        _ = configuration["EmailSettings:FromEmail"] ?? configuration["EmailSettings:SenderEmail"]
-            ?? throw new InvalidOperationException("Missing config: EmailSettings:FromEmail (or legacy EmailSettings:SenderEmail)");
+        _ = configuration["EmailSettings:FromName"]
+            ?? throw new InvalidOperationException("Missing config: EmailSettings:FromName");
+        _ = configuration["EmailSettings:FromEmail"]
+            ?? throw new InvalidOperationException("Missing config: EmailSettings:FromEmail");
 
         var paymentMode = GetRequiredConfig(configuration, "Payment:Mode");
         var paymentGateway = GetRequiredConfig(configuration, "Payment:Gateway");

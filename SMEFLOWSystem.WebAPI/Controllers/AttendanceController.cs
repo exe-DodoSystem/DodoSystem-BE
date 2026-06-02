@@ -236,4 +236,52 @@ public class AttendanceController : ControllerBase
             return BadRequest(new { Error = ex.Message });
         }
     }
+
+    /// <summary>[Admin, HR] Thêm ngày lễ mới</summary>
+    [HttpPost("holidays")]
+    [Authorize(Roles = "Admin,HR")]
+    public async Task<IActionResult> CreatePublicHoliday([FromBody] CreatePublicHolidayDto request)
+    {
+        try
+        {
+            var result = await _service.CreatePublicHolidayAsync(request);
+            return Ok(new { Data = result, Message = "Tạo ngày nghỉ lễ thành công." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { Error = ex.Message });
+        }
+    }
+
+    /// <summary>[Admin, HR] Lấy danh sách các ngày nghỉ lễ</summary>
+    [HttpGet("holidays")]
+    [Authorize(Roles = "Admin,HR")]
+    public async Task<IActionResult> GetPublicHolidays()
+    {
+        try
+        {
+            var result = await _service.GetPublicHolidaysAsync();
+            return Ok(new { Data = result });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { Error = ex.Message });
+        }
+    }
+
+    /// <summary>[Admin, HR] Xóa ngày nghỉ lễ theo ID</summary>
+    [HttpDelete("holidays/{id}")]
+    [Authorize(Roles = "Admin,HR")]
+    public async Task<IActionResult> DeletePublicHoliday(Guid id)
+    {
+        try
+        {
+            await _service.DeletePublicHolidayAsync(id);
+            return Ok(new { Message = "Xóa ngày nghỉ lễ thành công." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { Error = ex.Message });
+        }
+    }
 }

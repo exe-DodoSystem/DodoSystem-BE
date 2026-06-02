@@ -53,4 +53,10 @@ public class TimesheetAppealRepository : ITimesheetAppealRepository
         _context.Set<TimesheetAppeal>().Update(appeal);
         await _context.SaveChangesAsync();
     }
+
+    public async Task<TimesheetAppeal?> GetPendingByEmployeeDateAsync(Guid employeeId, DateOnly workDate)
+    {
+        return await _context.Set<TimesheetAppeal>()
+            .FirstOrDefaultAsync(x => x.EmployeeId == employeeId && x.WorkDate == workDate && x.Status == "PendingApproval");
+    }
 }

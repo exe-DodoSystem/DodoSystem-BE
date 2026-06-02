@@ -25,4 +25,16 @@ public class LeaveRequestRepository : ILeaveRequestRepository
                         && s.LeaveRequest.Status == "Approved")
             .ToListAsync();
     }
+
+    public async Task<List<LeaveRequestSegment>> GetApprovedSegmentsForEmployeesAsync(List<Guid> employeeIds, DateOnly minDate, DateOnly maxDate)
+    {
+        return await _context.LeaveRequestSegments
+            .AsNoTracking()
+            .Include(s => s.LeaveRequest)
+            .Where(s => s.LeaveDate >= minDate && s.LeaveDate <= maxDate
+                        && s.LeaveRequest != null
+                        && employeeIds.Contains(s.LeaveRequest.EmployeeId)
+                        && s.LeaveRequest.Status == "Approved")
+            .ToListAsync();
+    }
 }
