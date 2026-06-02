@@ -35,9 +35,13 @@ public class AttendanceController : ControllerBase
             var result = await _service.SubmitPunchAsync(userId, request);
             return Ok(new { Data = result, Message = "Punch submitted successfully" });
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException ex) when (ex.Message.StartsWith("Employee not found"))
         {
-            return NotFound(new { Error = "Employee not found for current user." });
+            return NotFound(new { Error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { Error = ex.Message });
         }
     }
 
