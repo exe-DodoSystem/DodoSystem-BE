@@ -217,6 +217,7 @@ public class ShiftManagementService : IShiftManagementService
         pattern.Name = request.Name;
         pattern.CycleLengthDays = request.CycleLengthDays;
 
+        await _shiftPatternRepo.DeletePatternDaysAsync(pattern.Id);
         pattern.Days.Clear();
         foreach (var day in request.Days)
         {

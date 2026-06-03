@@ -168,4 +168,11 @@ public class ShiftPatternRepository : IShiftPatternRepository
     {
         return _context.Shifts.AnyAsync(x => x.Id == shiftId);
     }
+
+    public async Task DeletePatternDaysAsync(Guid shiftPatternId)
+    {
+        var days = await _context.ShiftPatternDays.Where(x => x.ShiftPatternId == shiftPatternId).ToListAsync();
+        _context.ShiftPatternDays.RemoveRange(days);
+        await _context.SaveChangesAsync();
+    }
 }

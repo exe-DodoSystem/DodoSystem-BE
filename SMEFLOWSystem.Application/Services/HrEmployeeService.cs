@@ -18,6 +18,7 @@ public class HrEmployeeService : IHrEmployeeService
     private readonly ICurrentUserService _currentUser;
     private readonly IHrAuthorizationService _hrAuth;
     private readonly IMapper _mapper;
+    private readonly IUserRepository _userRepo;
 
     public HrEmployeeService(
         IEmployeeRepository employeeRepo,
@@ -25,7 +26,8 @@ public class HrEmployeeService : IHrEmployeeService
         IPositionRepository positionRepo,
         ICurrentUserService currentUser,
         IHrAuthorizationService hrAuth,
-        IMapper mapper)
+        IMapper mapper,
+        IUserRepository userRepo)
     {
         _employeeRepo = employeeRepo;
         _departmentRepo = departmentRepo;
@@ -33,6 +35,7 @@ public class HrEmployeeService : IHrEmployeeService
         _currentUser = currentUser;
         _hrAuth = hrAuth;
         _mapper = mapper;
+        _userRepo = userRepo;
     }
 
     public async Task<PagedResultDto<EmployeeDto>> GetPagedAsync(EmployeeQueryDto query)
@@ -223,6 +226,11 @@ public class HrEmployeeService : IHrEmployeeService
         emp.IsDeleted = true;
         emp.UpdatedAt = DateTime.UtcNow;
         await _employeeRepo.UpdateAsync(emp);
+
+        if (emp.UserId.HasValue)
+        {
+            await _userRepo.SoftDeleteUserAndFreeEmailAsync(emp.UserId.Value);
+        }
     }
 
     private async Task ValidateDepartmentPositionAsync(Guid? departmentId, Guid? positionId)
