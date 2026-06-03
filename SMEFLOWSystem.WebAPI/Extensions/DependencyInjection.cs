@@ -2,14 +2,18 @@ using FluentValidation.AspNetCore;
 using Hangfire;
 using Hangfire.Redis.StackExchange;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using SMEFLOWSystem.Core.Config;
+using SMEFLOWSystem.Application.Interfaces.IServices;
 using SMEFLOWSystem.Application.Options;
 using SMEFLOWSystem.WebAPI.Converters;
 using SMEFLOWSystem.WebAPI.BackgroundServices;
+using SMEFLOWSystem.WebAPI.Hubs;
+using SMEFLOWSystem.WebAPI.Services;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
@@ -120,7 +124,27 @@ public static class DependencyInjection
                     RoleClaimType = ClaimTypes.Role,
                     NameClaimType = ClaimTypes.NameIdentifier
                 };
+
+                options.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        var accessToken = context.Request.Query["access_token"];
+                        var path = context.HttpContext.Request.Path;
+                        if (!string.IsNullOrEmpty(accessToken) &&
+                            path.StartsWithSegments("/hubs/notifications"))
+                        {
+                            context.Token = accessToken;
+                        }
+                        return Task.CompletedTask;
+                    }
+                };
             });
+
+        // SignalR
+        services.AddSignalR();
+        services.AddSingleton<IUserIdProvider, UserIdProvider>();
+        services.AddScoped<IRealtimeNotificationService, SignalRNotificationService>();
 
         services.AddCors(options =>
         {

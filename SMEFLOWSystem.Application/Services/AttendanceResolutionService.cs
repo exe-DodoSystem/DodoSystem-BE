@@ -29,6 +29,9 @@ public class AttendanceResolutionService : IAttendanceResolutionService
     private readonly ITenantRepository _tenantRepository;
     private readonly IPublicHolidayRepository _publicHolidayRepository;
 
+    private readonly IRealtimeNotificationService _realtime;
+    private readonly IEmployeeRepository _employeeRepository;
+
     private const int MaxRetryCount = 3;
     private static readonly TimeZoneInfo VietnamTimeZone = GetVietnamTimeZone();
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> Locks = new();
@@ -45,7 +48,9 @@ public class AttendanceResolutionService : IAttendanceResolutionService
         ITransaction transaction,
         ICurrentTenantService currentTenantService,
         ITenantRepository tenantRepository,
-        IPublicHolidayRepository publicHolidayRepository)
+        IPublicHolidayRepository publicHolidayRepository,
+        IRealtimeNotificationService realtime,
+        IEmployeeRepository employeeRepository)
     {
         _logger = logger;
         _options = options.Value;
@@ -59,6 +64,8 @@ public class AttendanceResolutionService : IAttendanceResolutionService
         _currentTenantService = currentTenantService;
         _tenantRepository = tenantRepository;
         _publicHolidayRepository = publicHolidayRepository;
+        _realtime = realtime;
+        _employeeRepository = employeeRepository;
     }
 
     public Task ProcessUnresolvedPunchesAsync()
@@ -167,6 +174,10 @@ public class AttendanceResolutionService : IAttendanceResolutionService
             var existingTimesheets = await _dailyTimesheetRepository.GetWithSegmentsForEmployeesAsync(employeeIds, minDate, maxDate);
             var publicHolidays = await _publicHolidayRepository.GetAllAsync(tenantId);
 
+            // Load employees to retrieve user IDs for realtime notification
+            var employees = await _employeeRepository.GetByIdsAsync(employeeIds);
+            var employeeMap = employees.ToDictionary(e => e.Id);
+
             var bulkData = new BulkAttendanceDataContext
             {
                 EmployeeShiftPatterns = esps,
@@ -184,6 +195,7 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                 var mySemaphore = Locks.GetOrAdd(lockKey, _ => new SemaphoreSlim(1, 1));
                 await mySemaphore.WaitAsync();
 
+                DailyTimesheet? updatedTimesheet = null;
                 try
                 {
                     await _transaction.ExecuteAsync(async () =>
@@ -205,7 +217,34 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                         // Chỉ mark processed cho những log CHƯA xử lý thuộc nhóm của batch hiện tại
                         var newLogIds = group.Select(x => x.Log.Id).ToList();
                         await _rawPunchLogRepository.MarkProcessedAsync(newLogIds);
+
+                        // Retrieve the daily timesheet that was just updated or created
+                        updatedTimesheet = bulkData.ExistingTimesheets
+                            .FirstOrDefault(d => d.EmployeeId == group.Key.EmployeeId && d.WorkDate == group.Key.WorkDate);
                     });
+
+                    // Emit event after transaction commits successfully
+                    if (employeeMap.TryGetValue(group.Key.EmployeeId, out var employee) && employee?.UserId != null)
+                    {
+                        var todayDto = new
+                        {
+                            workDate = group.Key.WorkDate.ToString("yyyy-MM-dd"),
+                            status = updatedTimesheet?.Status,
+                            totalLateMinutes = updatedTimesheet?.TotalLateMinutes ?? 0,
+                            hasCheckedIn = updatedTimesheet?.Segments?.Any(s => s.ActualCheckIn != null) ?? false,
+                            hasCheckedOut = updatedTimesheet?.Segments?.Any(s => s.ActualCheckOut != null) ?? false
+                        };
+
+                        _ = _realtime.NotifyAttendanceUpdatedAsync(
+                                employee.UserId.Value,
+                                employee.TenantId,
+                                todayDto)
+                            .ContinueWith(t =>
+                            {
+                                if (t.IsFaulted)
+                                    _logger.LogWarning(t.Exception, "Notify attendance failed for employee {EmployeeId}", group.Key.EmployeeId);
+                            });
+                    }
                 }
                 catch (Exception ex)
                 {

@@ -1,5 +1,4 @@
 using AutoMapper;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SharedKernel.DTOs;
 using ShareKernel.Common.Enum;
@@ -19,21 +18,27 @@ namespace SMEFLOWSystem.Application.Services
         private readonly IPayrollRepository _payrollRepository;
         private readonly IEmployeeRepository _employeeRepository;
         private readonly IDailyTimesheetRepository _timesheetRepository;
+        private readonly IPublicHolidayRepository _publicHolidayRepository;
         private readonly IMapper _mapper;
         private readonly ILogger<PayrollService> _logger;
+        private readonly IRealtimeNotificationService _realtime;
 
         public PayrollService(
             IPayrollRepository payrollRepository,
             IEmployeeRepository employeeRepository,
             IDailyTimesheetRepository timesheetRepository,
+            IPublicHolidayRepository publicHolidayRepository,
             IMapper mapper,
-            ILogger<PayrollService> logger)
+            ILogger<PayrollService> logger,
+            IRealtimeNotificationService realtime)
         {
             _payrollRepository = payrollRepository;
             _employeeRepository = employeeRepository;
             _timesheetRepository = timesheetRepository;
+            _publicHolidayRepository = publicHolidayRepository;
             _mapper = mapper;
             _logger = logger;
+            _realtime = realtime;
         }
 
         public async Task<bool> GenerateMonthlyPayrollAsync(Guid tenantId, int month, int year)
@@ -46,27 +51,59 @@ namespace SMEFLOWSystem.Application.Services
             var newPayrolls = new List<Payroll>();
             var updatePayrolls = new List<Payroll>();
 
+            // Load ngày lễ của tenant một lần, dùng chung cho toàn bộ nhân viên
+            var holidays = await _publicHolidayRepository.GetAllAsync(tenantId);
+            var holidayDatesInMonth = holidays
+                .Select(h => h.IsRecurringYearly
+                    ? new DateOnly(year, h.Date.Month, h.Date.Day)
+                    : h.Date)
+                .Where(d => d.Month == month && d.Year == year)
+                .ToHashSet();
+
+            // Bulk load: 1 query duy nhất thay vì N queries
+            var allTimesheets = await _timesheetRepository.GetByTenantMonthAsync(tenantId, month, year);
+            var timesheetByEmployee = allTimesheets
+                .GroupBy(t => t.EmployeeId)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            // Tính 1 lần, dùng chung cho toàn bộ nhân viên
+            int daysInMonth = DateTime.DaysInMonth(year, month);
+            int standardDays = Enumerable.Range(1, daysInMonth)
+                .Select(day => new DateOnly(year, month, day))
+                .Count(date => date.DayOfWeek != DayOfWeek.Saturday
+                            && date.DayOfWeek != DayOfWeek.Sunday
+                            && !holidayDatesInMonth.Contains(date));
+
             foreach (var emp in employees)
             {
-                var timesheets = await _timesheetRepository.GetByEmployeeMonthAsync(emp.Id, month, year);
-                
+                var timesheets = timesheetByEmployee.TryGetValue(emp.Id, out var ts)
+                    ? ts
+                    : new List<DailyTimesheet>();
+
                 var existingPayroll = existingPayrolls.FirstOrDefault(p => p.EmployeeId == emp.Id);
-                
-                // Idempotent Check: Bỏ qua nếu đã Published
-                if (existingPayroll != null && existingPayroll.Status == PayrollStatus.Published)
+
+                // Idempotent Check: Bỏ qua nếu đã Published hoặc Paid
+                if (existingPayroll != null &&
+                    (existingPayroll.Status == PayrollStatus.Published || existingPayroll.Status == PayrollStatus.Paid))
                     continue;
 
-                // Tính Standard Working Days (Trừ T7, CN)
-                int daysInMonth = DateTime.DaysInMonth(year, month);
-                int standardDays = Enumerable.Range(1, daysInMonth)
-                    .Select(day => new DateTime(year, month, day))
-                    .Count(date => date.DayOfWeek != DayOfWeek.Saturday && date.DayOfWeek != DayOfWeek.Sunday);
-
                 // Tính toán các chỉ số từ Timesheet
-                int actualDays = timesheets.Count(t => t.ActualWorkHours > 0 || t.Status == "Present" || t.Status == "Late" || t.Status == "EarlyLeave");
-                int lateMinutes = timesheets.Sum(t => t.TotalLateMinutes);
-                int earlyLeaveMinutes = timesheets.Sum(t => t.TotalEarlyLeaveMinutes);
-                int absentDays = timesheets.Count(t => t.Status == "Absent");
+                int actualDays = timesheets.Count(t =>
+                    t.ActualWorkHours > 0 ||
+                    t.Status == StatusEnum.AttendanceNormal     ||
+                    t.Status == StatusEnum.AttendanceLate       ||
+                    t.Status == StatusEnum.AttendanceEarlyLeave ||
+                    t.Status == StatusEnum.AttendanceMissingOut ||
+                    t.Status == StatusEnum.AttendanceOnLeave);
+                // Loại ngày MissingOut khỏi penalty — AttendanceResolution ghi earlyLeaveMinutes = gần cả ca
+                // cho ngày MissingOut, gây phạt quá nặng. Ngày MissingOut cần xử lý thủ công bởi HR.
+                int lateMinutes = timesheets
+                    .Where(t => t.Status != StatusEnum.AttendanceMissingOut)
+                    .Sum(t => t.TotalLateMinutes);
+                int earlyLeaveMinutes = timesheets
+                    .Where(t => t.Status != StatusEnum.AttendanceMissingOut)
+                    .Sum(t => t.TotalEarlyLeaveMinutes);
+                int absentDays = timesheets.Count(t => t.Status == StatusEnum.AttendanceAbsent);
                 decimal otHours = timesheets.Sum(t => t.OTHours);
 
                 // Nếu không đi làm ngày nào thì BasePay = 0
@@ -143,7 +180,7 @@ namespace SMEFLOWSystem.Application.Services
             if (newPayrolls.Any()) await _payrollRepository.AddRangeAsync(newPayrolls);
             if (updatePayrolls.Any()) await _payrollRepository.UpdateRangeAsync(updatePayrolls);
 
-            return true;
+            return newPayrolls.Any() || updatePayrolls.Any();
         }
 
         public async Task<PayrollDto> CalculatePayrollForEmployeeAsync(Guid tenantId, Guid employeeId, int month, int year)
@@ -154,20 +191,42 @@ namespace SMEFLOWSystem.Application.Services
             var existingPayrolls = await _payrollRepository.GetByEmployeeMonthAsync(employeeId, tenantId, month, year);
             var existingPayroll = existingPayrolls.FirstOrDefault();
 
-            if (existingPayroll != null && existingPayroll.Status == PayrollStatus.Published)
-                throw new Exception("Phiếu lương đã chốt (Published), không thể tính toán lại.");
+            if (existingPayroll != null && existingPayroll.Status != PayrollStatus.Draft)
+                throw new Exception("Phiếu lương đã chốt, không thể tính toán lại.");
 
             var timesheets = await _timesheetRepository.GetByEmployeeMonthAsync(employeeId, month, year);
 
+            var holidays = await _publicHolidayRepository.GetAllAsync(tenantId);
+            var holidayDatesInMonth = holidays
+                .Select(h => h.IsRecurringYearly
+                    ? new DateOnly(year, h.Date.Month, h.Date.Day)
+                    : h.Date)
+                .Where(d => d.Month == month && d.Year == year)
+                .ToHashSet();
+
             int daysInMonth = DateTime.DaysInMonth(year, month);
             int standardDays = Enumerable.Range(1, daysInMonth)
-                .Select(day => new DateTime(year, month, day))
-                .Count(date => date.DayOfWeek != DayOfWeek.Saturday && date.DayOfWeek != DayOfWeek.Sunday);
+                .Select(day => new DateOnly(year, month, day))
+                .Count(date => date.DayOfWeek != DayOfWeek.Saturday
+                            && date.DayOfWeek != DayOfWeek.Sunday
+                            && !holidayDatesInMonth.Contains(date));
 
-            int actualDays = timesheets.Count(t => t.ActualWorkHours > 0 || t.Status == "Present" || t.Status == "Late" || t.Status == "EarlyLeave");
-            int lateMinutes = timesheets.Sum(t => t.TotalLateMinutes);
-            int earlyLeaveMinutes = timesheets.Sum(t => t.TotalEarlyLeaveMinutes);
-            int absentDays = timesheets.Count(t => t.Status == "Absent");
+            int actualDays = timesheets.Count(t =>
+                t.ActualWorkHours > 0 ||
+                t.Status == StatusEnum.AttendanceNormal     ||
+                t.Status == StatusEnum.AttendanceLate       ||
+                t.Status == StatusEnum.AttendanceEarlyLeave ||
+                t.Status == StatusEnum.AttendanceMissingOut ||
+                t.Status == StatusEnum.AttendanceOnLeave);
+            // Loại ngày MissingOut khỏi penalty — AttendanceResolution ghi earlyLeaveMinutes = gần cả ca
+            // cho ngày MissingOut, gây phạt quá nặng. Ngày MissingOut cần xử lý thủ công bởi HR.
+            int lateMinutes = timesheets
+                .Where(t => t.Status != StatusEnum.AttendanceMissingOut)
+                .Sum(t => t.TotalLateMinutes);
+            int earlyLeaveMinutes = timesheets
+                .Where(t => t.Status != StatusEnum.AttendanceMissingOut)
+                .Sum(t => t.TotalEarlyLeaveMinutes);
+            int absentDays = timesheets.Count(t => t.Status == StatusEnum.AttendanceAbsent);
             decimal otHours = timesheets.Sum(t => t.OTHours);
 
             decimal basePay = 0;
@@ -273,15 +332,26 @@ namespace SMEFLOWSystem.Application.Services
                 pageNumber: 1,
                 pageSize: 100); // Trả về tối đa 100 phiếu lương (khoảng 8 năm) cho App Mobile
 
-            // Lọc: Chỉ trả về phiếu lương đã Publish (hoặc Draft nếu theo yêu cầu đặc thù, nhưng chuẩn MVP là chỉ thấy Published)
-            var publishedItems = items.Where(p => p.Status == PayrollStatus.Published).ToList();
+            // Lọc: Chỉ trả về phiếu lương đã Publish hoặc Paid
+            var visibleItems = items.Where(p => 
+                p.Status == PayrollStatus.Published || 
+                p.Status == PayrollStatus.Paid).ToList();
 
-            return _mapper.Map<List<PayrollDto>>(publishedItems);
+            return _mapper.Map<List<PayrollDto>>(visibleItems);
         }
 
-        public async Task<bool> ApproveAsync(Guid payrollId) => throw new NotImplementedException();
-        public async Task<bool> RejectAsync(Guid payrollId, string reason) => throw new NotImplementedException();
-        public async Task<bool> MarkPaidAsync(Guid payrollId) => throw new NotImplementedException();
+        public async Task<bool> MarkPaidAsync(Guid payrollId)
+        {
+            var payroll = await _payrollRepository.GetByIdAsync(payrollId);
+            if (payroll == null) return false;
+
+            if (payroll.Status != PayrollStatus.Published)
+                throw new Exception("Chỉ phiếu lương đã chốt (Published) mới được đánh dấu đã thanh toán.");
+
+            payroll.Status = PayrollStatus.Paid;
+            await _payrollRepository.UpdateAsync(payroll);
+            return true;
+        }
 
         public async Task<PayrollDto> UpdateManualFieldsAsync(Guid payrollId, UpdatePayrollDto dto)
         {
@@ -307,12 +377,74 @@ namespace SMEFLOWSystem.Application.Services
             var payroll = await _payrollRepository.GetByIdAsync(payrollId);
             if (payroll == null) return false;
 
-            if (payroll.Status == PayrollStatus.Published)
-                throw new Exception("Phiếu lương này đã được chốt (Published) từ trước.");
+            if (payroll.Status != PayrollStatus.Draft)
+                throw new Exception("Chỉ phiếu lương ở trạng thái Nháp (Draft) mới được chốt.");
 
             payroll.Status = PayrollStatus.Published;
             await _payrollRepository.UpdateAsync(payroll);
+
+            // Emit realtime notification
+            var employee = await _employeeRepository.GetByIdAsync(payroll.EmployeeId);
+            if (employee?.UserId != null)
+            {
+                var payrollDto = new
+                {
+                    payrollId = payroll.Id,
+                    month = payroll.Month,
+                    year = payroll.Year,
+                    netSalary = payroll.NetSalary
+                };
+
+                _ = _realtime.NotifyPayrollPublishedAsync(employee.UserId.Value, payrollDto)
+                    .ContinueWith(t =>
+                    {
+                        if (t.IsFaulted)
+                            _logger.LogWarning(t.Exception, "Notify payroll.published failed for employee {UserId}", employee.UserId.Value);
+                    });
+            }
+
             return true;
+        }
+
+        public async Task<int> PublishAllDraftAsync(Guid tenantId, int month, int year)
+        {
+            var drafts = await _payrollRepository.GetDraftsByTenantMonthAsync(tenantId, month, year);
+            if (!drafts.Any()) return 0;
+
+            foreach (var payroll in drafts)
+            {
+                payroll.Status = PayrollStatus.Published;
+            }
+            
+            await _payrollRepository.UpdateRangeAsync(drafts);
+
+            // Emit realtime notification in bulk
+            var employeeIds = drafts.Select(p => p.EmployeeId).Distinct().ToList();
+            var employees = await _employeeRepository.GetByIdsAsync(employeeIds);
+            var employeeMap = employees.ToDictionary(e => e.Id);
+
+            foreach (var payroll in drafts)
+            {
+                if (employeeMap.TryGetValue(payroll.EmployeeId, out var employee) && employee?.UserId != null)
+                {
+                    var payrollDto = new
+                    {
+                        payrollId = payroll.Id,
+                        month = payroll.Month,
+                        year = payroll.Year,
+                        netSalary = payroll.NetSalary
+                    };
+
+                    _ = _realtime.NotifyPayrollPublishedAsync(employee.UserId.Value, payrollDto)
+                        .ContinueWith(t =>
+                        {
+                            if (t.IsFaulted)
+                                _logger.LogWarning(t.Exception, "Notify payroll.published failed for employee {UserId}", employee.UserId.Value);
+                        });
+                }
+            }
+
+            return drafts.Count;
         }
     }
 }

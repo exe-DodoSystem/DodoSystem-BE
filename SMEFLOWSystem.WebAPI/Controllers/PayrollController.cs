@@ -88,6 +88,27 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             return Ok(new { published = result });
         }
 
+        /// <summary>[TenantAdmin] Đánh dấu phiếu lương đã thanh toán</summary>
+        [HttpPut("{payrollId}/mark-paid")]
+        [Authorize(Roles = "TenantAdmin")]
+        public async Task<IActionResult> MarkPaid(Guid payrollId)
+        {
+            var result = await _payrollService.MarkPaidAsync(payrollId);
+            return Ok(new { paid = result });
+        }
+
+        /// <summary>[TenantAdmin] Chốt tất cả phiếu lương Draft trong tháng</summary>
+        [HttpPut("publish-all")]
+        [Authorize(Roles = "TenantAdmin")]
+        public async Task<IActionResult> PublishAll([FromQuery] int month, [FromQuery] int year)
+        {
+            var tenantId = _currentTenant.TenantId
+                ?? throw new UnauthorizedAccessException("Không xác định được công ty.");
+
+            var count = await _payrollService.PublishAllDraftAsync(tenantId, month, year);
+            return Ok(new { message = $"Đã chốt {count} phiếu lương.", publishedCount = count });
+        }
+
         /// <summary>[TenantAdmin, HRManager, Manager] Cập nhật tiền thưởng/phạt nhập tay cho phiếu lương</summary>
         [HttpPut("{payrollId}/manual-fields")]
         [Authorize(Roles = "TenantAdmin,HRManager,Manager")]

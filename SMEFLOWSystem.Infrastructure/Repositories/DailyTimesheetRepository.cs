@@ -91,4 +91,14 @@ public class DailyTimesheetRepository : IDailyTimesheetRepository
 
         await _context.SaveChangesAsync();
     }
+
+    public async Task<List<DailyTimesheet>> GetByTenantDateAsync(Guid tenantId, DateOnly workDate)
+    {
+        return await _context.DailyTimesheets
+            .AsNoTracking()
+            .Include(d => d.Employee)
+            .AsSplitQuery()
+            .Where(d => d.TenantId == tenantId && d.WorkDate == workDate)
+            .ToListAsync();
+    }
 }
