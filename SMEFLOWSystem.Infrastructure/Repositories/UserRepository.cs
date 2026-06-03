@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using SharedKernel.DTOs;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Core.Entities;
@@ -258,6 +258,18 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
                 .FirstOrDefaultAsync(u => u.Id == ownerUserId);
 
             return user!;
+        }
+
+        public async Task SoftDeleteUserAndFreeEmailAsync(Guid userId)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            if (user != null)
+            {
+                user.IsDeleted = true;
+                user.IsActive = false;
+                user.Email = user.Email + ".deleted_" + Guid.NewGuid().ToString("N");
+                await _context.SaveChangesAsync();
+            }
         }
     }
 }

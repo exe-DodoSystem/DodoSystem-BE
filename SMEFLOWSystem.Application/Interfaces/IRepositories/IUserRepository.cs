@@ -1,4 +1,4 @@
-﻿using SharedKernel.DTOs;
+using SharedKernel.DTOs;
 using SMEFLOWSystem.Application.DTOs.UserDtos;
 using SMEFLOWSystem.Core.Entities;
 using System;
@@ -29,5 +29,6 @@ namespace SMEFLOWSystem.Application.Interfaces.IRepositories
         Task<User> GetOwnerUserByIdAsync(Guid? ownerUserId);
         Task<User?> GetByIdIgnoreTenantAsync(Guid id);
         Task<User?> UpdateUserIgnoreTenantAsync(User user);
+        Task SoftDeleteUserAndFreeEmailAsync(Guid userId);
     }
 }

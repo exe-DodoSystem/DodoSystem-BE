@@ -37,4 +37,5 @@ public interface IShiftPatternRepository
     Task SoftDeleteAsync(ShiftPattern pattern);
     Task<bool> HasUsageAsync(Guid shiftPatternId);
     Task<bool> ShiftExistsAsync(Guid shiftId);
+    Task DeletePatternDaysAsync(Guid shiftPatternId);
 }
