@@ -12,4 +12,5 @@ public interface IDailyTimesheetRepository
     Task AddRangeAsync(List<DailyTimesheet> timesheets);
     Task UpdateAsync(DailyTimesheet timesheet);
     Task UpsertAsync(DailyTimesheet timesheet);
+    Task<List<DailyTimesheet>> GetByTenantDateAsync(Guid tenantId, DateOnly workDate);
 }

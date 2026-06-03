@@ -13,4 +13,5 @@ public interface ITimesheetAppealRepository
     Task<List<TimesheetAppeal>> GetPendingAsync(Guid tenantId);
     Task UpdateAsync(TimesheetAppeal appeal);
     Task<TimesheetAppeal?> GetPendingByEmployeeDateAsync(Guid employeeId, DateOnly workDate);
+    Task<int> GetPendingCountAsync(Guid tenantId);
 }

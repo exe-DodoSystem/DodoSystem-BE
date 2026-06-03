@@ -59,4 +59,10 @@ public class TimesheetAppealRepository : ITimesheetAppealRepository
         return await _context.Set<TimesheetAppeal>()
             .FirstOrDefaultAsync(x => x.EmployeeId == employeeId && x.WorkDate == workDate && x.Status == "PendingApproval");
     }
+
+    public async Task<int> GetPendingCountAsync(Guid tenantId)
+    {
+        return await _context.Set<TimesheetAppeal>()
+            .CountAsync(a => a.TenantId == tenantId && a.Status == "PendingApproval");
+    }
 }
