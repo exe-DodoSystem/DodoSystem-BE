@@ -8,6 +8,7 @@ using SMEFLOWSystem.Application.BackgroundJobs;
 using Microsoft.EntityFrameworkCore;
 using SMEFLOWSystem.Core.Entities;
 using SMEFLOWSystem.Infrastructure.Data;
+using SMEFLOWSystem.WebAPI.Hubs;
 
 namespace SMEFLOWSystem.WebAPI.Validator;
 
@@ -29,6 +30,8 @@ public static class WebApplicationExtensions
         app.UseCors("AllowFE");
         app.UseAuthentication();
         app.UseAuthorization();
+
+        app.MapHub<NotificationHub>("/hubs/notifications");
 
         app.UseMiddleware<ModuleAccessMiddleware>();
 

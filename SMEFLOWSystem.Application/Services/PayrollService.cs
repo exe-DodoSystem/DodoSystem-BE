@@ -21,6 +21,7 @@ namespace SMEFLOWSystem.Application.Services
         private readonly IPublicHolidayRepository _publicHolidayRepository;
         private readonly IMapper _mapper;
         private readonly ILogger<PayrollService> _logger;
+        private readonly IRealtimeNotificationService _realtime;
 
         public PayrollService(
             IPayrollRepository payrollRepository,
@@ -28,7 +29,8 @@ namespace SMEFLOWSystem.Application.Services
             IDailyTimesheetRepository timesheetRepository,
             IPublicHolidayRepository publicHolidayRepository,
             IMapper mapper,
-            ILogger<PayrollService> logger)
+            ILogger<PayrollService> logger,
+            IRealtimeNotificationService realtime)
         {
             _payrollRepository = payrollRepository;
             _employeeRepository = employeeRepository;
@@ -36,6 +38,7 @@ namespace SMEFLOWSystem.Application.Services
             _publicHolidayRepository = publicHolidayRepository;
             _mapper = mapper;
             _logger = logger;
+            _realtime = realtime;
         }
 
         public async Task<bool> GenerateMonthlyPayrollAsync(Guid tenantId, int month, int year)
@@ -379,6 +382,27 @@ namespace SMEFLOWSystem.Application.Services
 
             payroll.Status = PayrollStatus.Published;
             await _payrollRepository.UpdateAsync(payroll);
+
+            // Emit realtime notification
+            var employee = await _employeeRepository.GetByIdAsync(payroll.EmployeeId);
+            if (employee?.UserId != null)
+            {
+                var payrollDto = new
+                {
+                    payrollId = payroll.Id,
+                    month = payroll.Month,
+                    year = payroll.Year,
+                    netSalary = payroll.NetSalary
+                };
+
+                _ = _realtime.NotifyPayrollPublishedAsync(employee.UserId.Value, payrollDto)
+                    .ContinueWith(t =>
+                    {
+                        if (t.IsFaulted)
+                            _logger.LogWarning(t.Exception, "Notify payroll.published failed for employee {UserId}", employee.UserId.Value);
+                    });
+            }
+
             return true;
         }
 
@@ -393,6 +417,33 @@ namespace SMEFLOWSystem.Application.Services
             }
             
             await _payrollRepository.UpdateRangeAsync(drafts);
+
+            // Emit realtime notification in bulk
+            var employeeIds = drafts.Select(p => p.EmployeeId).Distinct().ToList();
+            var employees = await _employeeRepository.GetByIdsAsync(employeeIds);
+            var employeeMap = employees.ToDictionary(e => e.Id);
+
+            foreach (var payroll in drafts)
+            {
+                if (employeeMap.TryGetValue(payroll.EmployeeId, out var employee) && employee?.UserId != null)
+                {
+                    var payrollDto = new
+                    {
+                        payrollId = payroll.Id,
+                        month = payroll.Month,
+                        year = payroll.Year,
+                        netSalary = payroll.NetSalary
+                    };
+
+                    _ = _realtime.NotifyPayrollPublishedAsync(employee.UserId.Value, payrollDto)
+                        .ContinueWith(t =>
+                        {
+                            if (t.IsFaulted)
+                                _logger.LogWarning(t.Exception, "Notify payroll.published failed for employee {UserId}", employee.UserId.Value);
+                        });
+                }
+            }
+
             return drafts.Count;
         }
     }

@@ -69,39 +69,47 @@ namespace SMEFLOWSystem.Application.Services
             return workDate;
         }
 
-        private List<AlertItemDto> BuildAlerts(int pendingAppealsCount, int draftPayrollCount, int highLateCount, int missingOutCount)
+        private static List<AlertItemDto> BuildAlerts(int pendingAppealsCount, int draftPayrollCount, int frequentAbsentCount, int missingOutCount)
         {
-            return new List<AlertItemDto>
-            {
-                new AlertItemDto
+            var alerts = new List<AlertItemDto>();
+
+            if (pendingAppealsCount > 0)
+                alerts.Add(new AlertItemDto
                 {
                     Type = "PendingAppeals",
-                    Severity = pendingAppealsCount > 5 ? "High" : (pendingAppealsCount > 0 ? "Medium" : "Low"),
+                    Severity = pendingAppealsCount > 5 ? "High" : "Medium",
                     Message = $"Có {pendingAppealsCount} đơn giải trình đang chờ xử lý.",
                     Count = pendingAppealsCount
-                },
-                new AlertItemDto
+                });
+
+            if (draftPayrollCount > 0)
+                alerts.Add(new AlertItemDto
                 {
                     Type = "UnpublishedPayroll",
-                    Severity = draftPayrollCount > 0 ? "Medium" : "Low",
-                    Message = $"Có {draftPayrollCount} nhân viên đang ở trạng thái lương Nháp.",
+                    Severity = "Medium",
+                    Message = $"Có {draftPayrollCount} phiếu lương chưa được publish.",
                     Count = draftPayrollCount
-                },
-                new AlertItemDto
+                });
+
+            if (frequentAbsentCount > 0)
+                alerts.Add(new AlertItemDto
                 {
                     Type = "FrequentAbsent",
-                    Severity = highLateCount > 2 ? "High" : (highLateCount > 0 ? "Medium" : "Low"),
-                    Message = $"Có {highLateCount} nhân viên đi trễ từ 3 lần trở lên trong tháng.",
-                    Count = highLateCount
-                },
-                new AlertItemDto
+                    Severity = frequentAbsentCount > 2 ? "High" : "Medium",
+                    Message = $"Có {frequentAbsentCount} nhân viên vắng mặt từ 3 ngày trở lên trong tháng.",
+                    Count = frequentAbsentCount
+                });
+
+            if (missingOutCount > 0)
+                alerts.Add(new AlertItemDto
                 {
                     Type = "MissingOutUnresolved",
-                    Severity = missingOutCount > 2 ? "High" : (missingOutCount > 0 ? "Medium" : "Low"),
-                    Message = $"Có {missingOutCount} nhân viên có ngày chưa checkout trong tháng.",
+                    Severity = missingOutCount > 2 ? "High" : "Medium",
+                    Message = $"Có {missingOutCount} nhân viên có ngày thiếu chấm ra chưa giải trình.",
                     Count = missingOutCount
-                }
-            };
+                });
+
+            return alerts;
         }
 
         public async Task<AdminDashboardDto> GetAdminDashboardAsync(Guid tenantId, int month, int year)
@@ -171,18 +179,21 @@ namespace SMEFLOWSystem.Application.Services
 
             var pendingAppealsCount = pendingAppeals.Count;
 
-            var highLateCount = monthTimesheets
-                .Where(t => t.Status == StatusEnum.AttendanceLate)
+            var frequentAbsentCount = monthTimesheets
+                .Where(t => t.Status == StatusEnum.AttendanceAbsent)
                 .GroupBy(t => t.EmployeeId)
                 .Count(g => g.Count() >= 3);
 
-            var missingOutCount = monthTimesheets
+            var missingOutEmpIds = monthTimesheets
                 .Where(t => t.Status == StatusEnum.AttendanceMissingOut)
                 .Select(t => t.EmployeeId)
-                .Distinct()
-                .Count();
+                .ToHashSet();
+            var appealedEmpIds = pendingAppeals
+                .Select(a => a.EmployeeId)
+                .ToHashSet();
+            var missingOutCount = missingOutEmpIds.Except(appealedEmpIds).Count();
 
-            var alerts = BuildAlerts(pendingAppealsCount, payrollSummary.DraftCount, highLateCount, missingOutCount);
+            var alerts = BuildAlerts(pendingAppealsCount, payrollSummary.DraftCount, frequentAbsentCount, missingOutCount);
 
             return new AdminDashboardDto
             {
@@ -268,18 +279,21 @@ namespace SMEFLOWSystem.Application.Services
             var draftPayrollCount = payrolls.Count(p => p.Status == PayrollStatus.Draft);
             var deptPendingAppealsCount = pendingAppeals.Count;
 
-            var highLateCount = monthTimesheets
-                .Where(t => t.Status == StatusEnum.AttendanceLate)
+            var frequentAbsentCount = monthTimesheets
+                .Where(t => t.Status == StatusEnum.AttendanceAbsent)
                 .GroupBy(t => t.EmployeeId)
                 .Count(g => g.Count() >= 3);
 
-            var missingOutCount = monthTimesheets
+            var missingOutEmpIds = monthTimesheets
                 .Where(t => t.Status == StatusEnum.AttendanceMissingOut)
                 .Select(t => t.EmployeeId)
-                .Distinct()
-                .Count();
+                .ToHashSet();
+            var appealedEmpIds = pendingAppeals
+                .Select(a => a.EmployeeId)
+                .ToHashSet();
+            var missingOutCount = missingOutEmpIds.Except(appealedEmpIds).Count();
 
-            var alerts = BuildAlerts(deptPendingAppealsCount, draftPayrollCount, highLateCount, missingOutCount);
+            var alerts = BuildAlerts(deptPendingAppealsCount, draftPayrollCount, frequentAbsentCount, missingOutCount);
 
             return new ManagerDashboardDto
             {
@@ -300,9 +314,19 @@ namespace SMEFLOWSystem.Application.Services
             var employee = await _employeeRepo.GetByUserIdAsync(userId)
                 ?? throw new KeyNotFoundException("Không tìm thấy hồ sơ nhân sự cho tài khoản này.");
 
-            var todayStatus = await _attendanceService.GetMyTodayStatusAsync(userId);
+            var todayStatusTask = _attendanceService.GetMyTodayStatusAsync(userId);
+            var monthTimesheetsTask = _timesheetRepo.GetByEmployeeMonthAsync(employee.Id, month, year);
+            var shiftTask = _shiftPatternRepo.GetActivePatternDetailsAsync(employee.Id, workDate);
+            var payrollsTask = _payrollRepo.GetByEmployeeMonthAsync(employee.Id, employee.TenantId, month, year);
+            var appealsTask = _appealRepo.GetByEmployeeAsync(employee.Id);
 
-            var monthTimesheets = await _timesheetRepo.GetByEmployeeMonthAsync(employee.Id, month, year);
+            await Task.WhenAll(todayStatusTask, monthTimesheetsTask, shiftTask, payrollsTask, appealsTask);
+
+            var todayStatus = await todayStatusTask;
+            var monthTimesheets = await monthTimesheetsTask;
+            var (esp, definition) = await shiftTask;
+            var payrolls = await payrollsTask;
+            var appeals = await appealsTask;
 
             var myMonthSummary = new MyMonthSummaryDto
             {
@@ -316,7 +340,6 @@ namespace SMEFLOWSystem.Application.Services
             };
 
             CurrentShiftDto? myCurrentShift = null;
-            var (esp, definition) = await _shiftPatternRepo.GetActivePatternDetailsAsync(employee.Id, workDate);
             if (esp != null && definition != null && definition.CycleLengthDays > 0)
             {
                 var dayOffset = workDate.DayNumber - esp.EffectiveStartDate.DayNumber;
@@ -345,15 +368,13 @@ namespace SMEFLOWSystem.Application.Services
             }
 
             PayrollDto? myLatestPayroll = null;
-            var payrolls = await _payrollRepo.GetByEmployeeMonthAsync(employee.Id, employee.TenantId, month, year);
             var payroll = payrolls.FirstOrDefault();
             if (payroll != null && (payroll.Status == PayrollStatus.Published || payroll.Status == PayrollStatus.Paid))
             {
                 myLatestPayroll = _mapper.Map<PayrollDto>(payroll);
             }
 
-            var appeals = await _appealRepo.GetByEmployeeAsync(employee.Id);
-            var myPendingAppealsCount = appeals.Count(a => a.Status == "PendingApproval");
+            var myPendingAppealsCount = appeals.Count(a => a.Status == StatusEnum.ApprovalPending);
 
             return new EmployeeDashboardDto
             {

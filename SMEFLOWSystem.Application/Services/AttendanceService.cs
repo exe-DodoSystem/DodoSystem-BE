@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using ShareKernel.Common.Enum;
 using SMEFLOWSystem.Application.DTOs;
 using SMEFLOWSystem.Application.DTOs.AttendanceDtos;
@@ -23,6 +24,8 @@ namespace SMEFLOWSystem.Application.Services
         private readonly ITimesheetAppealRepository _appealRepository;
         private readonly ITransaction _transaction;
         private readonly IPublicHolidayRepository _publicHolidayRepository;
+        private readonly IRealtimeNotificationService _realtime;
+        private readonly ILogger<AttendanceService> _logger;
 
         private static readonly TimeZoneInfo VietnamTimeZone = GetVietnamTimeZone();
 
@@ -43,7 +46,9 @@ namespace SMEFLOWSystem.Application.Services
             ICurrentTenantService currentTenantService,
             ITimesheetAppealRepository appealRepository,
             ITransaction transaction,
-            IPublicHolidayRepository publicHolidayRepository)
+            IPublicHolidayRepository publicHolidayRepository,
+            IRealtimeNotificationService realtime,
+            ILogger<AttendanceService> logger)
         {
             _punchLogRepo = punchLogRepo;
             _employeeRepository = employeeRepository;
@@ -53,6 +58,8 @@ namespace SMEFLOWSystem.Application.Services
             _appealRepository = appealRepository;
             _transaction = transaction;
             _publicHolidayRepository = publicHolidayRepository;
+            _realtime = realtime;
+            _logger = logger;
         }
 
         public async Task<RawPunchLogDto> SubmitPunchAsync(Guid userId, SubmitPunchRequestDto request)
@@ -102,6 +109,24 @@ namespace SMEFLOWSystem.Application.Services
             };
 
             await _punchLogRepo.AddAsync(punch);
+
+            if (employee.UserId != null)
+            {
+                _ = _realtime.NotifyPunchReceivedAsync(
+                        employee.UserId.Value,
+                        new
+                        {
+                            received = true,
+                            punchType = punch.PunchType,
+                            timestamp = punch.Timestamp,
+                            message = "Đã ghi nhận chấm công, đang chờ xử lý..."
+                        })
+                    .ContinueWith(t =>
+                    {
+                        if (t.IsFaulted)
+                            _logger.LogWarning(t.Exception, "Notify punch.received failed for employee {EmployeeId}", employee.Id);
+                    });
+            }
 
             return new RawPunchLogDto
             {
@@ -378,6 +403,7 @@ namespace SMEFLOWSystem.Application.Services
                     appeal.Status = "Approved";
                     appeal.ApprovedBy = hrUser.Id;
                     appeal.ApprovedAt = DateTime.UtcNow;
+                    await _appealRepository.UpdateAsync(appeal);
 
                     // Create HR_Manual punches
                     if (appeal.AppealType == "In" || appeal.AppealType == "Both")
@@ -435,10 +461,31 @@ namespace SMEFLOWSystem.Application.Services
                     appeal.ApprovedBy = hrUser.Id;
                     appeal.ApprovedAt = DateTime.UtcNow;
                     appeal.RejectReason = request.RejectReason;
+                    await _appealRepository.UpdateAsync(appeal);
                 }
 
-                await _appealRepository.UpdateAsync(appeal);
             });
+
+            // Emit realtime notification
+            var employee = await _employeeRepository.GetByIdAsync(appeal.EmployeeId);
+            if (employee?.UserId != null)
+            {
+                var appealDto = new
+                {
+                    appealId = appeal.Id,
+                    workDate = appeal.WorkDate.ToString("yyyy-MM-dd"),
+                    status = appeal.Status,               // "Approved" hoặc "Rejected"
+                    rejectReason = appeal.RejectReason,   // null nếu Approved
+                    processedAt = DateTime.UtcNow
+                };
+
+                _ = _realtime.NotifyAppealProcessedAsync(employee.UserId.Value, appealDto)
+                    .ContinueWith(t =>
+                    {
+                        if (t.IsFaulted)
+                            _logger.LogWarning(t.Exception, "Notify appeal.processed failed for employee {EmployeeId}", appeal.EmployeeId);
+                    });
+            }
 
             return new TimesheetAppealDto
             {
