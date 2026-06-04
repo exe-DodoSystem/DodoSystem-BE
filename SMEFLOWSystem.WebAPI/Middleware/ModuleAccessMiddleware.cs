@@ -22,7 +22,9 @@ public class ModuleAccessMiddleware
     {
         ("/api/hr", "HR"),
 
-        ("/api/attendances", "ATTENDANCE"),
+        ("/api/v1/attendance", "ATTENDANCE"),
+        ("/api/v1/attendance/setting", "ATTENDANCE"),
+
         ("/api/payrolls", "PAYROLL"),
 
         ("/api/customers", "SALES"),

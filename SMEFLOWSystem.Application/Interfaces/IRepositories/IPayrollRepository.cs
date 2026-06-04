@@ -1,4 +1,4 @@
-﻿using SMEFLOWSystem.Core.Entities;
+using SMEFLOWSystem.Core.Entities;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -26,7 +26,8 @@ namespace SMEFLOWSystem.Application.Interfaces.IRepositories
             int pageNumber,
             int pageSize,
             string? sortBy,
-            string? sortDir);
+            string? sortDir,
+            List<Guid>? accessibleDepartmentIds = null);
 
         Task<(List<Payroll> Items, int TotalCount)> GetByEmployeeIdPagedAsync(
             Guid employeeId,

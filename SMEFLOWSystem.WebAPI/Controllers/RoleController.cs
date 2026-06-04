@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SMEFLOWSystem.SharedKernel.Common;
+
 using SharedKernel.DTOs;
 using SMEFLOWSystem.Application.DTOs.RoleDtos;
 using SMEFLOWSystem.Application.Interfaces.IServices;
@@ -41,7 +43,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
         }
         /// <summary>[SystemAdmin] Tạo Role mới</summary>
 
-        [Authorize(Roles = "SystemAdmin")]
+        [Authorize(Policy = PolicyNames.SystemAdmin)]
         [HttpPost]
         public async Task<IActionResult> CreateRole([FromBody] RoleUpdatedDto roleDto)
         {
@@ -57,7 +59,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
         }
         /// <summary>[SystemAdmin] Cập nhật thông tin Role</summary>
 
-        [Authorize(Roles = "SystemAdmin")]
+        [Authorize(Policy = PolicyNames.SystemAdmin)]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateRole(int id, [FromBody] RoleUpdatedDto roleDto)
         {

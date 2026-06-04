@@ -4,6 +4,8 @@ using SMEFLOWSystem.Application.Interfaces.IServices;
 using System.Security.Claims;
 using SMEFLOWSystem.SharedKernel.Interfaces;
 using Microsoft.AspNetCore.Authorization;
+using SMEFLOWSystem.SharedKernel.Common;
+
 
 namespace SMEFLOWSystem.WebAPI.Controllers
 {
@@ -58,7 +60,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
         }
         /// <summary>[TenantAdmin] Cập nhật roles cho user</summary>
 
-        [Authorize(Roles = "TenantAdmin")]
+        [Authorize(Policy = PolicyNames.TenantAdmin)]
         [HttpPut("{userId:guid}/role")]
         public async Task<IActionResult> SetUserRole([FromRoute] Guid userId, [FromBody] UserSetRoleDto request)
         {

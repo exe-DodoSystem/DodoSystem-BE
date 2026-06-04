@@ -3,8 +3,10 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SMEFLOWSystem.SharedKernel.Common;
 using SMEFLOWSystem.Application.DTOs.AttendanceDtos;
 using SMEFLOWSystem.Application.Interfaces.IServices;
+
 
 namespace SMEFLOWSystem.WebAPI.Controllers;
 
@@ -85,7 +87,7 @@ public class AttendanceController : ControllerBase
 
     /// <summary>[Admin, HR] Chấm công bằng tay cho nhân viên</summary>
     [HttpPost("manual-punch")]
-    [Authorize(Roles = "Admin,HR")]
+    [Authorize(Policy = PolicyNames.AdminOrHr)]
     public async Task<IActionResult> ManualPunch([FromBody] ManualPunchRequestDto request)
     {
         try
@@ -101,7 +103,7 @@ public class AttendanceController : ControllerBase
 
     /// <summary>[Admin, HR] Tính toán lại công cho nhân viên trong 1 khoảng thời gian</summary>
     [HttpPost("recalculate/{employeeId}")]
-    [Authorize(Roles = "Admin,HR")]
+    [Authorize(Policy = PolicyNames.AdminOrHr)]
     public async Task<IActionResult> RecalculateAttendance(Guid employeeId, [FromQuery] string fromDate, [FromQuery] string toDate)
     {
         try
@@ -160,7 +162,7 @@ public class AttendanceController : ControllerBase
 
     /// <summary>[Admin, HR] Lấy danh sách các yêu cầu giải trình đang chờ duyệt</summary>
     [HttpGet("appeals/pending")]
-    [Authorize(Roles = "Admin,HR")]
+    [Authorize(Policy = PolicyNames.AdminOrHr)]
     public async Task<IActionResult> GetPendingAppeals()
     {
         try
@@ -176,7 +178,7 @@ public class AttendanceController : ControllerBase
 
     /// <summary>[Admin, HR] Xử lý (Duyệt/Từ chối) yêu cầu giải trình</summary>
     [HttpPut("appeals/{appealId}/process")]
-    [Authorize(Roles = "Admin,HR")]
+    [Authorize(Policy = PolicyNames.AdminOrHr)]
     public async Task<IActionResult> ProcessAppeal(Guid appealId, [FromBody] ApproveAppealRequestDto request)
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -197,7 +199,7 @@ public class AttendanceController : ControllerBase
 
     /// <summary>[Admin, HR] Lấy báo cáo chấm công tháng của tất cả nhân viên</summary>
     [HttpGet("hr-monthly-report")]
-    [Authorize(Roles = "Admin,HR")]
+    [Authorize(Policy = PolicyNames.HrAccess)]
     public async Task<IActionResult> GetHRMonthlyReport([FromQuery] int month, [FromQuery] int year)
     {
         try
@@ -217,7 +219,7 @@ public class AttendanceController : ControllerBase
 
     /// <summary>[Admin, HR] Thêm ngày lễ mới</summary>
     [HttpPost("holidays")]
-    [Authorize(Roles = "Admin,HR")]
+    [Authorize(Policy = PolicyNames.AdminOrHr)]
     public async Task<IActionResult> CreatePublicHoliday([FromBody] CreatePublicHolidayDto request)
     {
         try
@@ -233,7 +235,7 @@ public class AttendanceController : ControllerBase
 
     /// <summary>[Admin, HR] Lấy danh sách các ngày nghỉ lễ</summary>
     [HttpGet("holidays")]
-    [Authorize(Roles = "Admin,HR")]
+    [Authorize(Policy = PolicyNames.HrAccess)]
     public async Task<IActionResult> GetPublicHolidays()
     {
         try
@@ -249,7 +251,7 @@ public class AttendanceController : ControllerBase
 
     /// <summary>[Admin, HR] Xóa ngày nghỉ lễ theo ID</summary>
     [HttpDelete("holidays/{id}")]
-    [Authorize(Roles = "Admin,HR")]
+    [Authorize(Policy = PolicyNames.AdminOrHr)]
     public async Task<IActionResult> DeletePublicHoliday(Guid id)
     {
         try

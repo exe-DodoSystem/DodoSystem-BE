@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SMEFLOWSystem.SharedKernel.Common;
+
 using SharedKernel.DTOs;
 using SMEFLOWSystem.Application.DTOs.HRDtos;
 using SMEFLOWSystem.Application.Interfaces.IServices;
@@ -116,7 +118,7 @@ public class HrEmployeesController : ControllerBase
     /// <summary>
     /// Lấy tất cả nhân viên trong một phòng ban (không phân trang) - Dành cho Manager để xem danh sách nhân viên trực thuộc
     /// </summary>
-    [Authorize(Roles = "TenantAdmin, HRManager, Manager")]
+    [Authorize(Policy = PolicyNames.HrAccess)]
     [HttpGet("department/{departmentId:guid}")]
     public async Task<ActionResult<List<EmployeeDto>>> GetByDepartmentId([FromRoute] Guid departmentId)
     {

@@ -7,11 +7,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using SMEFLOWSystem.Core.Config;
 using SMEFLOWSystem.Application.Interfaces.IServices;
 using SMEFLOWSystem.Application.Options;
-using SMEFLOWSystem.WebAPI.Converters;
+using SMEFLOWSystem.Core.Config;
+using SMEFLOWSystem.SharedKernel.Common;
 using SMEFLOWSystem.WebAPI.BackgroundServices;
+using SMEFLOWSystem.WebAPI.Converters;
 using SMEFLOWSystem.WebAPI.Hubs;
 using SMEFLOWSystem.WebAPI.Services;
 using System.Collections.Generic;
@@ -80,7 +81,35 @@ public static class DependencyInjection
         });
 
         services.AddHttpContextAccessor();
-        services.AddAuthorization();
+        services.AddAuthorization(options =>
+        {
+            options.AddPolicy(PolicyNames.TenantAdmin, policy =>
+                policy.RequireRole(RoleConstants.TenantAdmin));
+
+            options.AddPolicy(PolicyNames.HrManager, policy =>
+                policy.RequireRole(RoleConstants.HrManager));
+
+            options.AddPolicy(PolicyNames.Manager, policy =>
+                policy.RequireRole(RoleConstants.Manager));
+
+            options.AddPolicy(PolicyNames.Employee, policy =>
+                policy.RequireRole(RoleConstants.Employee));
+
+            options.AddPolicy(PolicyNames.SystemAdmin, policy =>
+                policy.RequireRole(RoleConstants.SystemAdmin));
+
+            // Composite policies
+            options.AddPolicy(PolicyNames.HrAccess, policy =>
+                policy.RequireRole(
+                    RoleConstants.TenantAdmin,
+                    RoleConstants.HrManager,
+                    RoleConstants.Manager));
+
+            options.AddPolicy(PolicyNames.AdminOrHr, policy =>
+                policy.RequireRole(
+                    RoleConstants.TenantAdmin,
+                    RoleConstants.HrManager));
+        });
 
         services.Configure<AttendanceResolutionOptions>(configuration.GetSection("AttendanceResolution"));
 

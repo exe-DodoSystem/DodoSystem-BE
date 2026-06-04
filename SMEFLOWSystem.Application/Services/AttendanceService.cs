@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using ShareKernel.Common.Enum;
 using SMEFLOWSystem.Application.DTOs;
 using SMEFLOWSystem.Application.DTOs.AttendanceDtos;
+using SMEFLOWSystem.Application.Extensions;
 using SMEFLOWSystem.Application.Helpers;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Application.Interfaces.IServices;
@@ -26,6 +27,8 @@ namespace SMEFLOWSystem.Application.Services
         private readonly IPublicHolidayRepository _publicHolidayRepository;
         private readonly IRealtimeNotificationService _realtime;
         private readonly ILogger<AttendanceService> _logger;
+        private readonly IHrAuthorizationService _hrAuth;
+        private readonly ICurrentUserService _currentUser;
 
         private static readonly TimeZoneInfo VietnamTimeZone = GetVietnamTimeZone();
 
@@ -48,7 +51,9 @@ namespace SMEFLOWSystem.Application.Services
             ITransaction transaction,
             IPublicHolidayRepository publicHolidayRepository,
             IRealtimeNotificationService realtime,
-            ILogger<AttendanceService> logger)
+            ILogger<AttendanceService> logger,
+            IHrAuthorizationService hrAuth,
+            ICurrentUserService currentUser)
         {
             _punchLogRepo = punchLogRepo;
             _employeeRepository = employeeRepository;
@@ -60,6 +65,8 @@ namespace SMEFLOWSystem.Application.Services
             _publicHolidayRepository = publicHolidayRepository;
             _realtime = realtime;
             _logger = logger;
+            _hrAuth = hrAuth;
+            _currentUser = currentUser;
         }
 
         public async Task<RawPunchLogDto> SubmitPunchAsync(Guid userId, SubmitPunchRequestDto request)
@@ -262,6 +269,11 @@ namespace SMEFLOWSystem.Application.Services
             if (employee == null)
                 throw new InvalidOperationException("Employee not found.");
 
+            if (!_currentUser.IsAdmin() && !_currentUser.IsHrManager())
+            {
+                await _hrAuth.EnsureEmployeeAccessAsync(employee);
+            }
+
             var punch = new RawPunchLog()
             {
                 EmployeeId = request.EmployeeId,
@@ -288,6 +300,12 @@ namespace SMEFLOWSystem.Application.Services
 
         public async Task RecalculateAttendanceAsync(Guid employeeId, DateOnly fromDate, DateOnly toDate)
         {
+            var employee = await _employeeRepository.GetByIdAsync(employeeId) ?? throw new KeyNotFoundException("Employee not found");
+            if (!_currentUser.IsAdmin() && !_currentUser.IsHrManager())
+            {
+                await _hrAuth.EnsureEmployeeAccessAsync(employee);
+            }
+
             var tenantId = _currentTenantService.TenantId ?? throw new UnauthorizedAccessException("Tenant ID is missing.");
             var setting = await _attendanceSettingRepository.GetByTenantIdAsync(tenantId);
             var cutOffTime = setting?.DayStartCutOffTime ?? new TimeSpan(4, 0, 0);
@@ -386,6 +404,12 @@ namespace SMEFLOWSystem.Application.Services
             var appeal = await _appealRepository.GetByIdAsync(appealId);
             if (appeal == null || appeal.TenantId != tenantId.Value)
                 throw new Exception("Appeal not found");
+
+            if (!_currentUser.IsAdmin() && !_currentUser.IsHrManager())
+            {
+                var targetEmployee = await _employeeRepository.GetByIdAsync(appeal.EmployeeId) ?? throw new KeyNotFoundException("Employee not found");
+                await _hrAuth.EnsureEmployeeAccessAsync(targetEmployee);
+            }
 
             if (appeal.Status != "PendingApproval")
                 throw new Exception("This appeal has already been processed.");
@@ -510,6 +534,12 @@ namespace SMEFLOWSystem.Application.Services
 
             var appeals = await _appealRepository.GetPendingAsync(tenantId.Value);
 
+            var accessibleDeptIds = await _hrAuth.GetAccessibleDepartmentIdsAsync();
+            if (accessibleDeptIds != null)
+            {
+                appeals = appeals.Where(appeal => appeal.Employee != null && accessibleDeptIds.Contains(appeal.Employee.DepartmentId ?? Guid.Empty)).ToList();
+            }
+
             return appeals.Select(appeal => new TimesheetAppealDto
             {
                 Id = appeal.Id,
@@ -603,6 +633,12 @@ namespace SMEFLOWSystem.Application.Services
             if (tenantId == null) throw new UnauthorizedAccessException("Tenant ID is missing.");
 
             var timesheets = await _dailyTimesheetRepository.GetByTenantMonthAsync(tenantId.Value, month, year);
+
+            var accessibleDeptIds = await _hrAuth.GetAccessibleDepartmentIdsAsync();
+            if (accessibleDeptIds != null)
+            {
+                timesheets = timesheets.Where(t => t.Employee != null && accessibleDeptIds.Contains(t.Employee.DepartmentId ?? Guid.Empty)).ToList();
+            }
 
             var report = timesheets.GroupBy(t => new { t.EmployeeId, t.Employee?.FullName })
                 .Select(g => new HRMonthlyReportItemDto

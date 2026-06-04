@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SMEFLOWSystem.SharedKernel.Common;
+
 using SMEFLOWSystem.Application.DTOs.ModuleDtos;
 using SMEFLOWSystem.Application.Interfaces.IServices;
 
@@ -18,7 +20,7 @@ public class BillingOrderModulesController : ControllerBase
     }
     /// <summary>[TenantAdmin] Lấy thông tin các module đã mua thuộc 1 module ID cụ thể</summary>
 
-    [Authorize(Roles = "TenantAdmin")]
+    [Authorize(Policy = PolicyNames.TenantAdmin)]
     [HttpGet("me/by-module-id/{moduleId:int}")]
     public async Task<ActionResult<List<BillingOrderModuleDto>>> GetMyByModuleId([FromRoute] int moduleId)
     {
@@ -34,7 +36,7 @@ public class BillingOrderModulesController : ControllerBase
     }
     /// <summary>[TenantAdmin] Lấy thông tin các module đã mua thuộc 1 module Code cụ thể</summary>
 
-    [Authorize(Roles = "TenantAdmin")]
+    [Authorize(Policy = PolicyNames.TenantAdmin)]
     [HttpGet("me/by-module-code/{code}")]
     public async Task<ActionResult<List<BillingOrderModuleDto>>> GetMyByModuleCode([FromRoute] string code)
     {
@@ -54,7 +56,7 @@ public class BillingOrderModulesController : ControllerBase
     }
     /// <summary>[TenantAdmin] Lấy danh sách module thuộc 1 đơn hàng thanh toán (Billing Order) cụ thể</summary>
 
-    [Authorize(Roles = "TenantAdmin")]
+    [Authorize(Policy = PolicyNames.TenantAdmin)]
     [HttpGet("me/by-billing-order-id/{billingOrderId:guid}")]
     public async Task<ActionResult<List<BillingOrderModuleDto>>> GetByBillingOrderId([FromRoute] Guid billingOrderId)
     {
@@ -63,7 +65,7 @@ public class BillingOrderModulesController : ControllerBase
     }
     /// <summary>[SystemAdmin] Lấy danh sách module thuộc 1 đơn hàng (Bỏ qua filter Tenant)</summary>
 
-    [Authorize(Roles = "SystemAdmin")]
+    [Authorize(Policy = PolicyNames.SystemAdmin)]
     [HttpGet("by-billing-order-id-ignore-tenant/{billingOrderId:guid}")]
     public async Task<ActionResult<List<BillingOrderModuleDto>>> GetByBillingOrderIdIgnoreTenant([FromRoute] Guid billingOrderId)
     {

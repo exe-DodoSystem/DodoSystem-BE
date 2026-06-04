@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SMEFLOWSystem.SharedKernel.Common;
+
 using SMEFLOWSystem.Application.DTOs;
 using SMEFLOWSystem.Application.DTOs.AttendanceDtos;
 using SMEFLOWSystem.Application.Interfaces.IServices;
@@ -22,6 +24,7 @@ public class AttendanceSettingController : ControllerBase
 
     /// <summary>Lấy cấu hình chấm công hiện tại của Tenant</summary>
     [HttpGet]
+    [Authorize(Policy = PolicyNames.HrAccess)]
     public async Task<IActionResult> GetConfig()
     {
         try
@@ -41,7 +44,7 @@ public class AttendanceSettingController : ControllerBase
 
     /// <summary>[Admin, HR] Cập nhật cấu hình chấm công (tạo mới nếu chưa có)</summary>
     [HttpPost]
-    [Authorize(Roles = "Admin,HR")]
+    [Authorize(Policy = PolicyNames.HrAccess)]
     public async Task<IActionResult> UpsertConfig([FromBody] UpdateAttendanceSettingRequestDto dto)
     {
         try
