@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SMEFLOWSystem.SharedKernel.Common;
+
 using SMEFLOWSystem.Application.Interfaces.IServices;
 using SMEFLOWSystem.Application.Interfaces.IServices.System;
 using SMEFLOWSystem.Application.Services;
@@ -52,7 +54,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
         /// Mua thêm Module cho công ty
         /// </summary>
         [HttpPost("buy-additional-modules")]
-        [Authorize(Roles = "TenantAdmin")]
+        [Authorize(Policy = PolicyNames.TenantAdmin)]
         public async Task<IActionResult> BuyAdditionalModules([FromBody] int[] newModuleIds)
         {
             var tenantId = _currentTenant.TenantId;

@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SMEFLOWSystem.SharedKernel.Common;
+
 using SharedKernel.DTOs;
 using SMEFLOWSystem.Application.DTOs.SystemDtos;
 using SMEFLOWSystem.Application.Interfaces.IServices.System;
@@ -8,7 +10,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers.System;
 
 [Route("api/system/tenants")]
 [ApiController]
-[Authorize(Roles = "SystemAdmin")]
+[Authorize(Policy = PolicyNames.SystemAdmin)]
 public class SystemTenantsController : ControllerBase
 {
     private readonly ISystemTenantService _systemTenantService;

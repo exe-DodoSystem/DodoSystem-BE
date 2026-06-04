@@ -83,7 +83,8 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
             int pageNumber,
             int pageSize,
             string? sortBy,
-            string? sortDir)
+            string? sortDir,
+            List<Guid>? accessibleDepartmentIds = null)
         {
             if (pageNumber < 1) pageNumber = 1;
             if (pageSize < 1) pageSize = 10;
@@ -96,6 +97,9 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
 
             if (departmentId.HasValue)
                 query = query.Where(p => p.Employee.DepartmentId == departmentId.Value);
+
+            if (accessibleDepartmentIds != null)
+                query = query.Where(p => p.Employee.DepartmentId.HasValue && accessibleDepartmentIds.Contains(p.Employee.DepartmentId.Value));
 
             if (employeeId.HasValue)
                 query = query.Where(p => p.EmployeeId == employeeId.Value);

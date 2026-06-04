@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SMEFLOWSystem.SharedKernel.Common;
+
 using SMEFLOWSystem.Application.Interfaces.IServices;
 using SMEFLOWSystem.SharedKernel.Interfaces;
 using System;
@@ -28,7 +30,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
 
         /// <summary>[TenantAdmin, HRManager] Dashboard tổng quan toàn công ty</summary>
         [HttpGet("admin")]
-        [Authorize(Roles = "TenantAdmin,HRManager")]
+        [Authorize(Policy = PolicyNames.AdminOrHr)]
         public async Task<IActionResult> GetAdminDashboard([FromQuery] int? month, [FromQuery] int? year)
         {
             var tenantId = _currentTenant.TenantId
@@ -42,7 +44,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
 
         /// <summary>[Manager] Dashboard phòng ban mình quản lý</summary>
         [HttpGet("manager")]
-        [Authorize(Roles = "Manager")]
+        [Authorize(Policy = PolicyNames.Manager)]
         public async Task<IActionResult> GetManagerDashboard([FromQuery] int? month, [FromQuery] int? year)
         {
             var tenantId = _currentTenant.TenantId

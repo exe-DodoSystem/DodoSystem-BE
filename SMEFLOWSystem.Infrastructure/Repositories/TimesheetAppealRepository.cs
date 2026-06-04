@@ -43,6 +43,7 @@ public class TimesheetAppealRepository : ITimesheetAppealRepository
     {
         return await _context.Set<TimesheetAppeal>()
             .AsNoTracking()
+            .Include(x => x.Employee)
             .Where(x => x.TenantId == tenantId && x.Status == "PendingApproval")
             .OrderBy(x => x.WorkDate)
             .ToListAsync();

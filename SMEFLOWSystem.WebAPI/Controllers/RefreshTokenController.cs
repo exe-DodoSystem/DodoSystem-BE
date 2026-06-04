@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SMEFLOWSystem.SharedKernel.Common;
+
 using SMEFLOWSystem.Application.DTOs.RefreshTokenDtos;
 using SMEFLOWSystem.Application.Interfaces.IServices;
 using System.Security.Claims;
@@ -39,7 +41,7 @@ public class RefreshTokenController : ControllerBase
 
     // TenantAdmin can view tokens of a user in the same tenant.
     /// <summary>[TenantAdmin] Lấy danh sách Refresh Token của một user bất kỳ trong Tenant</summary>
-    [Authorize(Roles = "TenantAdmin")]
+    [Authorize(Policy = PolicyNames.TenantAdmin)]
     [HttpGet("{userId:guid}")]
     public async Task<IActionResult> GetAllTokenByUserId([FromRoute] Guid userId)
     {

@@ -6,6 +6,8 @@ using SMEFLOWSystem.Application.DTOs.PayrollDtos;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Application.Interfaces.IServices;
 using SMEFLOWSystem.Core.Entities;
+using SMEFLOWSystem.SharedKernel.Interfaces;
+using SMEFLOWSystem.Application.Extensions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,6 +24,8 @@ namespace SMEFLOWSystem.Application.Services
         private readonly IMapper _mapper;
         private readonly ILogger<PayrollService> _logger;
         private readonly IRealtimeNotificationService _realtime;
+        private readonly IHrAuthorizationService _hrAuth;
+        private readonly ICurrentUserService _currentUser;
 
         public PayrollService(
             IPayrollRepository payrollRepository,
@@ -30,7 +34,9 @@ namespace SMEFLOWSystem.Application.Services
             IPublicHolidayRepository publicHolidayRepository,
             IMapper mapper,
             ILogger<PayrollService> logger,
-            IRealtimeNotificationService realtime)
+            IRealtimeNotificationService realtime,
+            IHrAuthorizationService hrAuth,
+            ICurrentUserService currentUser)
         {
             _payrollRepository = payrollRepository;
             _employeeRepository = employeeRepository;
@@ -39,6 +45,8 @@ namespace SMEFLOWSystem.Application.Services
             _mapper = mapper;
             _logger = logger;
             _realtime = realtime;
+            _hrAuth = hrAuth;
+            _currentUser = currentUser;
         }
 
         public async Task<bool> GenerateMonthlyPayrollAsync(Guid tenantId, int month, int year)
@@ -188,6 +196,11 @@ namespace SMEFLOWSystem.Application.Services
             var emp = await _employeeRepository.GetByIdAsync(employeeId);
             if (emp == null || emp.TenantId != tenantId) throw new Exception("Không tìm thấy nhân viên.");
 
+            if (!_currentUser.IsAdmin() && !_currentUser.IsHrManager())
+            {
+                await _hrAuth.EnsureEmployeeAccessAsync(emp);
+            }
+
             var existingPayrolls = await _payrollRepository.GetByEmployeeMonthAsync(employeeId, tenantId, month, year);
             var existingPayroll = existingPayrolls.FirstOrDefault();
 
@@ -295,6 +308,20 @@ namespace SMEFLOWSystem.Application.Services
 
         public async Task<PagedResultDto<PayrollDto>> GetPagedAsync(Guid tenantId, PayrollQueryDto query)
         {
+            var accessibleDeptIds = await _hrAuth.GetAccessibleDepartmentIdsAsync();
+            if (accessibleDeptIds != null)
+            {
+                if (query.DepartmentId.HasValue && !accessibleDeptIds.Contains(query.DepartmentId.Value))
+                    throw new UnauthorizedAccessException("Forbidden");
+
+                if (query.EmployeeId.HasValue)
+                {
+                    var emp = await _employeeRepository.GetByIdAsync(query.EmployeeId.Value);
+                    if (emp == null) throw new KeyNotFoundException("Employee not found");
+                    await _hrAuth.EnsureEmployeeAccessAsync(emp);
+                }
+            }
+
             var (items, totalCount) = await _payrollRepository.GetPagedAsync(
                 tenantId,
                 query.DepartmentId,
@@ -305,7 +332,8 @@ namespace SMEFLOWSystem.Application.Services
                 query.PageNumber,
                 query.PageSize,
                 query.SortBy,
-                query.SortDir);
+                query.SortDir,
+                accessibleDeptIds);
 
             var dtos = _mapper.Map<List<PayrollDto>>(items);
 
@@ -357,6 +385,13 @@ namespace SMEFLOWSystem.Application.Services
         {
             var payroll = await _payrollRepository.GetByIdAsync(payrollId);
             if (payroll == null) throw new Exception("Không tìm thấy phiếu lương.");
+
+            if (!_currentUser.IsAdmin() && !_currentUser.IsHrManager())
+            {
+                var employee = await _employeeRepository.GetByIdAsync(payroll.EmployeeId);
+                if (employee == null) throw new KeyNotFoundException("Employee not found");
+                await _hrAuth.EnsureEmployeeAccessAsync(employee);
+            }
 
             if (payroll.Status != PayrollStatus.Draft)
                 throw new Exception("Chỉ được cập nhật thông tin khi phiếu lương đang ở trạng thái Nháp (Draft).");

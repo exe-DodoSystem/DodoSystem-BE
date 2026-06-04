@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SMEFLOWSystem.SharedKernel.Common;
+
 using System.Security.Claims;
 using SMEFLOWSystem.Application.DTOs.PayrollDtos;
 using SMEFLOWSystem.Application.Interfaces.IServices;
@@ -28,7 +30,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
 
         /// <summary>[TenantAdmin] Tạo bảng lương nháp (Draft) hàng tháng cho tất cả nhân viên</summary>
         [HttpPost("generate")]
-        [Authorize(Roles = "TenantAdmin")]
+        [Authorize(Policy = PolicyNames.TenantAdmin)]
         public async Task<IActionResult> GenerateMonthlyPayroll([FromQuery] int month, [FromQuery] int year)
         {
             var tenantId = _currentTenant.TenantId
@@ -43,7 +45,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
 
         /// <summary>[TenantAdmin, HRManager] Tính toán lại lương cho một nhân viên cụ thể</summary>
         [HttpPost("calculate/{employeeId}")]
-        [Authorize(Roles = "TenantAdmin,HRManager")]
+        [Authorize(Policy = PolicyNames.AdminOrHr)]
         public async Task<IActionResult> CalculateForEmployee(Guid employeeId, [FromQuery] int month, [FromQuery] int year)
         {
             var tenantId = _currentTenant.TenantId
@@ -55,7 +57,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
 
         /// <summary>[TenantAdmin, HRManager, Manager] Lấy danh sách bảng lương có phân trang</summary>
         [HttpGet("paged")]
-        [Authorize(Roles = "TenantAdmin,HRManager,Manager")]
+        [Authorize(Policy = PolicyNames.HrAccess)]
         public async Task<IActionResult> GetPaged([FromQuery] PayrollQueryDto query)
         {
             var tenantId = _currentTenant.TenantId
@@ -81,7 +83,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
 
         /// <summary>[TenantAdmin, HRManager] Chốt phiếu lương (Publish)</summary>
         [HttpPut("{payrollId}/publish")]
-        [Authorize(Roles = "TenantAdmin,HRManager")]
+        [Authorize(Policy = PolicyNames.AdminOrHr)]
         public async Task<IActionResult> Publish(Guid payrollId)
         {
             var result = await _payrollService.PublishPayrollAsync(payrollId);
@@ -90,7 +92,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
 
         /// <summary>[TenantAdmin] Đánh dấu phiếu lương đã thanh toán</summary>
         [HttpPut("{payrollId}/mark-paid")]
-        [Authorize(Roles = "TenantAdmin")]
+        [Authorize(Policy = PolicyNames.TenantAdmin)]
         public async Task<IActionResult> MarkPaid(Guid payrollId)
         {
             var result = await _payrollService.MarkPaidAsync(payrollId);
@@ -99,7 +101,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
 
         /// <summary>[TenantAdmin] Chốt tất cả phiếu lương Draft trong tháng</summary>
         [HttpPut("publish-all")]
-        [Authorize(Roles = "TenantAdmin")]
+        [Authorize(Policy = PolicyNames.TenantAdmin)]
         public async Task<IActionResult> PublishAll([FromQuery] int month, [FromQuery] int year)
         {
             var tenantId = _currentTenant.TenantId
@@ -111,7 +113,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
 
         /// <summary>[TenantAdmin, HRManager, Manager] Cập nhật tiền thưởng/phạt nhập tay cho phiếu lương</summary>
         [HttpPut("{payrollId}/manual-fields")]
-        [Authorize(Roles = "TenantAdmin,HRManager,Manager")]
+        [Authorize(Policy = PolicyNames.HrAccess)]
         public async Task<IActionResult> UpdateManualFields(Guid payrollId, [FromBody] UpdatePayrollDto dto)
         {
             var result = await _payrollService.UpdateManualFieldsAsync(payrollId, dto);
