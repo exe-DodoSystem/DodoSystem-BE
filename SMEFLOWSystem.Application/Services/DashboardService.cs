@@ -25,6 +25,7 @@ namespace SMEFLOWSystem.Application.Services
         private readonly IHrAuthorizationService _hrAuth;
         private readonly IMapper _mapper;
         private readonly ILogger<DashboardService> _logger;
+        private readonly IModuleSubscriptionService _moduleSubscription;
 
         private static readonly TimeZoneInfo VietnamTimeZone = GetVietnamTimeZone();
 
@@ -46,7 +47,8 @@ namespace SMEFLOWSystem.Application.Services
             IShiftPatternRepository shiftPatternRepo,
             IHrAuthorizationService hrAuth,
             IMapper mapper,
-            ILogger<DashboardService> logger)
+            ILogger<DashboardService> logger,
+            IModuleSubscriptionService moduleSubscription)
         {
             _employeeRepo = employeeRepo;
             _timesheetRepo = timesheetRepo;
@@ -57,6 +59,7 @@ namespace SMEFLOWSystem.Application.Services
             _hrAuth = hrAuth;
             _mapper = mapper;
             _logger = logger;
+            _moduleSubscription = moduleSubscription;
         }
 
         private static DateOnly GetVietnamWorkDate()
@@ -67,6 +70,23 @@ namespace SMEFLOWSystem.Application.Services
                 ? DateOnly.FromDateTime(localNow.AddDays(-1))
                 : DateOnly.FromDateTime(localNow);
             return workDate;
+        }
+
+        private async Task<bool> HasModuleAsync(string moduleCode)
+        {
+            try
+            {
+                var sub = await _moduleSubscription.GetMyByModuleCodeAsync(moduleCode);
+                if (sub == null) return false;
+                var now = DateTime.UtcNow;
+                return (string.Equals(sub.Status, StatusEnum.ModuleActive, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(sub.Status, StatusEnum.ModuleTrial, StringComparison.OrdinalIgnoreCase))
+                       && sub.EndDate > now;
+            }
+            catch (Exception ex) when (ex is KeyNotFoundException || ex is UnauthorizedAccessException)
+            {
+                return false;
+            }
         }
 
         private static List<AlertItemDto> BuildAlerts(int pendingAppealsCount, int draftPayrollCount, int frequentAbsentCount, int missingOutCount)
@@ -116,11 +136,26 @@ namespace SMEFLOWSystem.Application.Services
         {
             var workDate = GetVietnamWorkDate();
 
+            var hasAttendance = await HasModuleAsync("ATTENDANCE");
+            var hasPayroll = await HasModuleAsync("PAYROLL");
+
             var employeesTask = _employeeRepo.GetAllActiveEmployeeByTenantId(tenantId);
-            var todayTimesheetsTask = _timesheetRepo.GetByTenantDateAsync(tenantId, workDate);
-            var monthTimesheetsTask = _timesheetRepo.GetByTenantMonthAsync(tenantId, month, year);
-            var pendingAppealsTask = _appealRepo.GetPendingAsync(tenantId);
-            var payrollsTask = _payrollRepo.GetByTenantMonthAsync(tenantId, month, year);
+            
+            var todayTimesheetsTask = hasAttendance 
+                ? _timesheetRepo.GetByTenantDateAsync(tenantId, workDate)
+                : Task.FromResult(new List<DailyTimesheet>());
+
+            var monthTimesheetsTask = hasAttendance
+                ? _timesheetRepo.GetByTenantMonthAsync(tenantId, month, year)
+                : Task.FromResult(new List<DailyTimesheet>());
+
+            var pendingAppealsTask = hasAttendance
+                ? _appealRepo.GetPendingAsync(tenantId)
+                : Task.FromResult(new List<TimesheetAppeal>());
+
+            var payrollsTask = hasPayroll
+                ? _payrollRepo.GetByTenantMonthAsync(tenantId, month, year)
+                : Task.FromResult(new List<Payroll>());
 
             await Task.WhenAll(employeesTask, todayTimesheetsTask, monthTimesheetsTask, pendingAppealsTask, payrollsTask);
 
@@ -144,56 +179,85 @@ namespace SMEFLOWSystem.Application.Services
                 .OrderBy(d => d.DepartmentName)
                 .ToList();
 
-            var todayAttendance = new TodayAttendanceSummaryDto
+            TodayAttendanceSummaryDto? todayAttendance = null;
+            if (hasAttendance)
             {
-                WorkDate = workDate,
-                CheckedIn = todayTimesheets.Count(t => t.Status == StatusEnum.AttendanceNormal || t.Status == StatusEnum.AttendanceLate || t.Status == StatusEnum.AttendanceEarlyLeave || t.Status == StatusEnum.AttendancePresent),
-                Absent = todayTimesheets.Count(t => t.Status == StatusEnum.AttendanceAbsent),
-                Late = todayTimesheets.Count(t => t.Status == StatusEnum.AttendanceLate),
-                MissingOut = todayTimesheets.Count(t => t.Status == StatusEnum.AttendanceMissingOut),
-                OnLeave = todayTimesheets.Count(t => t.Status == StatusEnum.AttendanceOnLeave),
-                TotalExpected = todayTimesheets.Count
-            };
+                todayAttendance = new TodayAttendanceSummaryDto
+                {
+                    WorkDate = workDate,
+                    CheckedIn = todayTimesheets.Count(t => t.Status == StatusEnum.AttendanceNormal || t.Status == StatusEnum.AttendanceLate || t.Status == StatusEnum.AttendanceEarlyLeave || t.Status == StatusEnum.AttendancePresent),
+                    Absent = todayTimesheets.Count(t => t.Status == StatusEnum.AttendanceAbsent),
+                    Late = todayTimesheets.Count(t => t.Status == StatusEnum.AttendanceLate),
+                    MissingOut = todayTimesheets.Count(t => t.Status == StatusEnum.AttendanceMissingOut),
+                    OnLeave = todayTimesheets.Count(t => t.Status == StatusEnum.AttendanceOnLeave),
+                    TotalExpected = todayTimesheets.Count
+                };
+            }
 
-            var monthlyStats = new MonthlyAttendanceStatsDto
+            MonthlyAttendanceStatsDto? monthlyStats = null;
+            if (hasAttendance)
             {
-                Month = month,
-                Year = year,
-                TotalWorkDays = monthTimesheets.Count(t => t.Status == StatusEnum.AttendanceNormal || t.Status == StatusEnum.AttendanceLate || t.Status == StatusEnum.AttendanceEarlyLeave || t.Status == StatusEnum.AttendancePresent),
-                TotalAbsentDays = monthTimesheets.Count(t => t.Status == StatusEnum.AttendanceAbsent),
-                TotalOTHours = monthTimesheets.Sum(t => t.OTHours),
-                TotalLateMinutes = monthTimesheets.Sum(t => t.TotalLateMinutes),
-                TotalEmployeeRecords = monthTimesheets.Count
-            };
+                monthlyStats = new MonthlyAttendanceStatsDto
+                {
+                    Month = month,
+                    Year = year,
+                    TotalWorkDays = monthTimesheets.Count(t => t.Status == StatusEnum.AttendanceNormal || t.Status == StatusEnum.AttendanceLate || t.Status == StatusEnum.AttendanceEarlyLeave || t.Status == StatusEnum.AttendancePresent),
+                    TotalAbsentDays = monthTimesheets.Count(t => t.Status == StatusEnum.AttendanceAbsent),
+                    TotalOTHours = monthTimesheets.Sum(t => t.OTHours),
+                    TotalLateMinutes = monthTimesheets.Sum(t => t.TotalLateMinutes),
+                    TotalEmployeeRecords = monthTimesheets.Count
+                };
+            }
 
-            var payrollSummary = new PayrollSummaryDto
+            PayrollSummaryDto? payrollSummary = null;
+            if (hasPayroll)
             {
-                Month = month,
-                Year = year,
-                DraftCount = payrolls.Count(p => p.Status == PayrollStatus.Draft),
-                PublishedCount = payrolls.Count(p => p.Status == PayrollStatus.Published),
-                PaidCount = payrolls.Count(p => p.Status == PayrollStatus.Paid),
-                TotalNetSalary = payrolls.Sum(p => p.NetSalary),
-                TotalPaidSalary = payrolls.Where(p => p.Status == PayrollStatus.Paid).Sum(p => p.NetSalary)
-            };
+                payrollSummary = new PayrollSummaryDto
+                {
+                    Month = month,
+                    Year = year,
+                    DraftCount = payrolls.Count(p => p.Status == PayrollStatus.Draft),
+                    PublishedCount = payrolls.Count(p => p.Status == PayrollStatus.Published),
+                    PaidCount = payrolls.Count(p => p.Status == PayrollStatus.Paid),
+                    TotalNetSalary = payrolls.Sum(p => p.NetSalary),
+                    TotalPaidSalary = payrolls.Where(p => p.Status == PayrollStatus.Paid).Sum(p => p.NetSalary)
+                };
+            }
 
-            var pendingAppealsCount = pendingAppeals.Count;
+            int? pendingAppealsCount = null;
+            if (hasAttendance)
+            {
+                pendingAppealsCount = pendingAppeals.Count;
+            }
 
-            var frequentAbsentCount = monthTimesheets
-                .Where(t => t.Status == StatusEnum.AttendanceAbsent)
-                .GroupBy(t => t.EmployeeId)
-                .Count(g => g.Count() >= 3);
+            int frequentAbsentCount = 0;
+            int missingOutCount = 0;
+            if (hasAttendance)
+            {
+                frequentAbsentCount = monthTimesheets
+                    .Where(t => t.Status == StatusEnum.AttendanceAbsent)
+                    .GroupBy(t => t.EmployeeId)
+                    .Count(g => g.Count() >= 3);
 
-            var missingOutEmpIds = monthTimesheets
-                .Where(t => t.Status == StatusEnum.AttendanceMissingOut)
-                .Select(t => t.EmployeeId)
-                .ToHashSet();
-            var appealedEmpIds = pendingAppeals
-                .Select(a => a.EmployeeId)
-                .ToHashSet();
-            var missingOutCount = missingOutEmpIds.Except(appealedEmpIds).Count();
+                var missingOutEmpIds = monthTimesheets
+                    .Where(t => t.Status == StatusEnum.AttendanceMissingOut)
+                    .Select(t => t.EmployeeId)
+                    .ToHashSet();
+                var appealedEmpIds = pendingAppeals
+                    .Select(a => a.EmployeeId)
+                    .ToHashSet();
+                missingOutCount = missingOutEmpIds.Except(appealedEmpIds).Count();
+            }
 
-            var alerts = BuildAlerts(pendingAppealsCount, payrollSummary.DraftCount, frequentAbsentCount, missingOutCount);
+            var alerts = BuildAlerts(
+                hasAttendance ? (pendingAppealsCount ?? 0) : 0, 
+                hasPayroll && payrollSummary != null ? payrollSummary.DraftCount : 0, 
+                hasAttendance ? frequentAbsentCount : 0, 
+                hasAttendance ? missingOutCount : 0);
+
+            var availableModules = new List<string> { "HR" };
+            if (hasAttendance) availableModules.Add("ATTENDANCE");
+            if (hasPayroll) availableModules.Add("PAYROLL");
 
             return new AdminDashboardDto
             {
@@ -203,7 +267,8 @@ namespace SMEFLOWSystem.Application.Services
                 MonthlyStats = monthlyStats,
                 PayrollSummary = payrollSummary,
                 PendingAppealsCount = pendingAppealsCount,
-                Alerts = alerts
+                Alerts = alerts,
+                AvailableModules = availableModules
             };
         }
 
@@ -228,17 +293,39 @@ namespace SMEFLOWSystem.Application.Services
                 return new ManagerDashboardDto();
             }
 
-            var todayTimesheetsTask = _timesheetRepo.GetByTenantDateAsync(tenantId, workDate);
-            var monthTimesheetsTask = _timesheetRepo.GetByTenantMonthAsync(tenantId, month, year);
-            var pendingAppealsTask = _appealRepo.GetPendingAsync(tenantId);
-            var payrollsTask = _payrollRepo.GetByTenantMonthAsync(tenantId, month, year);
+            var hasAttendance = await HasModuleAsync("ATTENDANCE");
+            var hasPayroll = await HasModuleAsync("PAYROLL");
+
+            Task<List<DailyTimesheet>> todayTimesheetsTask = hasAttendance
+                ? _timesheetRepo.GetByTenantDateAsync(tenantId, workDate)
+                : Task.FromResult(new List<DailyTimesheet>());
+
+            Task<List<DailyTimesheet>> monthTimesheetsTask = hasAttendance
+                ? _timesheetRepo.GetByTenantMonthAsync(tenantId, month, year)
+                : Task.FromResult(new List<DailyTimesheet>());
+
+            Task<List<TimesheetAppeal>> pendingAppealsTask = hasAttendance
+                ? _appealRepo.GetPendingAsync(tenantId)
+                : Task.FromResult(new List<TimesheetAppeal>());
+
+            Task<List<Payroll>> payrollsTask = hasPayroll
+                ? _payrollRepo.GetByTenantMonthAsync(tenantId, month, year)
+                : Task.FromResult(new List<Payroll>());
 
             await Task.WhenAll(todayTimesheetsTask, monthTimesheetsTask, pendingAppealsTask, payrollsTask);
 
-            var todayTimesheets = (await todayTimesheetsTask).Where(t => empIds.Contains(t.EmployeeId)).ToList();
-            var monthTimesheets = (await monthTimesheetsTask).Where(t => empIds.Contains(t.EmployeeId)).ToList();
-            var pendingAppeals = (await pendingAppealsTask).Where(a => empIds.Contains(a.EmployeeId)).ToList();
-            var payrolls = (await payrollsTask).Where(p => empIds.Contains(p.EmployeeId)).ToList();
+            var todayTimesheets = hasAttendance 
+                ? (await todayTimesheetsTask).Where(t => empIds.Contains(t.EmployeeId)).ToList()
+                : new List<DailyTimesheet>();
+            var monthTimesheets = hasAttendance
+                ? (await monthTimesheetsTask).Where(t => empIds.Contains(t.EmployeeId)).ToList()
+                : new List<DailyTimesheet>();
+            var pendingAppeals = hasAttendance
+                ? (await pendingAppealsTask).Where(a => empIds.Contains(a.EmployeeId)).ToList()
+                : new List<TimesheetAppeal>();
+            var payrolls = hasPayroll
+                ? (await payrollsTask).Where(p => empIds.Contains(p.EmployeeId)).ToList()
+                : new List<Payroll>();
 
             var deptEmployeeCount = employees.Count;
 
@@ -254,46 +341,76 @@ namespace SMEFLOWSystem.Application.Services
                 .OrderBy(d => d.DepartmentName)
                 .ToList();
 
-            var deptTodayAttendance = new TodayAttendanceSummaryDto
+            TodayAttendanceSummaryDto? deptTodayAttendance = null;
+            if (hasAttendance)
             {
-                WorkDate = workDate,
-                CheckedIn = todayTimesheets.Count(t => t.Status == StatusEnum.AttendanceNormal || t.Status == StatusEnum.AttendanceLate || t.Status == StatusEnum.AttendanceEarlyLeave || t.Status == StatusEnum.AttendancePresent),
-                Absent = todayTimesheets.Count(t => t.Status == StatusEnum.AttendanceAbsent),
-                Late = todayTimesheets.Count(t => t.Status == StatusEnum.AttendanceLate),
-                MissingOut = todayTimesheets.Count(t => t.Status == StatusEnum.AttendanceMissingOut),
-                OnLeave = todayTimesheets.Count(t => t.Status == StatusEnum.AttendanceOnLeave),
-                TotalExpected = todayTimesheets.Count
-            };
+                deptTodayAttendance = new TodayAttendanceSummaryDto
+                {
+                    WorkDate = workDate,
+                    CheckedIn = todayTimesheets.Count(t => t.Status == StatusEnum.AttendanceNormal || t.Status == StatusEnum.AttendanceLate || t.Status == StatusEnum.AttendanceEarlyLeave || t.Status == StatusEnum.AttendancePresent),
+                    Absent = todayTimesheets.Count(t => t.Status == StatusEnum.AttendanceAbsent),
+                    Late = todayTimesheets.Count(t => t.Status == StatusEnum.AttendanceLate),
+                    MissingOut = todayTimesheets.Count(t => t.Status == StatusEnum.AttendanceMissingOut),
+                    OnLeave = todayTimesheets.Count(t => t.Status == StatusEnum.AttendanceOnLeave),
+                    TotalExpected = todayTimesheets.Count
+                };
+            }
 
-            var deptMonthlyStats = new MonthlyAttendanceStatsDto
+            MonthlyAttendanceStatsDto? deptMonthlyStats = null;
+            if (hasAttendance)
             {
-                Month = month,
-                Year = year,
-                TotalWorkDays = monthTimesheets.Count(t => t.Status == StatusEnum.AttendanceNormal || t.Status == StatusEnum.AttendanceLate || t.Status == StatusEnum.AttendanceEarlyLeave || t.Status == StatusEnum.AttendancePresent),
-                TotalAbsentDays = monthTimesheets.Count(t => t.Status == StatusEnum.AttendanceAbsent),
-                TotalOTHours = monthTimesheets.Sum(t => t.OTHours),
-                TotalLateMinutes = monthTimesheets.Sum(t => t.TotalLateMinutes),
-                TotalEmployeeRecords = monthTimesheets.Count
-            };
+                deptMonthlyStats = new MonthlyAttendanceStatsDto
+                {
+                    Month = month,
+                    Year = year,
+                    TotalWorkDays = monthTimesheets.Count(t => t.Status == StatusEnum.AttendanceNormal || t.Status == StatusEnum.AttendanceLate || t.Status == StatusEnum.AttendanceEarlyLeave || t.Status == StatusEnum.AttendancePresent),
+                    TotalAbsentDays = monthTimesheets.Count(t => t.Status == StatusEnum.AttendanceAbsent),
+                    TotalOTHours = monthTimesheets.Sum(t => t.OTHours),
+                    TotalLateMinutes = monthTimesheets.Sum(t => t.TotalLateMinutes),
+                    TotalEmployeeRecords = monthTimesheets.Count
+                };
+            }
 
-            var draftPayrollCount = payrolls.Count(p => p.Status == PayrollStatus.Draft);
-            var deptPendingAppealsCount = pendingAppeals.Count;
+            int? draftPayrollCount = null;
+            if (hasPayroll)
+            {
+                draftPayrollCount = payrolls.Count(p => p.Status == PayrollStatus.Draft);
+            }
 
-            var frequentAbsentCount = monthTimesheets
-                .Where(t => t.Status == StatusEnum.AttendanceAbsent)
-                .GroupBy(t => t.EmployeeId)
-                .Count(g => g.Count() >= 3);
+            int? deptPendingAppealsCount = null;
+            if (hasAttendance)
+            {
+                deptPendingAppealsCount = pendingAppeals.Count;
+            }
 
-            var missingOutEmpIds = monthTimesheets
-                .Where(t => t.Status == StatusEnum.AttendanceMissingOut)
-                .Select(t => t.EmployeeId)
-                .ToHashSet();
-            var appealedEmpIds = pendingAppeals
-                .Select(a => a.EmployeeId)
-                .ToHashSet();
-            var missingOutCount = missingOutEmpIds.Except(appealedEmpIds).Count();
+            int frequentAbsentCount = 0;
+            int missingOutCount = 0;
+            if (hasAttendance)
+            {
+                frequentAbsentCount = monthTimesheets
+                    .Where(t => t.Status == StatusEnum.AttendanceAbsent)
+                    .GroupBy(t => t.EmployeeId)
+                    .Count(g => g.Count() >= 3);
 
-            var alerts = BuildAlerts(deptPendingAppealsCount, draftPayrollCount, frequentAbsentCount, missingOutCount);
+                var missingOutEmpIds = monthTimesheets
+                    .Where(t => t.Status == StatusEnum.AttendanceMissingOut)
+                    .Select(t => t.EmployeeId)
+                    .ToHashSet();
+                var appealedEmpIds = pendingAppeals
+                    .Select(a => a.EmployeeId)
+                    .ToHashSet();
+                missingOutCount = missingOutEmpIds.Except(appealedEmpIds).Count();
+            }
+
+            var alerts = BuildAlerts(
+                hasAttendance ? (deptPendingAppealsCount ?? 0) : 0, 
+                hasPayroll ? (draftPayrollCount ?? 0) : 0, 
+                hasAttendance ? frequentAbsentCount : 0, 
+                hasAttendance ? missingOutCount : 0);
+
+            var availableModules = new List<string> { "HR" };
+            if (hasAttendance) availableModules.Add("ATTENDANCE");
+            if (hasPayroll) availableModules.Add("PAYROLL");
 
             return new ManagerDashboardDto
             {
@@ -303,7 +420,8 @@ namespace SMEFLOWSystem.Application.Services
                 DeptMonthlyStats = deptMonthlyStats,
                 DraftPayrollCount = draftPayrollCount,
                 DeptPendingAppealsCount = deptPendingAppealsCount,
-                Alerts = alerts
+                Alerts = alerts,
+                AvailableModules = availableModules
             };
         }
 
@@ -314,11 +432,35 @@ namespace SMEFLOWSystem.Application.Services
             var employee = await _employeeRepo.GetByUserIdAsync(userId)
                 ?? throw new KeyNotFoundException("Không tìm thấy hồ sơ nhân sự cho tài khoản này.");
 
-            var todayStatusTask = _attendanceService.GetMyTodayStatusAsync(userId);
-            var monthTimesheetsTask = _timesheetRepo.GetByEmployeeMonthAsync(employee.Id, month, year);
-            var shiftTask = _shiftPatternRepo.GetActivePatternDetailsAsync(employee.Id, workDate);
-            var payrollsTask = _payrollRepo.GetByEmployeeMonthAsync(employee.Id, employee.TenantId, month, year);
-            var appealsTask = _appealRepo.GetByEmployeeAsync(employee.Id);
+            var hasAttendance = await HasModuleAsync("ATTENDANCE");
+            var hasPayroll = await HasModuleAsync("PAYROLL");
+
+            async Task<TodayAttendanceDto?> GetTodayStatusAsync()
+            {
+                if (!hasAttendance) return null;
+                return await _attendanceService.GetMyTodayStatusAsync(userId);
+            }
+
+            Task<List<DailyTimesheet>> monthTimesheetsTask = hasAttendance
+                ? _timesheetRepo.GetByEmployeeMonthAsync(employee.Id, month, year)
+                : Task.FromResult(new List<DailyTimesheet>());
+
+            async Task<(EmployeeShiftPattern? esp, ShiftPattern? definition)> GetShiftPatternAsync()
+            {
+                if (!hasAttendance) return (null, null);
+                return await _shiftPatternRepo.GetActivePatternDetailsAsync(employee.Id, workDate);
+            }
+
+            Task<List<Payroll>> payrollsTask = hasPayroll
+                ? _payrollRepo.GetByEmployeeMonthAsync(employee.Id, employee.TenantId, month, year)
+                : Task.FromResult(new List<Payroll>());
+
+            Task<List<TimesheetAppeal>> appealsTask = hasAttendance
+                ? _appealRepo.GetByEmployeeAsync(employee.Id)
+                : Task.FromResult(new List<TimesheetAppeal>());
+
+            var todayStatusTask = GetTodayStatusAsync();
+            var shiftTask = GetShiftPatternAsync();
 
             await Task.WhenAll(todayStatusTask, monthTimesheetsTask, shiftTask, payrollsTask, appealsTask);
 
@@ -328,19 +470,23 @@ namespace SMEFLOWSystem.Application.Services
             var payrolls = await payrollsTask;
             var appeals = await appealsTask;
 
-            var myMonthSummary = new MyMonthSummaryDto
+            MyMonthSummaryDto? myMonthSummary = null;
+            if (hasAttendance)
             {
-                Month = month,
-                Year = year,
-                WorkDays = monthTimesheets.Count(t => t.Status == StatusEnum.AttendanceNormal || t.Status == StatusEnum.AttendanceLate || t.Status == StatusEnum.AttendanceEarlyLeave || t.Status == StatusEnum.AttendancePresent),
-                AbsentDays = monthTimesheets.Count(t => t.Status == StatusEnum.AttendanceAbsent),
-                LateDays = monthTimesheets.Count(t => t.Status == StatusEnum.AttendanceLate),
-                TotalOTHours = monthTimesheets.Sum(t => t.OTHours),
-                TotalLateMinutes = monthTimesheets.Sum(t => t.TotalLateMinutes)
-            };
+                myMonthSummary = new MyMonthSummaryDto
+                {
+                    Month = month,
+                    Year = year,
+                    WorkDays = monthTimesheets.Count(t => t.Status == StatusEnum.AttendanceNormal || t.Status == StatusEnum.AttendanceLate || t.Status == StatusEnum.AttendanceEarlyLeave || t.Status == StatusEnum.AttendancePresent),
+                    AbsentDays = monthTimesheets.Count(t => t.Status == StatusEnum.AttendanceAbsent),
+                    LateDays = monthTimesheets.Count(t => t.Status == StatusEnum.AttendanceLate),
+                    TotalOTHours = monthTimesheets.Sum(t => t.OTHours),
+                    TotalLateMinutes = monthTimesheets.Sum(t => t.TotalLateMinutes)
+                };
+            }
 
             CurrentShiftDto? myCurrentShift = null;
-            if (esp != null && definition != null && definition.CycleLengthDays > 0)
+            if (hasAttendance && esp != null && definition != null && definition.CycleLengthDays > 0)
             {
                 var dayOffset = workDate.DayNumber - esp.EffectiveStartDate.DayNumber;
                 var dayIndex = dayOffset % definition.CycleLengthDays;
@@ -368,13 +514,24 @@ namespace SMEFLOWSystem.Application.Services
             }
 
             PayrollDto? myLatestPayroll = null;
-            var payroll = payrolls.FirstOrDefault();
-            if (payroll != null && (payroll.Status == PayrollStatus.Published || payroll.Status == PayrollStatus.Paid))
+            if (hasPayroll)
             {
-                myLatestPayroll = _mapper.Map<PayrollDto>(payroll);
+                var payroll = payrolls.FirstOrDefault();
+                if (payroll != null && (payroll.Status == PayrollStatus.Published || payroll.Status == PayrollStatus.Paid))
+                {
+                    myLatestPayroll = _mapper.Map<PayrollDto>(payroll);
+                }
             }
 
-            var myPendingAppealsCount = appeals.Count(a => a.Status == StatusEnum.ApprovalPending);
+            int? myPendingAppealsCount = null;
+            if (hasAttendance)
+            {
+                myPendingAppealsCount = appeals.Count(a => a.Status == StatusEnum.ApprovalPending);
+            }
+
+            var availableModules = new List<string> { "HR" };
+            if (hasAttendance) availableModules.Add("ATTENDANCE");
+            if (hasPayroll) availableModules.Add("PAYROLL");
 
             return new EmployeeDashboardDto
             {
@@ -382,7 +539,8 @@ namespace SMEFLOWSystem.Application.Services
                 MyMonthSummary = myMonthSummary,
                 MyCurrentShift = myCurrentShift,
                 MyLatestPayroll = myLatestPayroll,
-                MyPendingAppealsCount = myPendingAppealsCount
+                MyPendingAppealsCount = myPendingAppealsCount,
+                AvailableModules = availableModules
             };
         }
     }
