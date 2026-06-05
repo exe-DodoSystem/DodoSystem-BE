@@ -107,7 +107,7 @@ public static class DependencyInjection
 
             options.AddPolicy(PolicyNames.AdminOrHr, policy =>
                 policy.RequireRole(
-                    RoleConstants.TenantAdmin,
+                    RoleConstants.TenantAdmin, 
                     RoleConstants.HrManager));
         });
 
