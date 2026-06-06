@@ -34,7 +34,7 @@ public interface IShiftPatternRepository
     Task<ShiftPattern?> GetByIdWithDaysAsync(Guid id);
     Task AddAsync(ShiftPattern pattern);
     Task<ShiftPattern> UpdateAsync(ShiftPattern pattern);
-    Task SoftDeleteAsync(ShiftPattern pattern);
+    Task DeleteAsync(ShiftPattern pattern);
     Task<bool> HasUsageAsync(Guid shiftPatternId);
     Task<bool> ShiftExistsAsync(Guid shiftId);
     Task DeletePatternDaysAsync(Guid shiftPatternId);

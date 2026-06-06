@@ -139,31 +139,23 @@ namespace SMEFLOWSystem.Application.Services
             var hasAttendance = await HasModuleAsync("ATTENDANCE");
             var hasPayroll = await HasModuleAsync("PAYROLL");
 
-            var employeesTask = _employeeRepo.GetAllActiveEmployeeByTenantId(tenantId);
+            var employees = await _employeeRepo.GetAllActiveEmployeeByTenantId(tenantId);
             
-            var todayTimesheetsTask = hasAttendance 
-                ? _timesheetRepo.GetByTenantDateAsync(tenantId, workDate)
-                : Task.FromResult(new List<DailyTimesheet>());
+            var todayTimesheets = hasAttendance 
+                ? await _timesheetRepo.GetByTenantDateAsync(tenantId, workDate)
+                : new List<DailyTimesheet>();
 
-            var monthTimesheetsTask = hasAttendance
-                ? _timesheetRepo.GetByTenantMonthAsync(tenantId, month, year)
-                : Task.FromResult(new List<DailyTimesheet>());
+            var monthTimesheets = hasAttendance
+                ? await _timesheetRepo.GetByTenantMonthAsync(tenantId, month, year)
+                : new List<DailyTimesheet>();
 
-            var pendingAppealsTask = hasAttendance
-                ? _appealRepo.GetPendingAsync(tenantId)
-                : Task.FromResult(new List<TimesheetAppeal>());
+            var pendingAppeals = hasAttendance
+                ? await _appealRepo.GetPendingAsync(tenantId)
+                : new List<TimesheetAppeal>();
 
-            var payrollsTask = hasPayroll
-                ? _payrollRepo.GetByTenantMonthAsync(tenantId, month, year)
-                : Task.FromResult(new List<Payroll>());
-
-            await Task.WhenAll(employeesTask, todayTimesheetsTask, monthTimesheetsTask, pendingAppealsTask, payrollsTask);
-
-            var employees = await employeesTask;
-            var todayTimesheets = await todayTimesheetsTask;
-            var monthTimesheets = await monthTimesheetsTask;
-            var pendingAppeals = await pendingAppealsTask;
-            var payrolls = await payrollsTask;
+            var payrolls = hasPayroll
+                ? await _payrollRepo.GetByTenantMonthAsync(tenantId, month, year)
+                : new List<Payroll>();
 
             var totalEmployees = employees.Count;
 
@@ -296,35 +288,33 @@ namespace SMEFLOWSystem.Application.Services
             var hasAttendance = await HasModuleAsync("ATTENDANCE");
             var hasPayroll = await HasModuleAsync("PAYROLL");
 
-            Task<List<DailyTimesheet>> todayTimesheetsTask = hasAttendance
-                ? _timesheetRepo.GetByTenantDateAsync(tenantId, workDate)
-                : Task.FromResult(new List<DailyTimesheet>());
+            var todayTimesheetsRaw = hasAttendance
+                ? await _timesheetRepo.GetByTenantDateAsync(tenantId, workDate)
+                : new List<DailyTimesheet>();
 
-            Task<List<DailyTimesheet>> monthTimesheetsTask = hasAttendance
-                ? _timesheetRepo.GetByTenantMonthAsync(tenantId, month, year)
-                : Task.FromResult(new List<DailyTimesheet>());
+            var monthTimesheetsRaw = hasAttendance
+                ? await _timesheetRepo.GetByTenantMonthAsync(tenantId, month, year)
+                : new List<DailyTimesheet>();
 
-            Task<List<TimesheetAppeal>> pendingAppealsTask = hasAttendance
-                ? _appealRepo.GetPendingAsync(tenantId)
-                : Task.FromResult(new List<TimesheetAppeal>());
+            var pendingAppealsRaw = hasAttendance
+                ? await _appealRepo.GetPendingAsync(tenantId)
+                : new List<TimesheetAppeal>();
 
-            Task<List<Payroll>> payrollsTask = hasPayroll
-                ? _payrollRepo.GetByTenantMonthAsync(tenantId, month, year)
-                : Task.FromResult(new List<Payroll>());
-
-            await Task.WhenAll(todayTimesheetsTask, monthTimesheetsTask, pendingAppealsTask, payrollsTask);
+            var payrollsRaw = hasPayroll
+                ? await _payrollRepo.GetByTenantMonthAsync(tenantId, month, year)
+                : new List<Payroll>();
 
             var todayTimesheets = hasAttendance 
-                ? (await todayTimesheetsTask).Where(t => empIds.Contains(t.EmployeeId)).ToList()
+                ? todayTimesheetsRaw.Where(t => empIds.Contains(t.EmployeeId)).ToList()
                 : new List<DailyTimesheet>();
             var monthTimesheets = hasAttendance
-                ? (await monthTimesheetsTask).Where(t => empIds.Contains(t.EmployeeId)).ToList()
+                ? monthTimesheetsRaw.Where(t => empIds.Contains(t.EmployeeId)).ToList()
                 : new List<DailyTimesheet>();
             var pendingAppeals = hasAttendance
-                ? (await pendingAppealsTask).Where(a => empIds.Contains(a.EmployeeId)).ToList()
+                ? pendingAppealsRaw.Where(a => empIds.Contains(a.EmployeeId)).ToList()
                 : new List<TimesheetAppeal>();
             var payrolls = hasPayroll
-                ? (await payrollsTask).Where(p => empIds.Contains(p.EmployeeId)).ToList()
+                ? payrollsRaw.Where(p => empIds.Contains(p.EmployeeId)).ToList()
                 : new List<Payroll>();
 
             var deptEmployeeCount = employees.Count;
@@ -435,40 +425,25 @@ namespace SMEFLOWSystem.Application.Services
             var hasAttendance = await HasModuleAsync("ATTENDANCE");
             var hasPayroll = await HasModuleAsync("PAYROLL");
 
-            async Task<TodayAttendanceDto?> GetTodayStatusAsync()
-            {
-                if (!hasAttendance) return null;
-                return await _attendanceService.GetMyTodayStatusAsync(userId);
-            }
+            var todayStatus = hasAttendance
+                ? await _attendanceService.GetMyTodayStatusAsync(userId)
+                : null;
 
-            Task<List<DailyTimesheet>> monthTimesheetsTask = hasAttendance
-                ? _timesheetRepo.GetByEmployeeMonthAsync(employee.Id, month, year)
-                : Task.FromResult(new List<DailyTimesheet>());
+            var monthTimesheets = hasAttendance
+                ? await _timesheetRepo.GetByEmployeeMonthAsync(employee.Id, month, year)
+                : new List<DailyTimesheet>();
 
-            async Task<(EmployeeShiftPattern? esp, ShiftPattern? definition)> GetShiftPatternAsync()
-            {
-                if (!hasAttendance) return (null, null);
-                return await _shiftPatternRepo.GetActivePatternDetailsAsync(employee.Id, workDate);
-            }
+            var (esp, definition) = hasAttendance
+                ? await _shiftPatternRepo.GetActivePatternDetailsAsync(employee.Id, workDate)
+                : (null, null);
 
-            Task<List<Payroll>> payrollsTask = hasPayroll
-                ? _payrollRepo.GetByEmployeeMonthAsync(employee.Id, employee.TenantId, month, year)
-                : Task.FromResult(new List<Payroll>());
+            var payrolls = hasPayroll
+                ? await _payrollRepo.GetByEmployeeMonthAsync(employee.Id, employee.TenantId, month, year)
+                : new List<Payroll>();
 
-            Task<List<TimesheetAppeal>> appealsTask = hasAttendance
-                ? _appealRepo.GetByEmployeeAsync(employee.Id)
-                : Task.FromResult(new List<TimesheetAppeal>());
-
-            var todayStatusTask = GetTodayStatusAsync();
-            var shiftTask = GetShiftPatternAsync();
-
-            await Task.WhenAll(todayStatusTask, monthTimesheetsTask, shiftTask, payrollsTask, appealsTask);
-
-            var todayStatus = await todayStatusTask;
-            var monthTimesheets = await monthTimesheetsTask;
-            var (esp, definition) = await shiftTask;
-            var payrolls = await payrollsTask;
-            var appeals = await appealsTask;
+            var appeals = hasAttendance
+                ? await _appealRepo.GetByEmployeeAsync(employee.Id)
+                : new List<TimesheetAppeal>();
 
             MyMonthSummaryDto? myMonthSummary = null;
             if (hasAttendance)

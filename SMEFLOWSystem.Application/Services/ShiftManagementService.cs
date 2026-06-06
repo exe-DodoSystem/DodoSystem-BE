@@ -141,7 +141,7 @@ public class ShiftManagementService : IShiftManagementService
         if (hasUsage)
             throw new InvalidOperationException("Ca làm việc đã được sử dụng, không thể xóa.");
 
-        await _shiftRepo.SoftDeleteAsync(shift);
+        await _shiftRepo.DeleteAsync(shift);
     }
 
     public async Task<PagedResultDto<ShiftPatternDto>> GetPatternsPagedAsync(ShiftPatternQueryDto query)
@@ -245,7 +245,7 @@ public class ShiftManagementService : IShiftManagementService
         if (hasUsage)
             throw new InvalidOperationException("Lịch ca đã được sử dụng, không thể xóa.");
 
-        await _shiftPatternRepo.SoftDeleteAsync(pattern);
+        await _shiftPatternRepo.DeleteAsync(pattern);
     }
 
     public async Task<List<EmployeeShiftPatternDto>> BulkAssignPatternAsync(ShiftAssignmentBulkCreateDto request)

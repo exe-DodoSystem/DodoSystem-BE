@@ -334,8 +334,8 @@ namespace SMEFLOWSystem.Application.Services
 
             // GAP-05: Validation ngày giải trình
             var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, VietnamTimeZone));
-            if (request.WorkDate >= today) 
-                throw new InvalidOperationException("Không thể giải trình cho ngày hôm nay hoặc tương lai.");
+            if (request.WorkDate > today) 
+                throw new InvalidOperationException("Không thể giải trình cho ngày tương lai.");
             if (today.DayNumber - request.WorkDate.DayNumber > 30) 
                 throw new InvalidOperationException("Không thể giải trình cho ngày quá hạn 30 ngày.");
 
@@ -423,7 +423,8 @@ namespace SMEFLOWSystem.Application.Services
                 throw new Exception("This appeal has already been processed.");
 
             var hrUser = await _employeeRepository.GetByUserIdAsync(hrUserId);
-            if (hrUser == null) throw new Exception("HR Employee record not found.");
+            if (hrUser == null && !_currentUser.IsAdmin()) 
+                throw new Exception("HR Employee record not found.");
 
             var setting = await _attendanceSettingRepository.GetByTenantIdAsync(tenantId.Value);
             var cutOffTime = setting?.DayStartCutOffTime ?? new TimeSpan(4, 0, 0);
@@ -433,7 +434,7 @@ namespace SMEFLOWSystem.Application.Services
                 if (request.IsApproved)
                 {
                     appeal.Status = "Approved";
-                    appeal.ApprovedBy = hrUser.Id;
+                    appeal.ApprovedBy = hrUser?.Id ?? hrUserId;
                     appeal.ApprovedAt = DateTime.UtcNow;
                     await _appealRepository.UpdateAsync(appeal);
 
@@ -490,7 +491,7 @@ namespace SMEFLOWSystem.Application.Services
                 else
                 {
                     appeal.Status = "Rejected";
-                    appeal.ApprovedBy = hrUser.Id;
+                    appeal.ApprovedBy = hrUser?.Id ?? hrUserId;
                     appeal.ApprovedAt = DateTime.UtcNow;
                     appeal.RejectReason = request.RejectReason;
                     await _appealRepository.UpdateAsync(appeal);
