@@ -13,7 +13,7 @@ public interface IShiftRepository
     Task<Shift?> GetByIdWithSegmentsAsync(Guid id);
     Task AddAsync(Shift shift);
     Task<Shift> UpdateAsync(Shift shift);
-    Task SoftDeleteAsync(Shift shift);
+    Task DeleteAsync(Shift shift);
     Task<bool> HasUsageAsync(Guid shiftId);
     Task<bool> IsCodeOrNameExists(string code, string name);
 }

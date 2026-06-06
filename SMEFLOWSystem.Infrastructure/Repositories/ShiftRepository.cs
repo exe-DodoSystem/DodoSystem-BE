@@ -65,10 +65,9 @@ public class ShiftRepository : IShiftRepository
         return shift;
     }
 
-    public async Task SoftDeleteAsync(Shift shift)
+    public async Task DeleteAsync(Shift shift)
     {
-        shift.IsDeleted = true;
-        _context.Shifts.Update(shift);
+        _context.Shifts.Remove(shift);
         await _context.SaveChangesAsync();
     }
 

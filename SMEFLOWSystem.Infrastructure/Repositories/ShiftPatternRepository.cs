@@ -152,10 +152,9 @@ public class ShiftPatternRepository : IShiftPatternRepository
         return pattern;
     }
 
-    public async Task SoftDeleteAsync(ShiftPattern pattern)
+    public async Task DeleteAsync(ShiftPattern pattern)
     {
-        pattern.IsDeleted = true;
-        _context.ShiftPatterns.Update(pattern);
+        _context.ShiftPatterns.Remove(pattern);
         await _context.SaveChangesAsync();
     }
 

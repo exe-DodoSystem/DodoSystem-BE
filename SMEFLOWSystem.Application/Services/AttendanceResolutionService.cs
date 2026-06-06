@@ -600,7 +600,7 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                         .OrderBy(x => x.Diff)
                         .First();
 
-                    if (bestInCandidate.Diff <= proximityWindowMinutes)
+                    if (bestInCandidate.Diff <= proximityWindowMinutes || shiftSegments.Count == 1)
                     {
                         bestInLog = bestInCandidate.Log;
                         unmappedLogs.Remove(bestInLog);
@@ -622,7 +622,7 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                             .OrderBy(x => x.Diff)
                             .First();
 
-                        if (bestOutCandidate.Diff <= proximityWindowMinutes)
+                        if (bestOutCandidate.Diff <= proximityWindowMinutes || shiftSegments.Count == 1)
                         {
                             bestOutLog = bestOutCandidate.Log;
                             unmappedLogs.Remove(bestOutLog);
