@@ -7,11 +7,14 @@ using SMEFLOWSystem.Application.DTOs.PayrollDtos;
 using SMEFLOWSystem.Application.Interfaces.IServices;
 using SMEFLOWSystem.SharedKernel.Interfaces;
 
+using SMEFLOWSystem.WebAPI.Filters;
+
 namespace SMEFLOWSystem.WebAPI.Controllers
 {
     [Route("api/payrolls")]
     [ApiController]
     [Authorize]
+    [RequireModule("PAYROLL")]
     public class PayrollController : ControllerBase
     {
         private readonly IPayrollService _payrollService;

@@ -65,6 +65,7 @@ public partial class SMEFLOWSystemContext : DbContext
 
     public virtual DbSet<PublicHoliday> PublicHolidays { get; set; }
     public virtual DbSet<TimesheetAppeal> TimesheetAppeals { get; set; }
+    public virtual DbSet<ManualMonthlyTimesheet> ManualMonthlyTimesheets { get; set; }
 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -110,6 +111,7 @@ public partial class SMEFLOWSystemContext : DbContext
 
         modelBuilder.Entity<PublicHoliday>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
         modelBuilder.Entity<TimesheetAppeal>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<ManualMonthlyTimesheet>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
 
 
         ApplySoftDeleteQueryFilters(modelBuilder);
