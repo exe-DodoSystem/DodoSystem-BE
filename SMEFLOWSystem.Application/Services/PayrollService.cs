@@ -21,6 +21,7 @@ namespace SMEFLOWSystem.Application.Services
         private readonly IEmployeeRepository _employeeRepository;
         private readonly IDailyTimesheetRepository _timesheetRepository;
         private readonly IPublicHolidayRepository _publicHolidayRepository;
+        private readonly IManualMonthlyTimesheetRepository _manualTimesheetRepository;
         private readonly IMapper _mapper;
         private readonly ILogger<PayrollService> _logger;
         private readonly IRealtimeNotificationService _realtime;
@@ -32,6 +33,7 @@ namespace SMEFLOWSystem.Application.Services
             IEmployeeRepository employeeRepository,
             IDailyTimesheetRepository timesheetRepository,
             IPublicHolidayRepository publicHolidayRepository,
+            IManualMonthlyTimesheetRepository manualTimesheetRepository,
             IMapper mapper,
             ILogger<PayrollService> logger,
             IRealtimeNotificationService realtime,
@@ -42,6 +44,7 @@ namespace SMEFLOWSystem.Application.Services
             _employeeRepository = employeeRepository;
             _timesheetRepository = timesheetRepository;
             _publicHolidayRepository = publicHolidayRepository;
+            _manualTimesheetRepository = manualTimesheetRepository;
             _mapper = mapper;
             _logger = logger;
             _realtime = realtime;
@@ -74,6 +77,11 @@ namespace SMEFLOWSystem.Application.Services
                 .GroupBy(t => t.EmployeeId)
                 .ToDictionary(g => g.Key, g => g.ToList());
 
+            var allManualTimesheets = await _manualTimesheetRepository.GetByTenantMonthYearAsync(tenantId, month, year);
+            var manualTimesheetByEmployee = allManualTimesheets.ToDictionary(t => t.EmployeeId);
+
+            bool hasTimesheetData = allTimesheets.Any();
+
             // Tính 1 lần, dùng chung cho toàn bộ nhân viên
             int daysInMonth = DateTime.DaysInMonth(year, month);
             int standardDays = Enumerable.Range(1, daysInMonth)
@@ -95,24 +103,56 @@ namespace SMEFLOWSystem.Application.Services
                     (existingPayroll.Status == PayrollStatus.Published || existingPayroll.Status == PayrollStatus.Paid))
                     continue;
 
-                // Tính toán các chỉ số từ Timesheet
-                int actualDays = timesheets.Count(t =>
-                    t.ActualWorkHours > 0 ||
-                    t.Status == StatusEnum.AttendanceNormal     ||
-                    t.Status == StatusEnum.AttendanceLate       ||
-                    t.Status == StatusEnum.AttendanceEarlyLeave ||
-                    t.Status == StatusEnum.AttendanceMissingOut ||
-                    t.Status == StatusEnum.AttendanceOnLeave);
-                // Loại ngày MissingOut khỏi penalty — AttendanceResolution ghi earlyLeaveMinutes = gần cả ca
-                // cho ngày MissingOut, gây phạt quá nặng. Ngày MissingOut cần xử lý thủ công bởi HR.
-                int lateMinutes = timesheets
-                    .Where(t => t.Status != StatusEnum.AttendanceMissingOut)
-                    .Sum(t => t.TotalLateMinutes);
-                int earlyLeaveMinutes = timesheets
-                    .Where(t => t.Status != StatusEnum.AttendanceMissingOut)
-                    .Sum(t => t.TotalEarlyLeaveMinutes);
-                int absentDays = timesheets.Count(t => t.Status == StatusEnum.AttendanceAbsent);
-                decimal otHours = timesheets.Sum(t => t.OTHours);
+                var manualTimesheet = manualTimesheetByEmployee.TryGetValue(emp.Id, out var mt) ? mt : null;
+
+                int actualDays;
+                int lateMinutes;
+                int earlyLeaveMinutes;
+                int absentDays;
+                decimal otHours;
+
+                if (hasTimesheetData && timesheets.Any())
+                {
+                    // Tính toán các chỉ số từ Timesheet
+                    actualDays = timesheets.Count(t =>
+                        t.ActualWorkHours > 0 ||
+                        t.Status == StatusEnum.AttendanceNormal     ||
+                        t.Status == StatusEnum.AttendanceLate       ||
+                        t.Status == StatusEnum.AttendanceEarlyLeave ||
+                        t.Status == StatusEnum.AttendanceMissingOut ||
+                        t.Status == StatusEnum.AttendanceOnLeave);
+                    // Loại ngày MissingOut khỏi penalty — AttendanceResolution ghi earlyLeaveMinutes = gần cả ca
+                    // cho ngày MissingOut, gây phạt quá nặng. Ngày MissingOut cần xử lý thủ công bởi HR.
+                    lateMinutes = timesheets
+                        .Where(t => t.Status != StatusEnum.AttendanceMissingOut)
+                        .Sum(t => t.TotalLateMinutes);
+                    earlyLeaveMinutes = timesheets
+                        .Where(t => t.Status != StatusEnum.AttendanceMissingOut)
+                        .Sum(t => t.TotalEarlyLeaveMinutes);
+                    absentDays = timesheets.Count(t => t.Status == StatusEnum.AttendanceAbsent);
+                    otHours = timesheets.Sum(t => t.OTHours);
+                }
+                else if (manualTimesheet != null)
+                {
+                    // Lấy chỉ số từ bảng công nhập tay
+                    actualDays = manualTimesheet.ActualWorkingDays;
+                    lateMinutes = manualTimesheet.TotalLateMinutes;
+                    earlyLeaveMinutes = manualTimesheet.TotalEarlyLeaveMinutes;
+                    absentDays = manualTimesheet.AbsentDays;
+                    otHours = manualTimesheet.TotalOTHours;
+                }
+                else
+                {
+                    // Fallback: không có dữ liệu chấm công
+                    actualDays = standardDays;
+                    lateMinutes = 0;
+                    earlyLeaveMinutes = 0;
+                    absentDays = 0;
+                    otHours = 0;
+                    _logger.LogWarning(
+                        "Payroll fallback mode: Tenant {TenantId}, Employee {EmployeeId}, {Month}/{Year} — no timesheet data.",
+                        tenantId, emp.Id, month, year);
+                }
 
                 // Nếu không đi làm ngày nào thì BasePay = 0
                 decimal basePay = 0;
@@ -224,23 +264,54 @@ namespace SMEFLOWSystem.Application.Services
                             && date.DayOfWeek != DayOfWeek.Sunday
                             && !holidayDatesInMonth.Contains(date));
 
-            int actualDays = timesheets.Count(t =>
-                t.ActualWorkHours > 0 ||
-                t.Status == StatusEnum.AttendanceNormal     ||
-                t.Status == StatusEnum.AttendanceLate       ||
-                t.Status == StatusEnum.AttendanceEarlyLeave ||
-                t.Status == StatusEnum.AttendanceMissingOut ||
-                t.Status == StatusEnum.AttendanceOnLeave);
-            // Loại ngày MissingOut khỏi penalty — AttendanceResolution ghi earlyLeaveMinutes = gần cả ca
-            // cho ngày MissingOut, gây phạt quá nặng. Ngày MissingOut cần xử lý thủ công bởi HR.
-            int lateMinutes = timesheets
-                .Where(t => t.Status != StatusEnum.AttendanceMissingOut)
-                .Sum(t => t.TotalLateMinutes);
-            int earlyLeaveMinutes = timesheets
-                .Where(t => t.Status != StatusEnum.AttendanceMissingOut)
-                .Sum(t => t.TotalEarlyLeaveMinutes);
-            int absentDays = timesheets.Count(t => t.Status == StatusEnum.AttendanceAbsent);
-            decimal otHours = timesheets.Sum(t => t.OTHours);
+            var manualTimesheet = await _manualTimesheetRepository.GetByEmployeeMonthYearAsync(tenantId, employeeId, month, year);
+
+            int actualDays;
+            int lateMinutes;
+            int earlyLeaveMinutes;
+            int absentDays;
+            decimal otHours;
+            bool isTimesheetBased = timesheets.Any() || manualTimesheet != null;
+
+            if (timesheets.Any())
+            {
+                actualDays = timesheets.Count(t =>
+                    t.ActualWorkHours > 0 ||
+                    t.Status == StatusEnum.AttendanceNormal     ||
+                    t.Status == StatusEnum.AttendanceLate       ||
+                    t.Status == StatusEnum.AttendanceEarlyLeave ||
+                    t.Status == StatusEnum.AttendanceMissingOut ||
+                    t.Status == StatusEnum.AttendanceOnLeave);
+                // Loại ngày MissingOut khỏi penalty — AttendanceResolution ghi earlyLeaveMinutes = gần cả ca
+                // cho ngày MissingOut, gây phạt quá nặng. Ngày MissingOut cần xử lý thủ công bởi HR.
+                lateMinutes = timesheets
+                    .Where(t => t.Status != StatusEnum.AttendanceMissingOut)
+                    .Sum(t => t.TotalLateMinutes);
+                earlyLeaveMinutes = timesheets
+                    .Where(t => t.Status != StatusEnum.AttendanceMissingOut)
+                    .Sum(t => t.TotalEarlyLeaveMinutes);
+                absentDays = timesheets.Count(t => t.Status == StatusEnum.AttendanceAbsent);
+                otHours = timesheets.Sum(t => t.OTHours);
+            }
+            else if (manualTimesheet != null)
+            {
+                actualDays = manualTimesheet.ActualWorkingDays;
+                lateMinutes = manualTimesheet.TotalLateMinutes;
+                earlyLeaveMinutes = manualTimesheet.TotalEarlyLeaveMinutes;
+                absentDays = manualTimesheet.AbsentDays;
+                otHours = manualTimesheet.TotalOTHours;
+            }
+            else
+            {
+                actualDays = standardDays;
+                lateMinutes = 0;
+                earlyLeaveMinutes = 0;
+                absentDays = 0;
+                otHours = 0;
+                _logger.LogWarning(
+                    "Payroll fallback mode: Tenant {TenantId}, Employee {EmployeeId}, {Month}/{Year} — no timesheet data.",
+                    tenantId, employeeId, month, year);
+            }
 
             decimal basePay = 0;
             decimal otPay = 0;
@@ -273,7 +344,9 @@ namespace SMEFLOWSystem.Application.Services
                                             + (existingPayroll.CustomBonus ?? 0) - existingPayroll.CustomDeduction, 2);
                 
                 await _payrollRepository.UpdateAsync(existingPayroll);
-                return _mapper.Map<PayrollDto>(existingPayroll);
+                var dto = _mapper.Map<PayrollDto>(existingPayroll);
+                dto.IsTimesheetBased = isTimesheetBased;
+                return dto;
             }
             else
             {
@@ -302,7 +375,9 @@ namespace SMEFLOWSystem.Application.Services
                 await _payrollRepository.AddAsync(payroll);
                 
                 var created = await _payrollRepository.GetByIdAsync(payroll.Id);
-                return _mapper.Map<PayrollDto>(created ?? payroll);
+                var dto = _mapper.Map<PayrollDto>(created ?? payroll);
+                dto.IsTimesheetBased = isTimesheetBased;
+                return dto;
             }
         }
 
@@ -337,6 +412,22 @@ namespace SMEFLOWSystem.Application.Services
 
             var dtos = _mapper.Map<List<PayrollDto>>(items);
 
+            if (dtos.Any())
+            {
+                var month = query.Month ?? DateTime.UtcNow.Month;
+                var year = query.Year ?? DateTime.UtcNow.Year;
+                var allTimesheets = await _timesheetRepository.GetByTenantMonthAsync(tenantId, month, year);
+                var timesheetEmployeeIds = allTimesheets.Select(t => t.EmployeeId).ToHashSet();
+
+                var allManualTimesheets = await _manualTimesheetRepository.GetByTenantMonthYearAsync(tenantId, month, year);
+                var manualEmployeeIds = allManualTimesheets.Select(t => t.EmployeeId).ToHashSet();
+
+                foreach (var dto in dtos)
+                {
+                    dto.IsTimesheetBased = timesheetEmployeeIds.Contains(dto.EmployeeId) || manualEmployeeIds.Contains(dto.EmployeeId);
+                }
+            }
+
             return new PagedResultDto<PayrollDto>
             {
                 Items = dtos,
@@ -365,7 +456,19 @@ namespace SMEFLOWSystem.Application.Services
                 p.Status == PayrollStatus.Published || 
                 p.Status == PayrollStatus.Paid).ToList();
 
-            return _mapper.Map<List<PayrollDto>>(visibleItems);
+            var dtos = _mapper.Map<List<PayrollDto>>(visibleItems);
+
+            if (dtos.Any())
+            {
+                foreach (var dto in dtos)
+                {
+                    var timesheets = await _timesheetRepository.GetByEmployeeMonthAsync(employee.Id, dto.Month, dto.Year);
+                    var manualTimesheet = await _manualTimesheetRepository.GetByEmployeeMonthYearAsync(tenantId, employee.Id, dto.Month, dto.Year);
+                    dto.IsTimesheetBased = timesheets.Any() || manualTimesheet != null;
+                }
+            }
+
+            return dtos;
         }
 
         public async Task<bool> MarkPaidAsync(Guid payrollId)

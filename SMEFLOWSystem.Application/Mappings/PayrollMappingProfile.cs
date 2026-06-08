@@ -16,7 +16,8 @@ namespace SMEFLOWSystem.Application.Mappings
             CreateMap<Payroll, PayrollDto>()
                 .ForMember(dest => dest.EmployeeName, opt => opt.MapFrom(src => src.Employee != null ? src.Employee.FullName : string.Empty))
                 .ForMember(dest => dest.EmployeeCode, opt => opt.Ignore()) // Tạm ignore vì bảng Employee hiện chưa có Entity Code, nếu sau này có thì đổi lại
-                .ForMember(dest => dest.DepartmentName, opt => opt.MapFrom(src => (src.Employee != null && src.Employee.Department != null) ? src.Employee.Department.Name : string.Empty));
+                .ForMember(dest => dest.DepartmentName, opt => opt.MapFrom(src => (src.Employee != null && src.Employee.Department != null) ? src.Employee.Department.Name : string.Empty))
+                .ForMember(dest => dest.IsTimesheetBased, opt => opt.Ignore());
 
             CreateMap<UpdatePayrollDto, Payroll>()
                 .ForMember(dest => dest.CustomBonus, opt => opt.Condition(src => src.CustomBonus.HasValue))

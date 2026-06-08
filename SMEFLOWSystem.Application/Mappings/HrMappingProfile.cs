@@ -44,5 +44,10 @@ public class HrMappingProfile : Profile
             .ForMember(d => d.EmployeeName, opt => opt.MapFrom(s => s.Employee != null ? s.Employee.FullName : string.Empty))
             .ForMember(d => d.EmployeeDepartment, opt => opt.MapFrom(s => s.Employee != null && s.Employee.Department != null ? s.Employee.Department.Name : string.Empty))
             .ForMember(d => d.ShiftPatternName, opt => opt.MapFrom(s => s.ShiftPattern != null ? s.ShiftPattern.Name : string.Empty));
+
+        // Manual Monthly Timesheet Mappings
+        CreateMap<ManualMonthlyTimesheet, ManualMonthlyTimesheetDto>()
+            .ForMember(d => d.EmployeeName, opt => opt.MapFrom(s => s.Employee != null ? s.Employee.FullName : string.Empty));
+        CreateMap<ManualMonthlyTimesheetUpsertDto, ManualMonthlyTimesheet>();
     }
 }

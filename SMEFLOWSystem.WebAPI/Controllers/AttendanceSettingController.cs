@@ -8,11 +8,14 @@ using SMEFLOWSystem.Application.Interfaces.IServices;
 using System;
 using System.Threading.Tasks;
 
+using SMEFLOWSystem.WebAPI.Filters;
+
 namespace SMEFLOWSystem.WebAPI.Controllers;
 
 [ApiController]
 [Authorize]
 [Route("api/v1/attendance/setting")]
+[RequireModule("ATTENDANCE")]
 public class AttendanceSettingController : ControllerBase
 {
     private readonly IAttendanceService _service;

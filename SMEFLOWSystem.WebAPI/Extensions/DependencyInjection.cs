@@ -14,6 +14,7 @@ using SMEFLOWSystem.SharedKernel.Common;
 using SMEFLOWSystem.WebAPI.BackgroundServices;
 using SMEFLOWSystem.WebAPI.Converters;
 using SMEFLOWSystem.WebAPI.Hubs;
+using SMEFLOWSystem.WebAPI.Filters;
 using SMEFLOWSystem.WebAPI.Services;
 using System.Collections.Generic;
 using System.Linq;
@@ -31,7 +32,11 @@ public static class DependencyInjection
         services.AddMemoryCache();
         services.AddHostedService<OutboxPublisherHostedService>();
         services.AddHostedService<RabbitMqSubscriberHostedService>();
-        services.AddControllers()
+        services.AddScoped<ModuleRequirementFilter>();
+        services.AddControllers(options =>
+        {
+            options.Filters.Add<ModuleRequirementFilter>();
+        })
             .AddJsonOptions(options =>
             {
                 options.JsonSerializerOptions.Converters.Add(new TimeSpanJsonConverter());
