@@ -59,6 +59,7 @@ public static class DependencyInjection
 
         services.AddScoped<ISystemBootstrapService, SystemBootstrapService>();
         services.AddScoped<ISystemTenantService, SystemTenantService>();
+        services.AddScoped<ISystemDashboardService, SystemDashboardService>();
         return services;
     }
 }

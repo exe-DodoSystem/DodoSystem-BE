@@ -57,4 +57,17 @@ public class ModuleService : IModuleService
         var modules = await _moduleRepository.GetAllActiveAsync();
         return _mapper.Map<List<ModuleDto>>(modules);
     }
+
+    public async Task<bool> DeactivateModuleAsync(int moduleId)
+    {
+        var module = await _moduleRepository.GetByIdAsync(moduleId);
+        if (module == null)
+            return false;
+
+        module.IsActive = false;
+        module.UpdatedAt = DateTime.UtcNow;
+        
+        await _moduleRepository.UpdateAsync(module);
+        return true;
+    }
 }

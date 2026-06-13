@@ -10,4 +10,6 @@ public interface IModuleRepository
     Task AddAsync(Module module);
     Task<bool> ExistsByCodeOrShortCodeAsync(string code, string shortCode);
     Task<Module?> GetByCodeAsync(string code);
+    Task<Module?> GetByIdAsync(int id);
+    Task<Module> UpdateAsync(Module module);
 }

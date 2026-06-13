@@ -4,6 +4,7 @@ namespace SMEFLOWSystem.Application.DTOs.DashboardDtos;
 
 public class AdminDashboardDto
 {
+    public int TotalUsers { get; set; }
     public int TotalEmployees { get; set; }
     public List<DepartmentEmployeeCountDto> EmployeesByDepartment { get; set; } = new();
     public TodayAttendanceSummaryDto? TodayAttendance { get; set; }

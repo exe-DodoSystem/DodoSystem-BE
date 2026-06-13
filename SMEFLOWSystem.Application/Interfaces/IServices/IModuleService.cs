@@ -8,4 +8,5 @@ public interface IModuleService
     Task<ModuleDto> CreateAsync(ModuleCreateDto dto);
     Task<List<ModuleDto>> GetAllAsync();
     Task<List<ModuleDto>> GetAllActiveAsync();
+    Task<bool> DeactivateModuleAsync(int moduleId);
 }
