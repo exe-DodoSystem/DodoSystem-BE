@@ -1,6 +1,8 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SMEFLOWSystem.Application.DTOs.ModuleDtos;
 using SMEFLOWSystem.Application.Interfaces.IServices;
+using SMEFLOWSystem.SharedKernel.Common;
 
 namespace SMEFLOWSystem.WebAPI.Controllers;
 
@@ -33,6 +35,7 @@ public class ModulesController : ControllerBase
 
     /// <summary>[SystemAdmin] Tạo module mới vào hệ thống</summary>
     [HttpPost]
+    [Authorize(Policy = PolicyNames.SystemAdmin)]
     public async Task<ActionResult<ModuleDto>> Create([FromBody] ModuleCreateDto dto)
     {
         try
@@ -44,6 +47,18 @@ public class ModulesController : ControllerBase
         {
             return BadRequest(new { error = ex.Message });
         }
+    }
+
+    /// <summary>[SystemAdmin] Ngừng hoạt động 1 module</summary>
+    [HttpPut("{id}/deactivate")]
+    [Authorize(Policy = PolicyNames.SystemAdmin)]
+    public async Task<IActionResult> Deactivate([FromRoute] int id)
+    {
+        var success = await _moduleService.DeactivateModuleAsync(id);
+        if (!success)
+            return NotFound(new { error = "Không tìm thấy module hoặc module đã bị xóa." });
+
+        return Ok(new { message = "Đã ngừng hoạt động module thành công." });
     }
 }
 

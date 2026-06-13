@@ -8,10 +8,12 @@ namespace SMEFLOWSystem.Application.Services.System;
 public class SystemTenantService : ISystemTenantService
 {
     private readonly ITenantRepository _tenantRepository;
+    private readonly IModuleSubscriptionRepository _moduleSubscriptionRepository;
 
-    public SystemTenantService(ITenantRepository tenantRepository)
+    public SystemTenantService(ITenantRepository tenantRepository, IModuleSubscriptionRepository moduleSubscriptionRepository)
     {
         _tenantRepository = tenantRepository;
+        _moduleSubscriptionRepository = moduleSubscriptionRepository;
     }
 
     public async Task<PagedResultDto<SystemTenantDto>> GetAllAsync(PagingRequestDto request)
@@ -47,6 +49,8 @@ public class SystemTenantService : ISystemTenantService
         if (tenant == null)
             return null;
 
+        var modules = await _moduleSubscriptionRepository.GetByTenantIgnoreTenantAsync(tenantId);
+
         return new SystemTenantDto
         {
             Id = tenant.Id,
@@ -55,7 +59,15 @@ public class SystemTenantService : ISystemTenantService
             SubscriptionEndDate = tenant.SubscriptionEndDate,
             OwnerUserId = tenant.OwnerUserId,
             CreatedAt = tenant.CreatedAt,
-            UpdatedAt = tenant.UpdatedAt
+            UpdatedAt = tenant.UpdatedAt,
+            Modules = modules.Select(m => new SystemTenantModuleDto
+            {
+                ModuleId = m.ModuleId,
+                ModuleName = m.Module?.Name ?? string.Empty,
+                StartDate = m.StartDate,
+                EndDate = m.EndDate,
+                Status = m.Status
+            }).ToList()
         };
     }
 }

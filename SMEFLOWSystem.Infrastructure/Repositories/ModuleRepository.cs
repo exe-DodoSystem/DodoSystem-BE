@@ -46,6 +46,11 @@ public class ModuleRepository : IModuleRepository
         return _context.Modules.FirstOrDefaultAsync(m => m.Code == normalized && m.IsActive);
     }
 
+    public Task<Module?> GetByIdAsync(int id)
+    {
+        return _context.Modules.FirstOrDefaultAsync(m => m.Id == id);
+    }
+
     public async Task<Module> UpdateAsync(Module module)
     {
         _context.Modules.Update(module);

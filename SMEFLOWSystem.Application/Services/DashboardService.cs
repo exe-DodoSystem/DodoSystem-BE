@@ -26,6 +26,7 @@ namespace SMEFLOWSystem.Application.Services
         private readonly IMapper _mapper;
         private readonly ILogger<DashboardService> _logger;
         private readonly IModuleSubscriptionService _moduleSubscription;
+        private readonly IUserRepository _userRepository;
 
         private static readonly TimeZoneInfo VietnamTimeZone = GetVietnamTimeZone();
 
@@ -48,7 +49,8 @@ namespace SMEFLOWSystem.Application.Services
             IHrAuthorizationService hrAuth,
             IMapper mapper,
             ILogger<DashboardService> logger,
-            IModuleSubscriptionService moduleSubscription)
+            IModuleSubscriptionService moduleSubscription,
+            IUserRepository userRepository)
         {
             _employeeRepo = employeeRepo;
             _timesheetRepo = timesheetRepo;
@@ -60,6 +62,7 @@ namespace SMEFLOWSystem.Application.Services
             _mapper = mapper;
             _logger = logger;
             _moduleSubscription = moduleSubscription;
+            _userRepository = userRepository;
         }
 
         private static DateOnly GetVietnamWorkDate()
@@ -157,6 +160,8 @@ namespace SMEFLOWSystem.Application.Services
                 ? await _payrollRepo.GetByTenantMonthAsync(tenantId, month, year)
                 : new List<Payroll>();
 
+            var users = await _userRepository.GetAllUsersAsync();
+            var totalUsers = users.Count;
             var totalEmployees = employees.Count;
 
             var employeesByDepartment = employees
@@ -253,6 +258,7 @@ namespace SMEFLOWSystem.Application.Services
 
             return new AdminDashboardDto
             {
+                TotalUsers = totalUsers,
                 TotalEmployees = totalEmployees,
                 EmployeesByDepartment = employeesByDepartment,
                 TodayAttendance = todayAttendance,
