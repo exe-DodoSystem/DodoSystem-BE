@@ -520,7 +520,11 @@ public class AttendanceResolutionService : IAttendanceResolutionService
             .ToList();
             
         var approvedLeaveSegmentIds = new HashSet<Guid>(
-            approvedLeaveSegments.Select(s => s.TargetShiftSegmentId));
+            approvedLeaveSegments
+                .Where(s => s.TargetShiftSegmentId.HasValue)
+                .Select(s => s.TargetShiftSegmentId!.Value));
+                
+        var hasWholeDayLeave = approvedLeaveSegments.Any(s => s.TargetShiftSegmentId == null);
 
         // Lấy đơn xin OT đã duyệt (Approved) để tính OT hợp lệ
         var approvedOT = bulkData.ApprovedOTs
@@ -640,7 +644,7 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                         TargetShiftSegmentId = targetSegment.Id,
                         LateMinutes = 0,
                         EarlyLeaveMinutes = 0,
-                        Status = approvedLeaveSegmentIds.Contains(targetSegment.Id) ? StatusEnum.AttendanceOnLeave : StatusEnum.AttendanceAbsent
+                        Status = (approvedLeaveSegmentIds.Contains(targetSegment.Id) || hasWholeDayLeave) ? StatusEnum.AttendanceOnLeave : StatusEnum.AttendanceAbsent
                     });
                     continue;
                 }
@@ -693,7 +697,7 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                     if (stayLateMins > 0) totalLateOutOTMinutes += stayLateMins;
                 }
 
-                if (approvedLeaveSegmentIds.Contains(targetSegment.Id))
+                if (approvedLeaveSegmentIds.Contains(targetSegment.Id) || hasWholeDayLeave)
                 {
                     lateMins = 0; earlyMins = 0;
                 }
@@ -716,7 +720,7 @@ public class AttendanceResolutionService : IAttendanceResolutionService
                     CheckOutSelfieUrl = bestOutLog?.SelfieUrl ?? "",
                     LateMinutes = lateMins,
                     EarlyLeaveMinutes = earlyMins,
-                    Status = approvedLeaveSegmentIds.Contains(targetSegment.Id) ? StatusEnum.AttendanceOnLeave 
+                    Status = (approvedLeaveSegmentIds.Contains(targetSegment.Id) || hasWholeDayLeave) ? StatusEnum.AttendanceOnLeave 
                              : (!actualIn.HasValue || !actualOut.HasValue ? StatusEnum.AttendanceMissingOut : StatusEnum.AttendanceNormal)
                 });
             }

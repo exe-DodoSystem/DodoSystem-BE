@@ -51,6 +51,7 @@ public static class DependencyInjection
         services.AddScoped<IPayrollService, PayrollService>();
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<ILeaveRequestService, LeaveRequestService>();
 
 
         services.AddScoped<TenantExpirationRecurringJob>();

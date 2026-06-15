@@ -17,7 +17,7 @@ public partial class LeaveRequestSegment : ITenantEntity
     
     // Cốt lõi của bài toán "Nửa ngày phép đụng Ca Gãy"
     // Nếu xin nửa ngày, ID này sẽ link thẳng vào Segment tương ứng của Ca làm việc.
-    public Guid TargetShiftSegmentId { get; private set; } 
+    public Guid? TargetShiftSegmentId { get; private set; } 
     
     /// <summary>Số giờ xin nghỉ.</summary>
     public decimal HoursRequested { get; private set; }
@@ -27,7 +27,7 @@ public partial class LeaveRequestSegment : ITenantEntity
 
     protected LeaveRequestSegment() { }
 
-    public LeaveRequestSegment(Guid tenantId, Guid leaveRequestId, DateOnly date, Guid targetSegmentId, decimal hours)
+    public LeaveRequestSegment(Guid tenantId, Guid leaveRequestId, DateOnly date, Guid? targetSegmentId, decimal hours)
     {
         Id = Guid.NewGuid();
         TenantId = tenantId;

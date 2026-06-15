@@ -11,4 +11,12 @@ public interface ILeaveRequestRepository
     Task<List<LeaveRequestSegment>> GetApprovedSegmentsByEmployeeDateAsync(Guid employeeId, DateOnly leaveDate);
 
     Task<List<LeaveRequestSegment>> GetApprovedSegmentsForEmployeesAsync(List<Guid> employeeIds, DateOnly minDate, DateOnly maxDate);
+
+    Task<LeaveRequest?> GetByIdAsync(Guid id);
+    Task<List<LeaveRequest>> GetByEmployeeAsync(Guid employeeId);
+    Task<List<LeaveRequest>> GetPendingAsync();
+    Task<List<LeaveRequest>> GetAllAsync();
+    Task AddAsync(LeaveRequest leaveRequest);
+    Task UpdateAsync(LeaveRequest leaveRequest);
+    Task DeleteAsync(LeaveRequest leaveRequest);
 }

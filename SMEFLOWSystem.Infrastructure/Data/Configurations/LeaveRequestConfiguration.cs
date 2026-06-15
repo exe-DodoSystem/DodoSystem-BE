@@ -16,6 +16,11 @@ public class LeaveRequestConfiguration : IEntityTypeConfiguration<LeaveRequest>
             .IsRequired()
             .HasMaxLength(50);
 
+        builder.HasOne(x => x.LeaveTypeNavigation)
+            .WithMany()
+            .HasForeignKey(x => x.LeaveTypeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.Property(e => e.Status)
             .IsRequired()
             .HasMaxLength(20);
@@ -50,7 +55,10 @@ public class LeaveRequestSegmentConfiguration : IEntityTypeConfiguration<LeaveRe
             .HasColumnType("decimal(18,2)")
             .IsRequired();
 
-        builder.HasIndex(e => new { e.LeaveRequestId, e.TargetShiftSegmentId })
+        builder.Property(e => e.TargetShiftSegmentId)
+            .IsRequired(false);
+
+        builder.HasIndex(e => new { e.LeaveRequestId, e.LeaveDate, e.TargetShiftSegmentId })
             .IsUnique()
             .HasDatabaseName("IX_LeaveRequestSegments_UniqueSegment");
 

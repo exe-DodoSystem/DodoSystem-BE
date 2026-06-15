@@ -52,6 +52,11 @@ namespace ShareKernel.Common.Enum
         public const string ApprovalApproved = "Approved";
         public const string ApprovalRejected = "Rejected";
 
+        //Leave Request Status
+        public const string LeaveRequestPending = "Pending";
+        public const string LeaveRequestApproved = "Approved";
+        public const string LeaveRequestRejected = "Rejected";
+        public const string LeaveRequestCancelled = "Cancelled";
         // Outbox Message Status
         public const string OutboxPending = "Pending";
         public const string OutboxProcessed = "Processed";
@@ -67,5 +72,7 @@ namespace ShareKernel.Common.Enum
         public const string EmailTypeAdditional = "ADDITIONAL";
         public const string EmailTypeRenewal = "RENEWAL";
         public const string EmailTypeTrialOptional = "TRIAL_OPTIONAL";
+
+
     }
 }

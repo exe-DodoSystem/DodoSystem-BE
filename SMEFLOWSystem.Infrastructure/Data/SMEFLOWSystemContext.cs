@@ -56,6 +56,8 @@ public partial class SMEFLOWSystemContext : DbContext
     public virtual DbSet<TimesheetPeriod> TimesheetPeriods { get; set; }
     public virtual DbSet<LeaveRequest> LeaveRequests { get; set; }
     public virtual DbSet<LeaveRequestSegment> LeaveRequestSegments { get; set; }
+    public virtual DbSet<LeaveType> LeaveTypes { get; set; }
+    public virtual DbSet<EmployeeLeaveBalance> EmployeeLeaveBalances { get; set; }
     
     // Tầng 1 (Kế Hoạch Mới): Thu thập tín hiệu
     public virtual DbSet<RawPunchLog> RawPunchLogs { get; set; }
@@ -102,6 +104,8 @@ public partial class SMEFLOWSystemContext : DbContext
         modelBuilder.Entity<TimesheetPeriod>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
         modelBuilder.Entity<LeaveRequest>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
         modelBuilder.Entity<LeaveRequestSegment>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<LeaveType>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<EmployeeLeaveBalance>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
         
         // Quá trình chia Tenant an toàn cho Raw logs
         modelBuilder.Entity<RawPunchLog>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
