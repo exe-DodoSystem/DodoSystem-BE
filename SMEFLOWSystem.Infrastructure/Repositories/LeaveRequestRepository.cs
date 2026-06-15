@@ -37,4 +37,64 @@ public class LeaveRequestRepository : ILeaveRequestRepository
                         && s.LeaveRequest.Status == "Approved")
             .ToListAsync();
     }
+
+    public async Task<LeaveRequest?> GetByIdAsync(Guid id)
+    {
+        return await _context.LeaveRequests
+            .Include(r => r.Segments)
+                .ThenInclude(s => s.TargetShiftSegment)
+            .Include(r => r.Employee)
+            .Include(r => r.LeaveTypeNavigation)
+            .FirstOrDefaultAsync(r => r.Id == id);
+    }
+
+    public async Task<List<LeaveRequest>> GetByEmployeeAsync(Guid employeeId)
+    {
+        return await _context.LeaveRequests
+            .Include(r => r.Segments)
+                .ThenInclude(s => s.TargetShiftSegment)
+            .Include(r => r.LeaveTypeNavigation)
+            .Where(r => r.EmployeeId == employeeId)
+            .OrderByDescending(r => r.Segments.Min(s => (DateOnly?)s.LeaveDate))
+            .ToListAsync();
+    }
+
+    public async Task<List<LeaveRequest>> GetPendingAsync()
+    {
+        return await _context.LeaveRequests
+            .Include(r => r.Segments)
+                .ThenInclude(s => s.TargetShiftSegment)
+            .Include(r => r.Employee)
+            .Include(r => r.LeaveTypeNavigation)
+            .Where(r => r.Status == "Pending")
+            .ToListAsync();
+    }
+
+    public async Task<List<LeaveRequest>> GetAllAsync()
+    {
+        return await _context.LeaveRequests
+            .Include(r => r.Segments)
+                .ThenInclude(s => s.TargetShiftSegment)
+            .Include(r => r.Employee)
+            .Include(r => r.LeaveTypeNavigation)
+            .ToListAsync();
+    }
+
+    public async Task AddAsync(LeaveRequest leaveRequest)
+    {
+        await _context.LeaveRequests.AddAsync(leaveRequest);
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task UpdateAsync(LeaveRequest leaveRequest)
+    {
+        _context.LeaveRequests.Update(leaveRequest);
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task DeleteAsync(LeaveRequest leaveRequest)
+    {
+        _context.LeaveRequests.Remove(leaveRequest);
+        await _context.SaveChangesAsync();
+    }
 }

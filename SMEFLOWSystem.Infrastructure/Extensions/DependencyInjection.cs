@@ -73,6 +73,8 @@ public static class DependencyInjection
         services.AddScoped<IAttendanceSettingRepository, AttendanceSettingRepository>();
         services.AddScoped<IOvertimeRequestRepository, OvertimeRequestRepository>();
         services.AddScoped<ILeaveRequestRepository, LeaveRequestRepository>();
+        services.AddScoped<ILeaveTypeRepository, LeaveTypeRepository>();
+        services.AddScoped<ILeaveBalanceRepository, LeaveBalanceRepository>();
         services.AddScoped<ITimesheetAppealRepository, TimesheetAppealRepository>();
         services.AddScoped<IManualMonthlyTimesheetRepository, ManualMonthlyTimesheetRepository>();
 
