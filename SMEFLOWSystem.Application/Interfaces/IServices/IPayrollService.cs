@@ -17,5 +17,11 @@ namespace SMEFLOWSystem.Application.Interfaces.IServices
         Task<PayrollDto> UpdateManualFieldsAsync(Guid payrollId, UpdatePayrollDto dto);
         Task<bool> PublishPayrollAsync(Guid payrollId);
         Task<int> PublishAllDraftAsync(Guid tenantId, int month, int year);
+
+        /// <summary>[TenantAdmin, HRManager] Gán thưởng/phạt cho nhân viên theo tháng/năm</summary>
+        Task<PayrollDto> SetBonusPenaltyByEmployeeAsync(Guid tenantId, EmployeeBonusPenaltyDto dto);
+
+        /// <summary>[TenantAdmin, HRManager] Gán thưởng/phạt hàng loạt</summary>
+        Task<List<PayrollDto>> BulkSetBonusPenaltyAsync(Guid tenantId, BulkBonusPenaltyDto dto);
     }
 }

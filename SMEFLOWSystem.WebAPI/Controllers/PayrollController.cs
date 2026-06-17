@@ -122,5 +122,29 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             var result = await _payrollService.UpdateManualFieldsAsync(payrollId, dto);
             return Ok(result);
         }
+
+        /// <summary>[TenantAdmin, HRManager] Gán thưởng/phạt cho nhân viên theo tháng/năm (không cần biết payrollId)</summary>
+        [HttpPut("employee-bonus-penalty")]
+        [Authorize(Policy = PolicyNames.AdminOrHr)]
+        public async Task<IActionResult> SetBonusPenaltyByEmployee([FromBody] EmployeeBonusPenaltyDto dto)
+        {
+            var tenantId = _currentTenant.TenantId
+                ?? throw new UnauthorizedAccessException("Không xác định được công ty.");
+
+            var result = await _payrollService.SetBonusPenaltyByEmployeeAsync(tenantId, dto);
+            return Ok(result);
+        }
+
+        /// <summary>[TenantAdmin, HRManager] Gán thưởng/phạt hàng loạt cho nhiều nhân viên</summary>
+        [HttpPut("bulk-bonus-penalty")]
+        [Authorize(Policy = PolicyNames.AdminOrHr)]
+        public async Task<IActionResult> BulkSetBonusPenalty([FromBody] BulkBonusPenaltyDto dto)
+        {
+            var tenantId = _currentTenant.TenantId
+                ?? throw new UnauthorizedAccessException("Không xác định được công ty.");
+
+            var result = await _payrollService.BulkSetBonusPenaltyAsync(tenantId, dto);
+            return Ok(result);
+        }
     }
 }

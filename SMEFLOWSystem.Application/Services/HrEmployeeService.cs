@@ -255,4 +255,28 @@ public class HrEmployeeService : IHrEmployeeService
         var employees = await _employeeRepo.GetByDepartmentIdAsync(departmentId);
         return _mapper.Map<List<EmployeeDto>>(employees);
     }
+
+    public async Task<EmployeeDto> UpdateSalaryAsync(Guid employeeId, UpdateSalaryDto dto)
+    {
+        // Chỉ Admin hoặc HRManager mới được cập nhật lương
+        if (!_currentUser.IsAdmin() && !_currentUser.IsHrManager())
+            throw new UnauthorizedAccessException("Chỉ Admin hoặc HR Manager mới được cập nhật lương.");
+
+        if (dto.BaseSalary < 0)
+            throw new ArgumentException("Lương cơ bản không được âm.");
+
+        var emp = await _employeeRepo.GetByIdAsync(employeeId)
+            ?? throw new KeyNotFoundException("Không tìm thấy nhân viên.");
+
+        await _hrAuth.EnsureEmployeeAccessAsync(emp);
+
+        emp.BaseSalary = dto.BaseSalary;
+        emp.UpdatedAt = DateTime.UtcNow;
+
+        await _employeeRepo.UpdateAsync(emp);
+
+        var reloaded = await _employeeRepo.GetByIdAsync(emp.Id) ?? emp;
+        return _mapper.Map<EmployeeDto>(reloaded);
+    }
 }
+

@@ -132,4 +132,27 @@ public class HrEmployeesController : ControllerBase
             return StatusCode(403, new { error = "Bạn không có quyền truy cập" });
         }
     }
+
+    /// <summary>[TenantAdmin, HRManager] Cập nhật lương cơ bản cho nhân viên</summary>
+    [HttpPatch("{id:guid}/salary")]
+    [Authorize(Policy = PolicyNames.AdminOrHr)]
+    public async Task<ActionResult<EmployeeDto>> UpdateSalary([FromRoute] Guid id, [FromBody] UpdateSalaryDto request)
+    {
+        try
+        {
+            return Ok(await _service.UpdateSalaryAsync(id, request));
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return StatusCode(403, new { error = "Bạn không có quyền truy cập" });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
 }

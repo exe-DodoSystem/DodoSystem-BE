@@ -584,5 +584,108 @@ namespace SMEFLOWSystem.Application.Services
 
             return drafts.Count;
         }
+
+        public async Task<PayrollDto> SetBonusPenaltyByEmployeeAsync(Guid tenantId, EmployeeBonusPenaltyDto dto)
+        {
+            // Validate input
+            if (dto.Month < 1 || dto.Month > 12)
+                throw new ArgumentException("Tháng không hợp lệ (1-12).");
+            if (dto.Year < 2000 || dto.Year > 2100)
+                throw new ArgumentException("Năm không hợp lệ.");
+
+            var emp = await _employeeRepository.GetByIdAsync(dto.EmployeeId);
+            if (emp == null || emp.TenantId != tenantId)
+                throw new KeyNotFoundException("Không tìm thấy nhân viên.");
+
+            // Kiểm tra quyền truy cập
+            if (!_currentUser.IsAdmin() && !_currentUser.IsHrManager())
+            {
+                await _hrAuth.EnsureEmployeeAccessAsync(emp);
+            }
+
+            // Tìm payroll hiện có
+            var existingPayrolls = await _payrollRepository.GetByEmployeeMonthAsync(dto.EmployeeId, tenantId, dto.Month, dto.Year);
+            var payroll = existingPayrolls.FirstOrDefault();
+
+            if (payroll != null && payroll.Status != PayrollStatus.Draft)
+                throw new InvalidOperationException("Phiếu lương đã chốt, không thể thay đổi thưởng/phạt.");
+
+            if (payroll == null)
+            {
+                // Tạo Payroll Draft mới nếu chưa tồn tại
+                var holidays = await _publicHolidayRepository.GetAllAsync(tenantId);
+                var holidayDatesInMonth = holidays
+                    .Select(h => h.IsRecurringYearly
+                        ? new DateOnly(dto.Year, h.Date.Month, h.Date.Day)
+                        : h.Date)
+                    .Where(d => d.Month == dto.Month && d.Year == dto.Year)
+                    .ToHashSet();
+
+                int daysInMonth = DateTime.DaysInMonth(dto.Year, dto.Month);
+                int standardDays = Enumerable.Range(1, daysInMonth)
+                    .Select(day => new DateOnly(dto.Year, dto.Month, day))
+                    .Count(date => date.DayOfWeek != DayOfWeek.Saturday
+                                && date.DayOfWeek != DayOfWeek.Sunday
+                                && !holidayDatesInMonth.Contains(date));
+
+                payroll = new Payroll
+                {
+                    TenantId = tenantId,
+                    EmployeeId = dto.EmployeeId,
+                    Month = dto.Month,
+                    Year = dto.Year,
+                    Status = PayrollStatus.Draft,
+                    StandardWorkingDays = standardDays,
+                    ActualWorkingDays = 0,
+                    TotalLateMinutes = 0,
+                    TotalEarlyLeaveMinutes = 0,
+                    AbsentDays = 0,
+                    TotalOTHours = 0,
+                    BaseSalarySnapshot = emp.BaseSalary,
+                    BasePay = 0,
+                    OTPay = 0,
+                    PenaltyFee = 0,
+                    CustomBonus = 0,
+                    CustomDeduction = 0,
+                    NetSalary = 0
+                };
+
+                await _payrollRepository.AddAsync(payroll);
+            }
+
+            // Cập nhật thưởng/phạt
+            if (dto.CustomBonus.HasValue)
+                payroll.CustomBonus = dto.CustomBonus.Value;
+            if (dto.CustomDeduction.HasValue)
+                payroll.CustomDeduction = dto.CustomDeduction.Value;
+            if (!string.IsNullOrEmpty(dto.Reason))
+                payroll.Notes = dto.Reason;
+
+            // Tính lại NetSalary
+            payroll.NetSalary = Math.Round(
+                payroll.BasePay + payroll.OTPay - payroll.PenaltyFee
+                + (payroll.CustomBonus ?? 0) - payroll.CustomDeduction, 2);
+
+            await _payrollRepository.UpdateAsync(payroll);
+
+            // Reload với Include Employee+Department
+            var reloaded = await _payrollRepository.GetByIdAsync(payroll.Id);
+            return _mapper.Map<PayrollDto>(reloaded ?? payroll);
+        }
+
+        public async Task<List<PayrollDto>> BulkSetBonusPenaltyAsync(Guid tenantId, BulkBonusPenaltyDto dto)
+        {
+            if (dto.Items == null || dto.Items.Count == 0)
+                throw new ArgumentException("Danh sách thưởng/phạt không được rỗng.");
+
+            var results = new List<PayrollDto>();
+            foreach (var item in dto.Items)
+            {
+                var result = await SetBonusPenaltyByEmployeeAsync(tenantId, item);
+                results.Add(result);
+            }
+
+            return results;
+        }
     }
 }

@@ -11,4 +11,7 @@ public interface IHrEmployeeService
     Task<EmployeeDto> UpdateAsync(Guid id, EmployeeUpdateDto request);
     Task DeleteAsync(Guid id);
     Task<List<EmployeeDto>> GetAllByDepartmentId(Guid departmentId);
+
+    /// <summary>[TenantAdmin, HRManager] Cập nhật lương cơ bản cho nhân viên</summary>
+    Task<EmployeeDto> UpdateSalaryAsync(Guid employeeId, UpdateSalaryDto dto);
 }
