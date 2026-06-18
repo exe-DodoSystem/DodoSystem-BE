@@ -155,4 +155,26 @@ public class HrEmployeesController : ControllerBase
             return BadRequest(new { error = ex.Message });
         }
     }
+
+    /// <summary>[AdminOrHr] Xem lịch sử thay đổi lương của nhân viên</summary>
+    [HttpGet("{id:guid}/salary-history")]
+    [Authorize(Policy = PolicyNames.AdminOrHr)]
+    public async Task<ActionResult<PagedResultDto<EmployeeSalaryHistoryDto>>> GetSalaryHistory(
+        [FromRoute] Guid id,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        try
+        {
+            return Ok(await _service.GetSalaryHistoryPagedAsync(id, pageNumber, pageSize));
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return StatusCode(403, new { error = "Bạn không có quyền truy cập" });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+    }
 }

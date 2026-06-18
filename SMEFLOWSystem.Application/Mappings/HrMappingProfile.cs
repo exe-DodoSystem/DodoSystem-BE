@@ -49,6 +49,11 @@ public class HrMappingProfile : Profile
             .ForMember(d => d.EmployeeDepartment, opt => opt.MapFrom(s => s.Employee != null && s.Employee.Department != null ? s.Employee.Department.Name : string.Empty))
             .ForMember(d => d.ShiftPatternName, opt => opt.MapFrom(s => s.ShiftPattern != null ? s.ShiftPattern.Name : string.Empty));
 
+        // Employee Salary History Mappings
+        CreateMap<EmployeeSalaryHistory, EmployeeSalaryHistoryDto>()
+            .ForMember(d => d.Change, opt => opt.MapFrom(s => s.NewSalary - s.OldSalary))
+            .ForMember(d => d.ChangedByName, opt => opt.MapFrom(s => s.ChangedByUser != null ? s.ChangedByUser.FullName : string.Empty));
+
         // Manual Monthly Timesheet Mappings
         CreateMap<ManualMonthlyTimesheet, ManualMonthlyTimesheetDto>()
             .ForMember(d => d.EmployeeName, opt => opt.MapFrom(s => s.Employee != null ? s.Employee.FullName : string.Empty));

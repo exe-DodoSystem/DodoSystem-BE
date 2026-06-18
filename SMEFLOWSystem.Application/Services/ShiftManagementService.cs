@@ -16,6 +16,7 @@ public class ShiftManagementService : IShiftManagementService
     private readonly IShiftPatternRepository _shiftPatternRepo;
     private readonly IShiftAssignmentRepository _shiftAssignmentRepo;
     private readonly IEmployeeRepository _employeeRepo;
+    private readonly IPublicHolidayRepository _holidayRepo;
     private readonly IHrAuthorizationService _hrAuth;
     private readonly ICurrentUserService _currentUser;
     private readonly ICurrentTenantService _currentTenant;
@@ -26,6 +27,7 @@ public class ShiftManagementService : IShiftManagementService
         IShiftPatternRepository shiftPatternRepo,
         IShiftAssignmentRepository shiftAssignmentRepo,
         IEmployeeRepository employeeRepo,
+        IPublicHolidayRepository holidayRepo,
         IHrAuthorizationService hrAuth,
         ICurrentUserService currentUser,
         ICurrentTenantService currentTenant,
@@ -35,6 +37,7 @@ public class ShiftManagementService : IShiftManagementService
         _shiftPatternRepo = shiftPatternRepo;
         _shiftAssignmentRepo = shiftAssignmentRepo;
         _employeeRepo = employeeRepo;
+        _holidayRepo = holidayRepo;
         _hrAuth = hrAuth;
         _currentUser = currentUser;
         _currentTenant = currentTenant;
@@ -501,5 +504,129 @@ public class ShiftManagementService : IShiftManagementService
         }
 
         return dto;
+    }
+
+    public async Task<MyScheduleDto?> GetMyScheduleAsync(Guid userId, DateOnly? fromDate, DateOnly? toDate, bool includeOffDays)
+    {
+        var employee = await _employeeRepo.GetByUserIdAsync(userId)
+            ?? throw new KeyNotFoundException("Không tìm thấy hồ sơ nhân sự cho tài khoản này.");
+
+        var tenantId = _currentTenant.TenantId
+            ?? throw new InvalidOperationException("TenantId không xác định.");
+
+        var start = fromDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var end = toDate ?? start.AddDays(30);
+
+        if (start > end)
+        {
+            throw new ArgumentException("Từ ngày (fromDate) không được lớn hơn Đến ngày (toDate).");
+        }
+
+        if (end.DayNumber - start.DayNumber > 90)
+        {
+            throw new ArgumentException("Khoảng thời gian truy vấn không được vượt quá 90 ngày.");
+        }
+
+        // 1. Lấy tất cả active patterns trong range
+        var activePatterns = await _shiftPatternRepo.GetActivePatternsForEmployeesAsync(
+            new List<Guid> { employee.Id },
+            start,
+            end);
+
+        // Lấy assignment mới nhất trùng khớp với range
+        var assignment = activePatterns
+            .OrderByDescending(x => x.EffectiveStartDate)
+            .FirstOrDefault();
+
+        if (assignment == null)
+        {
+            return null;
+        }
+
+        // 2. Load Pattern chi tiết
+        var pattern = await _shiftPatternRepo.GetByIdWithDaysAsync(assignment.ShiftPatternId);
+        if (pattern == null)
+        {
+            return null;
+        }
+
+        // 3. Load Holidays
+        var holidays = await _holidayRepo.GetAllAsync(tenantId);
+
+        // 4. Lặp qua từng ngày trong range để expand ca làm
+        var daysList = new List<WorkDayDto>();
+        
+        // Chỉ duyệt các ngày trong khoảng giao giữa range yêu cầu và range active của assignment
+        var effectiveFrom = start > assignment.EffectiveStartDate ? start : assignment.EffectiveStartDate;
+        var effectiveTo = (assignment.EffectiveEndDate.HasValue && assignment.EffectiveEndDate.Value < end)
+            ? assignment.EffectiveEndDate.Value
+            : end;
+
+        for (var date = effectiveFrom; date <= effectiveTo; date = date.AddDays(1))
+        {
+            // Tính vị trí trong chu kỳ (tính từ ngày bắt đầu gán lịch)
+            var rawPos = date.DayNumber - assignment.EffectiveStartDate.DayNumber;
+            var cycleLength = pattern.CycleLengthDays;
+            
+            // Tránh chia lấy dư ra số âm trong C#
+            var cyclePos = ((rawPos % cycleLength) + cycleLength) % cycleLength;
+
+            var patternDay = pattern.Days.FirstOrDefault(d => d.DayIndex == cyclePos);
+            var isWorkDay = patternDay?.ScheduledShiftId != null;
+
+            // Tìm ngày lễ
+            var holiday = holidays.FirstOrDefault(h =>
+                h.IsRecurringYearly
+                    ? (h.Date.Month == date.Month && h.Date.Day == date.Day)
+                    : h.Date == date
+            );
+            var isHoliday = holiday != null;
+
+            // Chỉ thêm ngày nghỉ nếu includeOffDays = true, hoặc nếu là ngày làm việc
+            if (includeOffDays || isWorkDay)
+            {
+                var workDay = new WorkDayDto
+                {
+                    Date = date,
+                    DayOfWeekVi = ToDayOfWeekVi(date.DayOfWeek),
+                    IsWorkDay = isWorkDay,
+                    IsHoliday = isHoliday,
+                    HolidayName = holiday?.Name,
+                    ShiftName = patternDay?.ScheduledShift?.Name,
+                    ShiftCode = patternDay?.ScheduledShift?.Code,
+                    Segments = patternDay?.ScheduledShift != null 
+                        ? _mapper.Map<List<ShiftSegmentDto>>(patternDay.ScheduledShift.Segments)
+                        : new List<ShiftSegmentDto>()
+                };
+                daysList.Add(workDay);
+            }
+        }
+
+        return new MyScheduleDto
+        {
+            AssignmentId = assignment.Id,
+            ShiftPatternName = pattern.Name,
+            EffectiveStartDate = assignment.EffectiveStartDate,
+            EffectiveEndDate = assignment.EffectiveEndDate,
+            FromDate = start,
+            ToDate = end,
+            TotalWorkDays = daysList.Count(d => d.IsWorkDay),
+            Days = daysList
+        };
+    }
+
+    private static string ToDayOfWeekVi(DayOfWeek dayOfWeek)
+    {
+        return dayOfWeek switch
+        {
+            DayOfWeek.Monday => "Thứ Hai",
+            DayOfWeek.Tuesday => "Thứ Ba",
+            DayOfWeek.Wednesday => "Thứ Tư",
+            DayOfWeek.Thursday => "Thứ Năm",
+            DayOfWeek.Friday => "Thứ Sáu",
+            DayOfWeek.Saturday => "Thứ Bảy",
+            DayOfWeek.Sunday => "Chủ Nhật",
+            _ => string.Empty
+        };
     }
 }

@@ -19,6 +19,7 @@ public class HrEmployeeService : IHrEmployeeService
     private readonly IHrAuthorizationService _hrAuth;
     private readonly IMapper _mapper;
     private readonly IUserRepository _userRepo;
+    private readonly IEmployeeSalaryHistoryRepository _salaryHistoryRepo;
 
     public HrEmployeeService(
         IEmployeeRepository employeeRepo,
@@ -27,7 +28,8 @@ public class HrEmployeeService : IHrEmployeeService
         ICurrentUserService currentUser,
         IHrAuthorizationService hrAuth,
         IMapper mapper,
-        IUserRepository userRepo)
+        IUserRepository userRepo,
+        IEmployeeSalaryHistoryRepository salaryHistoryRepo)
     {
         _employeeRepo = employeeRepo;
         _departmentRepo = departmentRepo;
@@ -36,6 +38,7 @@ public class HrEmployeeService : IHrEmployeeService
         _hrAuth = hrAuth;
         _mapper = mapper;
         _userRepo = userRepo;
+        _salaryHistoryRepo = salaryHistoryRepo;
     }
 
     public async Task<PagedResultDto<EmployeeDto>> GetPagedAsync(EmployeeQueryDto query)
@@ -270,6 +273,21 @@ public class HrEmployeeService : IHrEmployeeService
 
         await _hrAuth.EnsureEmployeeAccessAsync(emp);
 
+        // Lưu lịch sử thay đổi lương trước khi cập nhật
+        var history = new EmployeeSalaryHistory
+        {
+            Id = Guid.NewGuid(),
+            TenantId = emp.TenantId,
+            EmployeeId = emp.Id,
+            OldSalary = emp.BaseSalary,
+            NewSalary = dto.BaseSalary,
+            EffectiveDate = dto.EffectiveDate ?? DateOnly.FromDateTime(DateTime.UtcNow),
+            Reason = dto.Reason,
+            ChangedByUserId = _currentUser.UserId,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _salaryHistoryRepo.AddAsync(history);
+
         emp.BaseSalary = dto.BaseSalary;
         emp.UpdatedAt = DateTime.UtcNow;
 
@@ -277,6 +295,28 @@ public class HrEmployeeService : IHrEmployeeService
 
         var reloaded = await _employeeRepo.GetByIdAsync(emp.Id) ?? emp;
         return _mapper.Map<EmployeeDto>(reloaded);
+    }
+
+    public async Task<PagedResultDto<EmployeeSalaryHistoryDto>> GetSalaryHistoryPagedAsync(Guid employeeId, int pageNumber, int pageSize)
+    {
+        // Chỉ Admin hoặc HRManager mới được xem lịch sử lương
+        if (!_currentUser.IsAdmin() && !_currentUser.IsHrManager())
+            throw new UnauthorizedAccessException("Chỉ Admin hoặc HR Manager mới được xem lịch sử lương.");
+
+        var emp = await _employeeRepo.GetByIdAsync(employeeId)
+            ?? throw new KeyNotFoundException("Không tìm thấy nhân viên.");
+
+        await _hrAuth.EnsureEmployeeAccessAsync(emp);
+
+        var (items, total) = await _salaryHistoryRepo.GetPagedByEmployeeIdAsync(employeeId, pageNumber, pageSize);
+
+        return new PagedResultDto<EmployeeSalaryHistoryDto>
+        {
+            Items = _mapper.Map<List<EmployeeSalaryHistoryDto>>(items),
+            TotalCount = total,
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
     }
 }
 

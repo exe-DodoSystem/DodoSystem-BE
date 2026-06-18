@@ -21,4 +21,5 @@ public interface IShiftManagementService
     Task<PagedResultDto<EmployeeShiftPatternDto>> GetAssignmentsPagedAsync(ShiftAssignmentQueryDto query);
     Task<EmployeeShiftPatternDto> GetAssignmentByIdAsync(Guid id);
     Task<MyCurrentShiftAssignmentDto?> GetMyCurrentAssignmentAsync(Guid userId);
+    Task<MyScheduleDto?> GetMyScheduleAsync(Guid userId, DateOnly? fromDate, DateOnly? toDate, bool includeOffDays);
 }

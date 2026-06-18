@@ -104,4 +104,36 @@ public class HrShiftAssignmentsController : ControllerBase
             return NotFound(new { error = ex.Message });
         }
     }
+
+    /// <summary>[Employee, TenantAdmin, HRManager, Manager] Xem lịch làm việc tương lai chi tiết của bản thân</summary>
+    [HttpGet("my-schedule")]
+    public async Task<ActionResult<MyScheduleDto>> GetMySchedule(
+        [FromQuery] DateOnly? fromDate,
+        [FromQuery] DateOnly? toDate,
+        [FromQuery] bool includeOffDays = false)
+    {
+        var userIdString = base.User.FindFirst(global::System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!Guid.TryParse(userIdString, out var userId))
+        {
+            return Unauthorized(new { error = "Tài khoản chưa được xác thực đúng cách." });
+        }
+
+        try
+        {
+            var schedule = await _service.GetMyScheduleAsync(userId, fromDate, toDate, includeOffDays);
+            if (schedule == null)
+            {
+                return NotFound(new { message = "Bạn không có lịch làm việc nào được phân công trong khoảng thời gian này." });
+            }
+            return Ok(schedule);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
 }

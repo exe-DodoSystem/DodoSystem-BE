@@ -14,4 +14,7 @@ public interface IHrEmployeeService
 
     /// <summary>[TenantAdmin, HRManager] Cập nhật lương cơ bản cho nhân viên</summary>
     Task<EmployeeDto> UpdateSalaryAsync(Guid employeeId, UpdateSalaryDto dto);
+
+    /// <summary>[AdminOrHr] Xem lịch sử thay đổi lương của nhân viên</summary>
+    Task<PagedResultDto<EmployeeSalaryHistoryDto>> GetSalaryHistoryPagedAsync(Guid employeeId, int pageNumber, int pageSize);
 }
