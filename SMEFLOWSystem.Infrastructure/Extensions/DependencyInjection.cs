@@ -78,6 +78,7 @@ public static class DependencyInjection
         services.AddScoped<ITimesheetAppealRepository, TimesheetAppealRepository>();
         services.AddScoped<IManualMonthlyTimesheetRepository, ManualMonthlyTimesheetRepository>();
         services.AddScoped<IEmployeeSalaryHistoryRepository, EmployeeSalaryHistoryRepository>();
+        services.AddScoped<IBonusDeductionEntryRepository, BonusDeductionEntryRepository>();
 
         // HR Authorization: Manager-Department assignment
         services.AddScoped<IManagerDepartmentRepository, ManagerDepartmentRepository>();

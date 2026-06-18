@@ -146,5 +146,53 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             var result = await _payrollService.BulkSetBonusPenaltyAsync(tenantId, dto);
             return Ok(result);
         }
+
+        /// <summary>[AdminOrHr] Tạo 1 entry thưởng/phạt có cấu trúc</summary>
+        [HttpPost("entries")]
+        [Authorize(Policy = PolicyNames.AdminOrHr)]
+        public async Task<IActionResult> CreateEntry([FromBody] CreateBonusDeductionEntryDto dto)
+        {
+            var tenantId = _currentTenant.TenantId
+                ?? throw new UnauthorizedAccessException("Không xác định được công ty.");
+
+            var result = await _payrollService.CreateEntryAsync(tenantId, dto);
+            return Ok(result);
+        }
+
+        /// <summary>[AdminOrHr] Xóa entry thưởng/phạt (chỉ khi phiếu lương tương ứng còn ở trạng thái Draft)</summary>
+        [HttpDelete("entries/{id:guid}")]
+        [Authorize(Policy = PolicyNames.AdminOrHr)]
+        public async Task<IActionResult> DeleteEntry(Guid id)
+        {
+            var tenantId = _currentTenant.TenantId
+                ?? throw new UnauthorizedAccessException("Không xác định được công ty.");
+
+            var result = await _payrollService.DeleteEntryAsync(tenantId, id);
+            return Ok(new { success = result });
+        }
+
+        /// <summary>[HrAccess] Xem danh sách các entry thưởng/phạt có cấu trúc (có phân trang và lọc)</summary>
+        [HttpGet("entries")]
+        [Authorize(Policy = PolicyNames.HrAccess)]
+        public async Task<IActionResult> GetEntriesPaged([FromQuery] BonusDeductionEntryQueryDto query)
+        {
+            var tenantId = _currentTenant.TenantId
+                ?? throw new UnauthorizedAccessException("Không xác định được công ty.");
+
+            var result = await _payrollService.GetEntriesPagedAsync(tenantId, query);
+            return Ok(result);
+        }
+
+        /// <summary>[AdminOrHr] Tạo hàng loạt cùng 1 entry thưởng/phạt cho nhiều nhân viên</summary>
+        [HttpPost("entries/bulk")]
+        [Authorize(Policy = PolicyNames.AdminOrHr)]
+        public async Task<IActionResult> CreateBulkEntries([FromBody] CreateBulkBonusDeductionDto dto)
+        {
+            var tenantId = _currentTenant.TenantId
+                ?? throw new UnauthorizedAccessException("Không xác định được công ty.");
+
+            var result = await _payrollService.CreateBulkEntriesAsync(tenantId, dto);
+            return Ok(result);
+        }
     }
 }

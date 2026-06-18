@@ -22,6 +22,7 @@ namespace SMEFLOWSystem.Application.Services
         private readonly IDailyTimesheetRepository _timesheetRepository;
         private readonly IPublicHolidayRepository _publicHolidayRepository;
         private readonly IManualMonthlyTimesheetRepository _manualTimesheetRepository;
+        private readonly IBonusDeductionEntryRepository _entriesRepo;
         private readonly IMapper _mapper;
         private readonly ILogger<PayrollService> _logger;
         private readonly IRealtimeNotificationService _realtime;
@@ -34,6 +35,7 @@ namespace SMEFLOWSystem.Application.Services
             IDailyTimesheetRepository timesheetRepository,
             IPublicHolidayRepository publicHolidayRepository,
             IManualMonthlyTimesheetRepository manualTimesheetRepository,
+            IBonusDeductionEntryRepository entriesRepo,
             IMapper mapper,
             ILogger<PayrollService> logger,
             IRealtimeNotificationService realtime,
@@ -45,6 +47,7 @@ namespace SMEFLOWSystem.Application.Services
             _timesheetRepository = timesheetRepository;
             _publicHolidayRepository = publicHolidayRepository;
             _manualTimesheetRepository = manualTimesheetRepository;
+            _entriesRepo = entriesRepo;
             _mapper = mapper;
             _logger = logger;
             _realtime = realtime;
@@ -79,6 +82,11 @@ namespace SMEFLOWSystem.Application.Services
 
             var allManualTimesheets = await _manualTimesheetRepository.GetByTenantMonthYearAsync(tenantId, month, year);
             var manualTimesheetByEmployee = allManualTimesheets.ToDictionary(t => t.EmployeeId);
+
+            var allEntries = await _entriesRepo.GetByTenantMonthYearAsync(tenantId, month, year);
+            var entriesByEmployee = allEntries
+                .GroupBy(e => e.EmployeeId)
+                .ToDictionary(g => g.Key, g => g.ToList());
 
             bool hasTimesheetData = allTimesheets.Any();
 
@@ -174,6 +182,10 @@ namespace SMEFLOWSystem.Application.Services
                     penaltyFee = (lateMinutes + earlyLeaveMinutes) * minuteRate;
                 }
 
+                var empEntries = entriesByEmployee.TryGetValue(emp.Id, out var el) ? el : new List<EmployeeBonusDeductionEntry>();
+                decimal structuredBonus = empEntries.Where(e => e.Type == BonusDeductionType.Bonus).Sum(e => e.Amount);
+                decimal structuredDeduction = empEntries.Where(e => e.Type == BonusDeductionType.Deduction).Sum(e => e.Amount);
+
                 if (existingPayroll != null)
                 {
                     // Cập nhật đè lên bản Draft cũ (Giữ nguyên CustomBonus/Deduction nếu có)
@@ -189,8 +201,12 @@ namespace SMEFLOWSystem.Application.Services
                     existingPayroll.OTPay = Math.Round(otPay, 2);
                     existingPayroll.PenaltyFee = Math.Round(penaltyFee, 2);
 
+                    existingPayroll.StructuredBonus = Math.Round(structuredBonus, 2);
+                    existingPayroll.StructuredDeduction = Math.Round(structuredDeduction, 2);
+
                     existingPayroll.NetSalary = Math.Round(existingPayroll.BasePay + existingPayroll.OTPay - existingPayroll.PenaltyFee 
-                                                + (existingPayroll.CustomBonus ?? 0) - existingPayroll.CustomDeduction, 2);
+                                                + existingPayroll.StructuredBonus + (existingPayroll.CustomBonus ?? 0) 
+                                                - existingPayroll.StructuredDeduction - existingPayroll.CustomDeduction, 2);
                     
                     updatePayrolls.Add(existingPayroll);
                 }
@@ -216,10 +232,15 @@ namespace SMEFLOWSystem.Application.Services
                         BasePay = Math.Round(basePay, 2),
                         OTPay = Math.Round(otPay, 2),
                         PenaltyFee = Math.Round(penaltyFee, 2),
+
+                        StructuredBonus = Math.Round(structuredBonus, 2),
+                        StructuredDeduction = Math.Round(structuredDeduction, 2),
+
                         CustomBonus = 0,
                         CustomDeduction = 0,
                     };
-                    payroll.NetSalary = Math.Round(payroll.BasePay + payroll.OTPay - payroll.PenaltyFee, 2);
+                    payroll.NetSalary = Math.Round(payroll.BasePay + payroll.OTPay - payroll.PenaltyFee 
+                                                + payroll.StructuredBonus - payroll.StructuredDeduction, 2);
                     
                     newPayrolls.Add(payroll);
                 }
@@ -326,6 +347,11 @@ namespace SMEFLOWSystem.Application.Services
                 penaltyFee = (lateMinutes + earlyLeaveMinutes) * minuteRate;
             }
 
+            // Lấy các entry thưởng/phạt có cấu trúc của nhân viên
+            var empEntries = await _entriesRepo.GetByEmployeeMonthYearAsync(tenantId, employeeId, month, year);
+            decimal structuredBonus = empEntries.Where(e => e.Type == BonusDeductionType.Bonus).Sum(e => e.Amount);
+            decimal structuredDeduction = empEntries.Where(e => e.Type == BonusDeductionType.Deduction).Sum(e => e.Amount);
+
             if (existingPayroll != null)
             {
                 existingPayroll.StandardWorkingDays = standardDays;
@@ -340,12 +366,18 @@ namespace SMEFLOWSystem.Application.Services
                 existingPayroll.OTPay = Math.Round(otPay, 2);
                 existingPayroll.PenaltyFee = Math.Round(penaltyFee, 2);
 
+                existingPayroll.StructuredBonus = Math.Round(structuredBonus, 2);
+                existingPayroll.StructuredDeduction = Math.Round(structuredDeduction, 2);
+
                 existingPayroll.NetSalary = Math.Round(existingPayroll.BasePay + existingPayroll.OTPay - existingPayroll.PenaltyFee 
-                                            + (existingPayroll.CustomBonus ?? 0) - existingPayroll.CustomDeduction, 2);
+                                            + existingPayroll.StructuredBonus + (existingPayroll.CustomBonus ?? 0) 
+                                            - existingPayroll.StructuredDeduction - existingPayroll.CustomDeduction, 2);
                 
                 await _payrollRepository.UpdateAsync(existingPayroll);
                 var dto = _mapper.Map<PayrollDto>(existingPayroll);
                 dto.IsTimesheetBased = isTimesheetBased;
+                dto.BonusEntries = _mapper.Map<List<BonusDeductionEntryDto>>(empEntries.Where(e => e.Type == BonusDeductionType.Bonus).ToList());
+                dto.DeductionEntries = _mapper.Map<List<BonusDeductionEntryDto>>(empEntries.Where(e => e.Type == BonusDeductionType.Deduction).ToList());
                 return dto;
             }
             else
@@ -367,16 +399,21 @@ namespace SMEFLOWSystem.Application.Services
                     BasePay = Math.Round(basePay, 2),
                     OTPay = Math.Round(otPay, 2),
                     PenaltyFee = Math.Round(penaltyFee, 2),
+                    StructuredBonus = Math.Round(structuredBonus, 2),
+                    StructuredDeduction = Math.Round(structuredDeduction, 2),
                     CustomBonus = 0,
                     CustomDeduction = 0,
                 };
-                payroll.NetSalary = Math.Round(payroll.BasePay + payroll.OTPay - payroll.PenaltyFee, 2);
+                payroll.NetSalary = Math.Round(payroll.BasePay + payroll.OTPay - payroll.PenaltyFee 
+                                            + payroll.StructuredBonus - payroll.StructuredDeduction, 2);
                 
                 await _payrollRepository.AddAsync(payroll);
                 
                 var created = await _payrollRepository.GetByIdAsync(payroll.Id);
                 var dto = _mapper.Map<PayrollDto>(created ?? payroll);
                 dto.IsTimesheetBased = isTimesheetBased;
+                dto.BonusEntries = _mapper.Map<List<BonusDeductionEntryDto>>(empEntries.Where(e => e.Type == BonusDeductionType.Bonus).ToList());
+                dto.DeductionEntries = _mapper.Map<List<BonusDeductionEntryDto>>(empEntries.Where(e => e.Type == BonusDeductionType.Deduction).ToList());
                 return dto;
             }
         }
@@ -503,8 +540,9 @@ namespace SMEFLOWSystem.Application.Services
             payroll.CustomDeduction = dto.CustomDeduction ?? 0;
             if (!string.IsNullOrEmpty(dto.Reason)) payroll.Notes = dto.Reason;
 
-            payroll.NetSalary = Math.Round(payroll.BasePay + payroll.OTPay - payroll.PenaltyFee 
-                                         + (payroll.CustomBonus ?? 0) - payroll.CustomDeduction, 2);
+            payroll.NetSalary = Math.Round(payroll.BasePay + payroll.OTPay - payroll.PenaltyFee
+                                         + payroll.StructuredBonus + (payroll.CustomBonus ?? 0)
+                                         - payroll.StructuredDeduction - payroll.CustomDeduction, 2);
 
             await _payrollRepository.UpdateAsync(payroll);
             return _mapper.Map<PayrollDto>(payroll);
@@ -664,7 +702,8 @@ namespace SMEFLOWSystem.Application.Services
             // Tính lại NetSalary
             payroll.NetSalary = Math.Round(
                 payroll.BasePay + payroll.OTPay - payroll.PenaltyFee
-                + (payroll.CustomBonus ?? 0) - payroll.CustomDeduction, 2);
+                + payroll.StructuredBonus + (payroll.CustomBonus ?? 0)
+                - payroll.StructuredDeduction - payroll.CustomDeduction, 2);
 
             await _payrollRepository.UpdateAsync(payroll);
 
@@ -686,6 +725,180 @@ namespace SMEFLOWSystem.Application.Services
             }
 
             return results;
+        }
+
+        public async Task<BonusDeductionEntryDto> CreateEntryAsync(Guid tenantId, CreateBonusDeductionEntryDto dto)
+        {
+            if (!_currentUser.IsAdmin() && !_currentUser.IsHrManager())
+                throw new UnauthorizedAccessException("Chỉ Admin hoặc HR Manager mới được thêm entry thưởng/phạt.");
+
+            if (dto.Month < 1 || dto.Month > 12)
+                throw new ArgumentException("Tháng không hợp lệ (1-12).");
+
+            if (dto.Amount <= 0)
+                throw new ArgumentException("Số tiền phải lớn hơn 0.");
+
+            var emp = await _employeeRepository.GetByIdAsync(dto.EmployeeId)
+                ?? throw new KeyNotFoundException("Không tìm thấy nhân viên.");
+
+            if (emp.TenantId != tenantId)
+                throw new UnauthorizedAccessException("Forbidden");
+
+            // Kiểm tra xem phiếu lương đã chốt chưa
+            var existingPayrolls = await _payrollRepository.GetByEmployeeMonthAsync(dto.EmployeeId, tenantId, dto.Month, dto.Year);
+            var payroll = existingPayrolls.FirstOrDefault();
+            if (payroll != null && payroll.Status != PayrollStatus.Draft)
+                throw new InvalidOperationException("Phiếu lương của tháng này đã chốt, không thể thêm entry mới.");
+
+            var entry = new EmployeeBonusDeductionEntry
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                EmployeeId = dto.EmployeeId,
+                Month = dto.Month,
+                Year = dto.Year,
+                Type = dto.Type,
+                Category = dto.Category,
+                Amount = dto.Amount,
+                Reason = dto.Reason,
+                CreatedByUserId = _currentUser.UserId,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _entriesRepo.AddAsync(entry);
+
+            // Tính toán lại bảng lương của nhân viên nếu đã tồn tại bản Draft
+            if (payroll != null && payroll.Status == PayrollStatus.Draft)
+            {
+                await CalculatePayrollForEmployeeAsync(tenantId, dto.EmployeeId, dto.Month, dto.Year);
+            }
+
+            var createdEntry = await _entriesRepo.GetByIdAsync(entry.Id);
+            return _mapper.Map<BonusDeductionEntryDto>(createdEntry ?? entry);
+        }
+
+        public async Task<bool> DeleteEntryAsync(Guid tenantId, Guid id)
+        {
+            if (!_currentUser.IsAdmin() && !_currentUser.IsHrManager())
+                throw new UnauthorizedAccessException("Chỉ Admin hoặc HR Manager mới được xóa entry thưởng/phạt.");
+
+            var entry = await _entriesRepo.GetByIdAsync(id)
+                ?? throw new KeyNotFoundException("Không tìm thấy entry thưởng/phạt.");
+
+            if (entry.TenantId != tenantId)
+                throw new UnauthorizedAccessException("Forbidden");
+
+            // Kiểm tra xem phiếu lương đã chốt chưa
+            var existingPayrolls = await _payrollRepository.GetByEmployeeMonthAsync(entry.EmployeeId, tenantId, entry.Month, entry.Year);
+            var payroll = existingPayrolls.FirstOrDefault();
+            if (payroll != null && payroll.Status != PayrollStatus.Draft)
+                throw new InvalidOperationException("Phiếu lương của tháng này đã chốt, không thể xóa entry.");
+
+            await _entriesRepo.DeleteAsync(entry);
+
+            // Tính toán lại bảng lương nếu đã có Draft
+            if (payroll != null && payroll.Status == PayrollStatus.Draft)
+            {
+                await CalculatePayrollForEmployeeAsync(tenantId, entry.EmployeeId, entry.Month, entry.Year);
+            }
+
+            return true;
+        }
+
+        public async Task<PagedResultDto<BonusDeductionEntryDto>> GetEntriesPagedAsync(Guid tenantId, BonusDeductionEntryQueryDto query)
+        {
+            var accessibleDeptIds = await _hrAuth.GetAccessibleDepartmentIdsAsync();
+            if (accessibleDeptIds != null)
+            {
+                if (query.DepartmentId.HasValue && !accessibleDeptIds.Contains(query.DepartmentId.Value))
+                    throw new UnauthorizedAccessException("Forbidden");
+
+                if (query.EmployeeId.HasValue)
+                {
+                    var emp = await _employeeRepository.GetByIdAsync(query.EmployeeId.Value);
+                    if (emp == null) throw new KeyNotFoundException("Employee not found");
+                    await _hrAuth.EnsureEmployeeAccessAsync(emp);
+                }
+            }
+
+            var (items, total) = await _entriesRepo.GetPagedAsync(query, tenantId, accessibleDeptIds);
+
+            return new PagedResultDto<BonusDeductionEntryDto>
+            {
+                Items = _mapper.Map<List<BonusDeductionEntryDto>>(items),
+                TotalCount = total,
+                PageNumber = query.PageNumber,
+                PageSize = query.PageSize
+            };
+        }
+
+        public async Task<List<BonusDeductionEntryDto>> CreateBulkEntriesAsync(Guid tenantId, CreateBulkBonusDeductionDto dto)
+        {
+            if (!_currentUser.IsAdmin() && !_currentUser.IsHrManager())
+                throw new UnauthorizedAccessException("Chỉ Admin hoặc HR Manager mới được thêm entry thưởng/phạt hàng loạt.");
+
+            if (dto.EmployeeIds == null || !dto.EmployeeIds.Any())
+                throw new ArgumentException("Danh sách nhân viên không được rỗng.");
+
+            if (dto.Month < 1 || dto.Month > 12)
+                throw new ArgumentException("Tháng không hợp lệ (1-12).");
+
+            if (dto.Amount <= 0)
+                throw new ArgumentException("Số tiền phải lớn hơn 0.");
+
+            var uniqueIds = dto.EmployeeIds.Distinct().ToList();
+            var employees = await _employeeRepository.GetByIdsAsync(uniqueIds);
+            
+            if (employees.Count != uniqueIds.Count)
+                throw new ArgumentException("Danh sách nhân viên chứa ID không tồn tại.");
+
+            foreach (var emp in employees)
+            {
+                if (emp.TenantId != tenantId)
+                    throw new UnauthorizedAccessException("Forbidden");
+
+                var existingPayrolls = await _payrollRepository.GetByEmployeeMonthAsync(emp.Id, tenantId, dto.Month, dto.Year);
+                var payroll = existingPayrolls.FirstOrDefault();
+                if (payroll != null && payroll.Status != PayrollStatus.Draft)
+                    throw new InvalidOperationException($"Phiếu lương của nhân viên {emp.FullName} đã chốt, không thể thêm entry.");
+            }
+
+            var newEntries = new List<EmployeeBonusDeductionEntry>();
+            foreach (var emp in employees)
+            {
+                var entry = new EmployeeBonusDeductionEntry
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = tenantId,
+                    EmployeeId = emp.Id,
+                    Month = dto.Month,
+                    Year = dto.Year,
+                    Type = dto.Type,
+                    Category = dto.Category,
+                    Amount = dto.Amount,
+                    Reason = dto.Reason,
+                    CreatedByUserId = _currentUser.UserId,
+                    CreatedAt = DateTime.UtcNow
+                };
+                newEntries.Add(entry);
+            }
+
+            await _entriesRepo.AddRangeAsync(newEntries);
+
+            // Recalculate payrolls that are in Draft status
+            foreach (var empId in uniqueIds)
+            {
+                var existingPayrolls = await _payrollRepository.GetByEmployeeMonthAsync(empId, tenantId, dto.Month, dto.Year);
+                var payroll = existingPayrolls.FirstOrDefault();
+                if (payroll != null && payroll.Status == PayrollStatus.Draft)
+                {
+                    await CalculatePayrollForEmployeeAsync(tenantId, empId, dto.Month, dto.Year);
+                }
+            }
+
+            var allTenantEntries = await _entriesRepo.GetByTenantMonthYearAsync(tenantId, dto.Month, dto.Year);
+            var createdEntries = allTenantEntries.Where(x => uniqueIds.Contains(x.EmployeeId) && newEntries.Select(e => e.Id).Contains(x.Id)).ToList();
+            return _mapper.Map<List<BonusDeductionEntryDto>>(createdEntries);
         }
     }
 }

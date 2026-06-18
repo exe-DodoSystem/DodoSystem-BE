@@ -36,6 +36,9 @@ public partial class Payroll : ITenantEntity
     public decimal OTPay { get; set; }                // Lương OT
     public decimal PenaltyFee { get; set; }           // Phạt đi trễ/về sớm
 
+    public decimal StructuredBonus { get; set; }      // Tổng tiền thưởng tự động từ entries
+    public decimal StructuredDeduction { get; set; }  // Tổng tiền khấu trừ tự động từ entries
+
     public decimal? CustomBonus { get; set; }         // Thưởng (Admin nhập tay)
     public decimal CustomDeduction { get; set; }      // Khấu trừ khác (Thuế/BHXH, Admin nhập tay)
 

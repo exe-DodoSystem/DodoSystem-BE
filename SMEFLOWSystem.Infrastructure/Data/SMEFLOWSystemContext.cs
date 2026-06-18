@@ -69,6 +69,7 @@ public partial class SMEFLOWSystemContext : DbContext
     public virtual DbSet<TimesheetAppeal> TimesheetAppeals { get; set; }
     public virtual DbSet<ManualMonthlyTimesheet> ManualMonthlyTimesheets { get; set; }
     public virtual DbSet<EmployeeSalaryHistory> EmployeeSalaryHistories { get; set; }
+    public virtual DbSet<EmployeeBonusDeductionEntry> EmployeeBonusDeductionEntries { get; set; }
 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -118,6 +119,7 @@ public partial class SMEFLOWSystemContext : DbContext
         modelBuilder.Entity<TimesheetAppeal>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
         modelBuilder.Entity<ManualMonthlyTimesheet>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
         modelBuilder.Entity<EmployeeSalaryHistory>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
+        modelBuilder.Entity<EmployeeBonusDeductionEntry>().HasQueryFilter(e => e.TenantId == _currentTenantService.TenantId);
 
 
         ApplySoftDeleteQueryFilters(modelBuilder);

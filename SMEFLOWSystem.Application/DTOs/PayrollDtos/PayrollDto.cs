@@ -30,6 +30,9 @@ namespace SMEFLOWSystem.Application.DTOs.PayrollDtos
         public decimal OTPay { get; set; }              // Lương OT
         public decimal PenaltyFee { get; set; }         // Phạt
 
+        public decimal StructuredBonus { get; set; }
+        public decimal StructuredDeduction { get; set; }
+
         public decimal? CustomBonus { get; set; }       // Tiền thưởng
         public decimal CustomDeduction { get; set; }    // Khấu trừ khác
 
@@ -43,6 +46,9 @@ namespace SMEFLOWSystem.Application.DTOs.PayrollDtos
         public DateTime? UpdatedAt { get; set; }
 
         public bool IsTimesheetBased { get; set; } = true;
+
+        public List<BonusDeductionEntryDto> BonusEntries { get; set; } = new();
+        public List<BonusDeductionEntryDto> DeductionEntries { get; set; } = new();
     }
 
 }

@@ -90,6 +90,8 @@ public class PayrollConfiguration : IEntityTypeConfiguration<Payroll>
         entity.Property(e => e.PenaltyFee).HasDefaultValue(0m).HasColumnType("decimal(18, 2)");
         entity.Property(e => e.CustomBonus).HasDefaultValue(0m).HasColumnType("decimal(18, 2)");
         entity.Property(e => e.CustomDeduction).HasDefaultValue(0m).HasColumnType("decimal(18, 2)");
+        entity.Property(e => e.StructuredBonus).HasDefaultValue(0m).HasColumnType("decimal(18, 2)");
+        entity.Property(e => e.StructuredDeduction).HasDefaultValue(0m).HasColumnType("decimal(18, 2)");
         entity.Property(e => e.NetSalary).HasDefaultValue(0m).HasColumnType("decimal(18, 2)");
         entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
         entity.Property(e => e.Notes).HasMaxLength(255);

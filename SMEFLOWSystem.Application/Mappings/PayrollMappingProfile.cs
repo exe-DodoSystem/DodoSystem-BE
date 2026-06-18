@@ -19,6 +19,12 @@ namespace SMEFLOWSystem.Application.Mappings
                 .ForMember(dest => dest.DepartmentName, opt => opt.MapFrom(src => (src.Employee != null && src.Employee.Department != null) ? src.Employee.Department.Name : string.Empty))
                 .ForMember(dest => dest.IsTimesheetBased, opt => opt.Ignore());
 
+            CreateMap<EmployeeBonusDeductionEntry, BonusDeductionEntryDto>()
+                .ForMember(dest => dest.EmployeeName, opt => opt.MapFrom(src => src.Employee != null ? src.Employee.FullName : string.Empty))
+                .ForMember(dest => dest.Type, opt => opt.MapFrom(src => src.Type.ToString()))
+                .ForMember(dest => dest.Category, opt => opt.MapFrom(src => src.Category.ToString()))
+                .ForMember(dest => dest.CreatedByName, opt => opt.MapFrom(src => src.CreatedByUser != null ? src.CreatedByUser.FullName : string.Empty));
+
             CreateMap<UpdatePayrollDto, Payroll>()
                 .ForMember(dest => dest.CustomBonus, opt => opt.Condition(src => src.CustomBonus.HasValue))
                 .ForMember(dest => dest.CustomDeduction, opt => opt.Condition(src => src.CustomDeduction.HasValue))

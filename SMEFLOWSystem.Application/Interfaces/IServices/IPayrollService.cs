@@ -23,5 +23,10 @@ namespace SMEFLOWSystem.Application.Interfaces.IServices
 
         /// <summary>[TenantAdmin, HRManager] Gán thưởng/phạt hàng loạt</summary>
         Task<List<PayrollDto>> BulkSetBonusPenaltyAsync(Guid tenantId, BulkBonusPenaltyDto dto);
+
+        Task<BonusDeductionEntryDto> CreateEntryAsync(Guid tenantId, CreateBonusDeductionEntryDto dto);
+        Task<bool> DeleteEntryAsync(Guid tenantId, Guid id);
+        Task<PagedResultDto<BonusDeductionEntryDto>> GetEntriesPagedAsync(Guid tenantId, BonusDeductionEntryQueryDto query);
+        Task<List<BonusDeductionEntryDto>> CreateBulkEntriesAsync(Guid tenantId, CreateBulkBonusDeductionDto dto);
     }
 }
