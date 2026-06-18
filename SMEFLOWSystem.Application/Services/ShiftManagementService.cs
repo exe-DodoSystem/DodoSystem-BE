@@ -1,5 +1,6 @@
 using AutoMapper;
 using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.Extensions.Logging;
 using SharedKernel.DTOs;
 using SMEFLOWSystem.Application.DTOs.ShiftDtos;
 using SMEFLOWSystem.Application.Extensions;
@@ -21,6 +22,8 @@ public class ShiftManagementService : IShiftManagementService
     private readonly ICurrentUserService _currentUser;
     private readonly ICurrentTenantService _currentTenant;
     private readonly IMapper _mapper;
+    private readonly IRealtimeNotificationService _realtime;
+    private readonly ILogger<ShiftManagementService> _logger;
 
     public ShiftManagementService(
         IShiftRepository shiftRepo,
@@ -31,7 +34,9 @@ public class ShiftManagementService : IShiftManagementService
         IHrAuthorizationService hrAuth,
         ICurrentUserService currentUser,
         ICurrentTenantService currentTenant,
-        IMapper mapper)
+        IMapper mapper,
+        IRealtimeNotificationService realtime,
+        ILogger<ShiftManagementService> logger)
     {
         _shiftRepo = shiftRepo;
         _shiftPatternRepo = shiftPatternRepo;
@@ -42,6 +47,8 @@ public class ShiftManagementService : IShiftManagementService
         _currentUser = currentUser;
         _currentTenant = currentTenant;
         _mapper = mapper;
+        _realtime = realtime;
+        _logger = logger;
     }
 
     public async Task<PagedResultDto<ShiftDto>> GetPagedAsync(ShiftQueryDto query)
@@ -291,6 +298,39 @@ public class ShiftManagementService : IShiftManagementService
         }).ToList();
 
         await _shiftAssignmentRepo.BulkInsertAssignmentsAsync(assignments);
+
+        // Emit realtime notifications
+        var hrName = "HR Manager";
+        if (_currentUser.UserId.HasValue)
+        {
+            var hrEmp = await _employeeRepo.GetByUserIdAsync(_currentUser.UserId.Value);
+            if (hrEmp != null)
+            {
+                hrName = hrEmp.FullName;
+            }
+        }
+
+        foreach (var emp in employees)
+        {
+            if (emp.UserId.HasValue)
+            {
+                var shiftAssignedDto = new
+                {
+                    shiftPatternId = shiftPattern.Id,
+                    shiftPatternName = shiftPattern.Name,
+                    effectiveStartDate = request.EffectiveStartDate.ToString("yyyy-MM-dd"),
+                    assignedBy = hrName
+                };
+
+                _ = _realtime.NotifyShiftAssignedAsync(emp.UserId.Value, shiftAssignedDto)
+                    .ContinueWith(t =>
+                    {
+                        if (t.IsFaulted)
+                            _logger.LogWarning(t.Exception, "Notify shift.assigned failed for employee {UserId}", emp.UserId.Value);
+                    });
+            }
+        }
+
         return _mapper.Map<List<EmployeeShiftPatternDto>>(assignments);
     }
 

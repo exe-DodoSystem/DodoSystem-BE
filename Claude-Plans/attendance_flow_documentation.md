@@ -1,7 +1,7 @@
 # Attendance Flow Documentation — DodoSystem Backend
 
 > Tài liệu phân tích chi tiết luồng Chấm Công (Attendance) trong hệ thống DodoSystem.
-> Cập nhật: 2026-06-02 (phản ánh toàn bộ thay đổi từ Phase 1–7)
+> Cập nhật: 2026-06-18 (phản ánh toàn bộ thay đổi từ Phase 1–7 + realtime notifications GAP-01, GAP-03, GAP-06)
 
 ---
 
@@ -646,6 +646,21 @@ TimesheetAppeal {
 }
 ```
 
+**Realtime notification (GAP-01):**
+```
+[Fire-and-forget]
+_ = _realtime.NotifyAppealSubmittedAsync(tenantId, {
+    appealId:     "uuid",
+    employeeId:   employee.Id,
+    employeeName: employee.FullName,
+    workDate:     request.WorkDate,
+    appealType:   request.AppealType,
+    reason:       request.Reason,
+    submittedAt:  DateTime.UtcNow
+}).ContinueWith(log if faulted)
+→ Gửi tới group "tenant:{tenantId}:admins" — HR thấy ngay lập tức
+```
+
 #### D.2 — HR xem và xử lý
 
 ```
@@ -705,6 +720,24 @@ UpdateAsync(appeal)
 // Không tạo RawPunchLog, không reset IsProcessed
 ```
 
+**Realtime notifications — Sau transaction (GAP-03):**
+```
+// Thông báo cho nhân viên
+_ = _realtime.NotifyAppealProcessedAsync(employee.UserId.Value, {
+    appealId:     appeal.Id,
+    workDate:     appeal.WorkDate,
+    status:       isApproved ? "Approved" : "Rejected",
+    rejectReason: request.RejectReason,
+    processedAt:  DateTime.UtcNow
+}).ContinueWith(log if faulted)
+
+// Refresh dashboard toàn tenant
+_ = _realtime.NotifyDashboardRefreshAsync(tenantId)
+    .ContinueWith(log if faulted)
+
+// Cả 2 đều fire-and-forget, NGOÀI transaction block
+```
+
 #### D.3 — Background Job tái tính
 
 ```
@@ -733,6 +766,19 @@ POST /api/v1/attendance/manual-punch
 - Không validate timezone (HR tự nhập UTC)
 - Tạo `RawPunchLog` với `DeviceId = "HR_Manual"`, `IsProcessed = false`
 - Background Job xử lý như bình thường ở lần chạy tiếp theo
+
+**Realtime notification (GAP-06):**
+```
+if employee.UserId != null:
+    _ = _realtime.NotifyAttendanceManualAdjustedAsync(employee.UserId.Value, {
+        workDate:   workDate (tính từ timestamp theo VN timezone),
+        punchType:  request.PunchType,
+        timestamp:  request.Timestamp,
+        adjustedBy: "HR Manager",
+        note:       request.Reason
+    }).ContinueWith(log if faulted)
+→ Gửi tới "user:{userId}" — nhân viên biết HR đã bổ sung check-in/out thay mình
+```
 
 ---
 

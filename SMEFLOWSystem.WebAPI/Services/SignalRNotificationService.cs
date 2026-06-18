@@ -77,4 +77,108 @@ public class SignalRNotificationService : IRealtimeNotificationService
             _logger.LogWarning(ex, "Failed to notify punch received for user {UserId}", userId);
         }
     }
+
+    public async Task NotifyDashboardRefreshAsync(Guid tenantId)
+    {
+        try
+        {
+            await _hub.Clients.Group($"tenant:{tenantId}:dashboard")
+                .SendAsync("dashboard.refresh", new { tenantId });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to notify dashboard refresh for tenant {TenantId}", tenantId);
+        }
+    }
+
+    public async Task NotifyAppealSubmittedAsync(Guid tenantId, object data)
+    {
+        try
+        {
+            await _hub.Clients.Group($"tenant:{tenantId}:admins")
+                .SendAsync("appeal.submitted", data);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to notify appeal submitted for tenant {TenantId}", tenantId);
+        }
+    }
+
+    public async Task NotifyPayrollPaidAsync(Guid userId, object data)
+    {
+        try
+        {
+            await _hub.Clients.Group($"user:{userId}")
+                .SendAsync("payroll.paid", data);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to notify payroll paid for user {UserId}", userId);
+        }
+    }
+
+    public async Task NotifyShiftAssignedAsync(Guid userId, object data)
+    {
+        try
+        {
+            await _hub.Clients.Group($"user:{userId}")
+                .SendAsync("shift.assigned", data);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to notify shift assigned for user {UserId}", userId);
+        }
+    }
+
+    public async Task NotifyBonusDeductionEntryAddedAsync(Guid userId, object data)
+    {
+        try
+        {
+            await _hub.Clients.Group($"user:{userId}")
+                .SendAsync("bonus_deduction.entry_added", data);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to notify bonus/deduction entry added for user {UserId}", userId);
+        }
+    }
+
+    public async Task NotifyAttendanceManualAdjustedAsync(Guid userId, object data)
+    {
+        try
+        {
+            await _hub.Clients.Group($"user:{userId}")
+                .SendAsync("attendance.manual_adjusted", data);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to notify attendance manual adjusted for user {UserId}", userId);
+        }
+    }
+
+    public async Task NotifyPayrollGeneratedAsync(Guid userId, object data)
+    {
+        try
+        {
+            await _hub.Clients.Group($"user:{userId}")
+                .SendAsync("payroll.generated", data);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to notify payroll generated for user {UserId}", userId);
+        }
+    }
+
+    public async Task NotifyEmployeeOnboardedAsync(Guid tenantId, object data)
+    {
+        try
+        {
+            await _hub.Clients.Group($"tenant:{tenantId}:admins")
+                .SendAsync("employee.onboarded", data);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to notify employee onboarded for tenant {TenantId}", tenantId);
+        }
+    }
 }

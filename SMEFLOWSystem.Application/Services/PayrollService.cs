@@ -64,6 +64,7 @@ namespace SMEFLOWSystem.Application.Services
             var existingPayrolls = await _payrollRepository.GetByTenantMonthAsync(tenantId, month, year);
             var newPayrolls = new List<Payroll>();
             var updatePayrolls = new List<Payroll>();
+            var skippedCount = 0;
 
             // Load ngày lễ của tenant một lần, dùng chung cho toàn bộ nhân viên
             var holidays = await _publicHolidayRepository.GetAllAsync(tenantId);
@@ -109,7 +110,10 @@ namespace SMEFLOWSystem.Application.Services
                 // Idempotent Check: Bỏ qua nếu đã Published hoặc Paid
                 if (existingPayroll != null &&
                     (existingPayroll.Status == PayrollStatus.Published || existingPayroll.Status == PayrollStatus.Paid))
+                {
+                    skippedCount++;
                     continue;
+                }
 
                 var manualTimesheet = manualTimesheetByEmployee.TryGetValue(emp.Id, out var mt) ? mt : null;
 
@@ -249,10 +253,30 @@ namespace SMEFLOWSystem.Application.Services
             if (newPayrolls.Any()) await _payrollRepository.AddRangeAsync(newPayrolls);
             if (updatePayrolls.Any()) await _payrollRepository.UpdateRangeAsync(updatePayrolls);
 
+            // Emit realtime notification
+            if (_currentUser.UserId.HasValue)
+            {
+                var generatedDto = new
+                {
+                    month = month,
+                    year = year,
+                    generatedCount = newPayrolls.Count + updatePayrolls.Count,
+                    skippedCount = skippedCount,
+                    type = "bulk"
+                };
+
+                _ = _realtime.NotifyPayrollGeneratedAsync(_currentUser.UserId.Value, generatedDto)
+                    .ContinueWith(t =>
+                    {
+                        if (t.IsFaulted)
+                            _logger.LogWarning(t.Exception, "Notify payroll.generated failed for user {UserId}", _currentUser.UserId.Value);
+                    });
+            }
+
             return newPayrolls.Any() || updatePayrolls.Any();
         }
 
-        public async Task<PayrollDto> CalculatePayrollForEmployeeAsync(Guid tenantId, Guid employeeId, int month, int year)
+        public async Task<PayrollDto> CalculatePayrollForEmployeeAsync(Guid tenantId, Guid employeeId, int month, int year, bool suppressGenerateNotify = false)
         {
             var emp = await _employeeRepository.GetByIdAsync(employeeId);
             if (emp == null || emp.TenantId != tenantId) throw new Exception("Không tìm thấy nhân viên.");
@@ -378,6 +402,27 @@ namespace SMEFLOWSystem.Application.Services
                 dto.IsTimesheetBased = isTimesheetBased;
                 dto.BonusEntries = _mapper.Map<List<BonusDeductionEntryDto>>(empEntries.Where(e => e.Type == BonusDeductionType.Bonus).ToList());
                 dto.DeductionEntries = _mapper.Map<List<BonusDeductionEntryDto>>(empEntries.Where(e => e.Type == BonusDeductionType.Deduction).ToList());
+
+                // Emit realtime notification
+                if (!suppressGenerateNotify && _currentUser.UserId.HasValue)
+                {
+                    var generatedDto = new
+                    {
+                        month = month,
+                        year = year,
+                        generatedCount = 1,
+                        skippedCount = 0,
+                        type = "single"
+                    };
+
+                    _ = _realtime.NotifyPayrollGeneratedAsync(_currentUser.UserId.Value, generatedDto)
+                        .ContinueWith(t =>
+                        {
+                            if (t.IsFaulted)
+                                _logger.LogWarning(t.Exception, "Notify payroll.generated failed for user {UserId}", _currentUser.UserId.Value);
+                        });
+                }
+
                 return dto;
             }
             else
@@ -403,6 +448,7 @@ namespace SMEFLOWSystem.Application.Services
                     StructuredDeduction = Math.Round(structuredDeduction, 2),
                     CustomBonus = 0,
                     CustomDeduction = 0,
+                    NetSalary = 0
                 };
                 payroll.NetSalary = Math.Round(payroll.BasePay + payroll.OTPay - payroll.PenaltyFee 
                                             + payroll.StructuredBonus - payroll.StructuredDeduction, 2);
@@ -414,6 +460,27 @@ namespace SMEFLOWSystem.Application.Services
                 dto.IsTimesheetBased = isTimesheetBased;
                 dto.BonusEntries = _mapper.Map<List<BonusDeductionEntryDto>>(empEntries.Where(e => e.Type == BonusDeductionType.Bonus).ToList());
                 dto.DeductionEntries = _mapper.Map<List<BonusDeductionEntryDto>>(empEntries.Where(e => e.Type == BonusDeductionType.Deduction).ToList());
+
+                // Emit realtime notification
+                if (!suppressGenerateNotify && _currentUser.UserId.HasValue)
+                {
+                    var generatedDto = new
+                    {
+                        month = month,
+                        year = year,
+                        generatedCount = 1,
+                        skippedCount = 0,
+                        type = "single"
+                    };
+
+                    _ = _realtime.NotifyPayrollGeneratedAsync(_currentUser.UserId.Value, generatedDto)
+                        .ContinueWith(t =>
+                        {
+                            if (t.IsFaulted)
+                                _logger.LogWarning(t.Exception, "Notify payroll.generated failed for user {UserId}", _currentUser.UserId.Value);
+                        });
+                }
+
                 return dto;
             }
         }
@@ -518,6 +585,36 @@ namespace SMEFLOWSystem.Application.Services
 
             payroll.Status = PayrollStatus.Paid;
             await _payrollRepository.UpdateAsync(payroll);
+
+            // Emit realtime notification for payroll.paid
+            var employee = await _employeeRepository.GetByIdAsync(payroll.EmployeeId);
+            if (employee?.UserId != null)
+            {
+                var payrollPaidDto = new
+                {
+                    payrollId = payroll.Id,
+                    month = payroll.Month,
+                    year = payroll.Year,
+                    netSalary = payroll.NetSalary,
+                    paidAt = DateTime.UtcNow
+                };
+
+                _ = _realtime.NotifyPayrollPaidAsync(employee.UserId.Value, payrollPaidDto)
+                    .ContinueWith(t =>
+                    {
+                        if (t.IsFaulted)
+                            _logger.LogWarning(t.Exception, "Notify payroll.paid failed for employee {UserId}", employee.UserId.Value);
+                    });
+            }
+
+            // Emit dashboard refresh
+            _ = _realtime.NotifyDashboardRefreshAsync(payroll.TenantId)
+                .ContinueWith(t =>
+                {
+                    if (t.IsFaulted)
+                        _logger.LogWarning(t.Exception, "Notify dashboard.refresh failed for tenant {TenantId}", payroll.TenantId);
+                });
+
             return true;
         }
 
@@ -579,6 +676,14 @@ namespace SMEFLOWSystem.Application.Services
                     });
             }
 
+            // Emit dashboard refresh
+            _ = _realtime.NotifyDashboardRefreshAsync(payroll.TenantId)
+                .ContinueWith(t =>
+                {
+                    if (t.IsFaulted)
+                        _logger.LogWarning(t.Exception, "Notify dashboard.refresh failed for tenant {TenantId}", payroll.TenantId);
+                });
+
             return true;
         }
 
@@ -619,6 +724,14 @@ namespace SMEFLOWSystem.Application.Services
                         });
                 }
             }
+
+            // Emit dashboard refresh
+            _ = _realtime.NotifyDashboardRefreshAsync(tenantId)
+                .ContinueWith(t =>
+                {
+                    if (t.IsFaulted)
+                        _logger.LogWarning(t.Exception, "Notify dashboard.refresh failed for tenant {TenantId}", tenantId);
+                });
 
             return drafts.Count;
         }
@@ -770,7 +883,29 @@ namespace SMEFLOWSystem.Application.Services
             // Tính toán lại bảng lương của nhân viên nếu đã tồn tại bản Draft
             if (payroll != null && payroll.Status == PayrollStatus.Draft)
             {
-                await CalculatePayrollForEmployeeAsync(tenantId, dto.EmployeeId, dto.Month, dto.Year);
+                await CalculatePayrollForEmployeeAsync(tenantId, dto.EmployeeId, dto.Month, dto.Year, suppressGenerateNotify: true);
+            }
+
+            // Emit realtime notification
+            if (emp.UserId != null)
+            {
+                var entryAddedDto = new
+                {
+                    type = entry.Type.ToString(),
+                    category = entry.Category.ToString(),
+                    amount = entry.Amount,
+                    reason = entry.Reason,
+                    month = entry.Month,
+                    year = entry.Year,
+                    createdAt = entry.CreatedAt
+                };
+
+                _ = _realtime.NotifyBonusDeductionEntryAddedAsync(emp.UserId.Value, entryAddedDto)
+                    .ContinueWith(t =>
+                    {
+                        if (t.IsFaulted)
+                            _logger.LogWarning(t.Exception, "Notify bonus_deduction.entry_added failed for employee {UserId}", emp.UserId.Value);
+                    });
             }
 
             var createdEntry = await _entriesRepo.GetByIdAsync(entry.Id);
@@ -799,7 +934,7 @@ namespace SMEFLOWSystem.Application.Services
             // Tính toán lại bảng lương nếu đã có Draft
             if (payroll != null && payroll.Status == PayrollStatus.Draft)
             {
-                await CalculatePayrollForEmployeeAsync(tenantId, entry.EmployeeId, entry.Month, entry.Year);
+                await CalculatePayrollForEmployeeAsync(tenantId, entry.EmployeeId, entry.Month, entry.Year, suppressGenerateNotify: true);
             }
 
             return true;
@@ -892,7 +1027,33 @@ namespace SMEFLOWSystem.Application.Services
                 var payroll = existingPayrolls.FirstOrDefault();
                 if (payroll != null && payroll.Status == PayrollStatus.Draft)
                 {
-                    await CalculatePayrollForEmployeeAsync(tenantId, empId, dto.Month, dto.Year);
+                    await CalculatePayrollForEmployeeAsync(tenantId, empId, dto.Month, dto.Year, suppressGenerateNotify: true);
+                }
+            }
+
+            // Emit realtime notifications in bulk
+            var employeeMap = employees.ToDictionary(e => e.Id);
+            foreach (var entry in newEntries)
+            {
+                if (employeeMap.TryGetValue(entry.EmployeeId, out var employee) && employee?.UserId != null)
+                {
+                    var entryAddedDto = new
+                    {
+                        type = entry.Type.ToString(),
+                        category = entry.Category.ToString(),
+                        amount = entry.Amount,
+                        reason = entry.Reason,
+                        month = entry.Month,
+                        year = entry.Year,
+                        createdAt = entry.CreatedAt
+                    };
+
+                    _ = _realtime.NotifyBonusDeductionEntryAddedAsync(employee.UserId.Value, entryAddedDto)
+                        .ContinueWith(t =>
+                        {
+                            if (t.IsFaulted)
+                                _logger.LogWarning(t.Exception, "Notify bonus_deduction.entry_added failed for employee {UserId}", employee.UserId.Value);
+                        });
                 }
             }
 

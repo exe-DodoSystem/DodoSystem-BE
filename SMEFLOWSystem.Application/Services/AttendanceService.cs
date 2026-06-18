@@ -295,6 +295,37 @@ namespace SMEFLOWSystem.Application.Services
 
             await _punchLogRepo.AddAsync(punch);
 
+            // Emit realtime notification
+            var hrName = "HR Manager";
+            if (_currentUser.UserId.HasValue)
+            {
+                var hrEmp = await _employeeRepository.GetByUserIdAsync(_currentUser.UserId.Value);
+                if (hrEmp != null)
+                {
+                    hrName = hrEmp.FullName;
+                }
+            }
+
+            if (employee.UserId != null)
+            {
+                var localTime = TimeZoneInfo.ConvertTimeFromUtc(punch.Timestamp, VietnamTimeZone);
+                var manualPunchDto = new
+                {
+                    workDate = localTime.ToString("yyyy-MM-dd"),
+                    punchType = punch.PunchType,
+                    timestamp = punch.Timestamp,
+                    adjustedBy = hrName,
+                    note = request.Reason
+                };
+
+                _ = _realtime.NotifyAttendanceManualAdjustedAsync(employee.UserId.Value, manualPunchDto)
+                    .ContinueWith(t =>
+                    {
+                        if (t.IsFaulted)
+                            _logger.LogWarning(t.Exception, "Notify attendance.manual_adjusted failed for employee {UserId}", employee.UserId.Value);
+                    });
+            }
+
             return new RawPunchLogDto
             {
                 Id = punch.Id,
@@ -359,6 +390,25 @@ namespace SMEFLOWSystem.Application.Services
             };
 
             await _appealRepository.AddAsync(appeal);
+
+            // Emit realtime notification
+            var appealDto = new
+            {
+                appealId = appeal.Id,
+                employeeId = appeal.EmployeeId,
+                employeeName = employee.FullName,
+                workDate = appeal.WorkDate.ToString("yyyy-MM-dd"),
+                appealType = appeal.AppealType,
+                reason = appeal.Reason,
+                submittedAt = DateTime.UtcNow
+            };
+
+            _ = _realtime.NotifyAppealSubmittedAsync(tenantId.Value, appealDto)
+                .ContinueWith(t =>
+                {
+                    if (t.IsFaulted)
+                        _logger.LogWarning(t.Exception, "Notify appeal.submitted failed for tenant {TenantId}", tenantId.Value);
+                });
 
             return new TimesheetAppealDto
             {
@@ -519,6 +569,14 @@ namespace SMEFLOWSystem.Application.Services
                             _logger.LogWarning(t.Exception, "Notify appeal.processed failed for employee {EmployeeId}", appeal.EmployeeId);
                     });
             }
+
+            // Emit dashboard refresh
+            _ = _realtime.NotifyDashboardRefreshAsync(tenantId.Value)
+                .ContinueWith(t =>
+                {
+                    if (t.IsFaulted)
+                        _logger.LogWarning(t.Exception, "Notify dashboard.refresh failed for tenant {TenantId}", tenantId.Value);
+                });
 
             return new TimesheetAppealDto
             {

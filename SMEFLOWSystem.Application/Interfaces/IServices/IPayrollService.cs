@@ -9,7 +9,7 @@ namespace SMEFLOWSystem.Application.Interfaces.IServices
     public interface IPayrollService
     {
         Task<bool> GenerateMonthlyPayrollAsync(Guid tenantId, int month, int year);
-        Task<PayrollDto> CalculatePayrollForEmployeeAsync(Guid tenantId, Guid employeeId, int month, int year);
+        Task<PayrollDto> CalculatePayrollForEmployeeAsync(Guid tenantId, Guid employeeId, int month, int year, bool suppressGenerateNotify = false);
         Task<PagedResultDto<PayrollDto>> GetPagedAsync(Guid tenantId, PayrollQueryDto query);
         Task<List<PayrollDto>> GetMyPayrollAsync(Guid tenantId, Guid userId, int? month, int? year);
         Task<bool> MarkPaidAsync(Guid payrollId); 

@@ -1,5 +1,6 @@
 using Hangfire.Server;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using ShareKernel.Common.Enum;
 using SMEFLOWSystem.Application.Events.Notification;
@@ -31,6 +32,8 @@ namespace SMEFLOWSystem.Application.Services
         private readonly IConfiguration _configuration;
         private readonly IOutboxMessageRepository _outboxMessageRepository;
         private readonly IManagerDepartmentRepository _managerDepartmentRepository;
+        private readonly IRealtimeNotificationService _realtime;
+        private readonly ILogger<InviteService> _logger;
 
         public InviteService(
             IInviteRepository inviteRepository,
@@ -43,7 +46,9 @@ namespace SMEFLOWSystem.Application.Services
             IModuleSubscriptionRepository moduleSubscriptionRepository,
             IConfiguration configuration,
             IOutboxMessageRepository outboxMessageRepository,
-            IManagerDepartmentRepository managerDepartmentRepository)
+            IManagerDepartmentRepository managerDepartmentRepository,
+            IRealtimeNotificationService realtime,
+            ILogger<InviteService> logger)
         {
             _inviteRepository = inviteRepository;
             _userRepository = userRepository;
@@ -56,6 +61,8 @@ namespace SMEFLOWSystem.Application.Services
             _configuration = configuration;
             _outboxMessageRepository = outboxMessageRepository;
             _managerDepartmentRepository = managerDepartmentRepository;
+            _realtime = realtime;
+            _logger = logger;
         }
 
         public Task CompleteOnboardingAsync(string token, string fullName, string password, string? phone)
@@ -244,6 +251,32 @@ namespace SMEFLOWSystem.Application.Services
             invite.IsUsed = true;
             invite.UpdatedAt = DateTime.UtcNow;
             await _inviteRepository.UpdateInviteAsync(invite);
+
+            // Emit realtime notification & dashboard refresh
+            var reloadedEmployee = await _employeeRepository.GetByIdAsync(employee.Id);
+            var onboardedDto = new
+            {
+                employeeId = employee.Id,
+                employeeName = employee.FullName,
+                email = employee.Email,
+                departmentName = reloadedEmployee?.Department?.Name ?? string.Empty,
+                positionName = reloadedEmployee?.Position?.Name ?? string.Empty,
+                onboardedAt = DateTime.UtcNow
+            };
+
+            _ = _realtime.NotifyEmployeeOnboardedAsync(invite.TenantId, onboardedDto)
+                .ContinueWith(t =>
+                {
+                    if (t.IsFaulted)
+                        _logger.LogWarning(t.Exception, "Notify employee.onboarded failed for tenant {TenantId}", invite.TenantId);
+                });
+
+            _ = _realtime.NotifyDashboardRefreshAsync(invite.TenantId)
+                .ContinueWith(t =>
+                {
+                    if (t.IsFaulted)
+                        _logger.LogWarning(t.Exception, "Notify dashboard.refresh failed for tenant {TenantId}", invite.TenantId);
+                });
         }
     }
 }

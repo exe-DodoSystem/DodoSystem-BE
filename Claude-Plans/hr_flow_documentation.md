@@ -1,7 +1,7 @@
 # HR Flow Documentation — DodoSystem Backend
 
 > Tài liệu phân tích chi tiết luồng Nhân Sự (HR) trong hệ thống DodoSystem.
-> Cập nhật: 2026-06-02
+> Cập nhật: 2026-06-18 (thêm realtime notifications GAP-04, GAP-08)
 
 ---
 
@@ -315,6 +315,10 @@ Hệ thống HR bao gồm **7 module chính**, vận hành theo mô hình phân 
       ← Tạo Employee (Status="Working", BaseSalary=0, HireDate=today)
       ← Nếu role=Manager && có DepartmentId → auto tạo ManagerDepartment
       ← invite.IsUsed = true
+      ← [Realtime - GAP-08] NotifyEmployeeOnboardedAsync(tenantId, { employeeName, departmentName, ... })
+         → HR Admin thấy ngay qua "tenant:{tenantId}:admins"
+      ← [Realtime] NotifyDashboardRefreshAsync(tenantId)
+         → Dashboard tự cập nhật totalEmployees
 ```
 
 **Sơ đồ Invite → Onboarding:**
@@ -330,6 +334,9 @@ Nhân viên nhận link → /validate (kiểm tra)
 /complete → User + UserRole + Employee tạo cùng lúc
      ↓
 invite.IsUsed = true
+     ↓
+[Fire-and-forget] NotifyEmployeeOnboardedAsync(tenantId, {...})
+[Fire-and-forget] NotifyDashboardRefreshAsync(tenantId)
 ```
 
 ---
@@ -466,6 +473,13 @@ POST /api/hr/shift-assignments/bulk
    tất cả assignment cũ của các nhân viên này
 4. BulkInsertAssignmentsAsync → tạo EmployeeShiftPattern mới:
    { EffectiveStartDate = request.EffectiveStartDate, EffectiveEndDate = null }
+5. [Realtime - GAP-04] Bulk load employees (1 query GetByIdsAsync), emit per employee:
+   foreach emp with UserId != null:
+       _ = _realtime.NotifyShiftAssignedAsync(emp.UserId.Value, {
+           shiftPatternName:    shiftPattern.Name,
+           effectiveStartDate:  request.EffectiveStartDate
+       }).ContinueWith(log if faulted)
+   → Gửi tới "user:{userId}" từng nhân viên, mobile app cập nhật calendar
 ```
 
 #### E.4 — Nhân viên xem lịch ca hiện tại

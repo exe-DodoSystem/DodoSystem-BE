@@ -276,6 +276,19 @@ return newPayrolls.Any() || updatePayrolls.Any()
 // true  → controller trả "Tạo phiếu lương Draft thành công"
 ```
 
+**Realtime notification (GAP-05):**
+```
+if _currentUser.UserId.HasValue && result == true:
+    _ = _realtime.NotifyPayrollGeneratedAsync(_currentUser.UserId.Value, {
+        month:          month,
+        year:           year,
+        generatedCount: newPayrolls.Count + updatePayrolls.Count,
+        skippedCount:   skippedCount,
+        type:           "bulk"
+    }).ContinueWith(log if faulted)
+→ Gửi tới "user:{userId}" (admin đang thao tác)
+```
+
 ---
 
 ### LUỒNG B: Tính lại lương 1 nhân viên (Calculate For Employee)
@@ -314,6 +327,21 @@ else:
     → Create Draft + trả về PayrollDto
 ```
 
+**Realtime notification (GAP-05) — chỉ khi `suppressGenerateNotify = false`:**
+```
+if _currentUser.UserId.HasValue && !suppressGenerateNotify:
+    _ = _realtime.NotifyPayrollGeneratedAsync(_currentUser.UserId.Value, {
+        month:          month,
+        year:           year,
+        generatedCount: 1,
+        type:           "single"
+    }).ContinueWith(log if faulted)
+
+// suppressGenerateNotify = true khi gọi nội bộ từ:
+//   CreateEntryAsync, DeleteEntryAsync, CreateBulkEntriesAsync
+// → tránh emit payroll.generated khi mục đích là bonus_deduction.entry_added
+```
+
 ---
 
 ### LUỒNG B2: Quản lý Entries Thưởng/Phạt (Bonus/Deduction Entries)
@@ -339,9 +367,21 @@ if payroll != null && payroll.Status != Draft → throw "Phiếu lương đã ch
 // Lưu entry
 CreateEntry(...)
 
-// Nếu đã có phiếu Draft → tính lại ngay
+// Nếu đã có phiếu Draft → tính lại ngay (suppress payroll.generated)
 if draftPayroll exists:
-    CalculatePayrollForEmployeeAsync(employeeId, month, year)
+    CalculatePayrollForEmployeeAsync(employeeId, month, year, suppressGenerateNotify: true)
+
+// Realtime notification (GAP-07)
+if emp.UserId != null:
+    _ = _realtime.NotifyBonusDeductionEntryAddedAsync(emp.UserId.Value, {
+        type:      entry.Type,      // "Bonus" | "Deduction"
+        category:  entry.Category,
+        amount:    entry.Amount,
+        reason:    entry.Reason,
+        month:     month,
+        year:      year,
+        createdAt: DateTime.UtcNow
+    }).ContinueWith(log if faulted)
 
 return BonusDeductionEntryDto
 ```
@@ -354,7 +394,9 @@ return BonusDeductionEntryDto
 if payroll != null && payroll.Status != Draft → throw
 
 DeleteEntry(id)
-if draftPayroll exists → CalculatePayrollForEmployeeAsync(...)
+// Suppress payroll.generated — chỉ là recalculate nội bộ
+if draftPayroll exists → CalculatePayrollForEmployeeAsync(..., suppressGenerateNotify: true)
+// Không emit notification khi xóa entry
 ```
 
 **Bulk create:**
@@ -368,7 +410,9 @@ if draftPayroll exists → CalculatePayrollForEmployeeAsync(...)
   "amount": 300000,
   "reason": "Thuế TNCN tháng 6"
 }
-// Tạo 1 entry per employee, sau đó recalculate từng người nếu có Draft
+// Tạo 1 entry per employee
+// Nếu có Draft → CalculatePayrollForEmployeeAsync(suppressGenerateNotify: true) per employee
+// Sau đó emit NotifyBonusDeductionEntryAddedAsync per employee (nếu có UserId)
 ```
 
 ---
@@ -421,6 +465,20 @@ if payroll.Status != Draft → throw "Chỉ phiếu Draft mới được chốt"
 
 payroll.Status = Published
 UpdateAsync(payroll)
+
+// Realtime notifications (GAP-05 / dashboard)
+employee = GetByIdAsync(payroll.EmployeeId)
+if employee.UserId != null:
+    _ = _realtime.NotifyPayrollPublishedAsync(employee.UserId.Value, {
+        payrollId: payroll.Id,
+        month:     payroll.Month,
+        year:      payroll.Year,
+        netSalary: payroll.NetSalary
+    }).ContinueWith(log if faulted)
+
+_ = _realtime.NotifyDashboardRefreshAsync(payroll.TenantId)
+    .ContinueWith(log if faulted)
+
 return { published: true }
 ```
 
@@ -438,10 +496,27 @@ foreach payroll in drafts:
     payroll.Status = Published
 
 UpdateRangeAsync(drafts)
+
+// Realtime notifications — bulk load để tránh N+1
+employeeIds = drafts.Select(d.EmployeeId).Distinct()
+employees = GetByIdsAsync(employeeIds)   ← 1 query
+employeeMap = employees.ToDictionary(e.Id)
+
+foreach draft in drafts:
+    if employeeMap[draft.EmployeeId].UserId != null:
+        _ = _realtime.NotifyPayrollPublishedAsync(userId, {
+            payrollId: draft.Id,
+            month:     draft.Month,
+            year:      draft.Year,
+            netSalary: draft.NetSalary
+        }).ContinueWith(log if faulted)
+
+_ = _realtime.NotifyDashboardRefreshAsync(tenantId).ContinueWith(log if faulted)
+
 return { message: "Đã chốt N phiếu lương", publishedCount: N }
 ```
 
-> **Lưu ý:** `publish-all` không có logic guard từng phiếu — `GetDraftsByTenantMonthAsync` đã chỉ lấy Draft.
+> **Lưu ý:** `publish-all` không có logic guard từng phiếu — `GetDraftsByTenantMonthAsync` đã chỉ lấy Draft. Dùng `GetByIdsAsync` (bulk load 1 query) tránh N+1 khi load employees.
 
 ---
 
@@ -458,6 +533,21 @@ if payroll.Status != Published → throw "Chỉ phiếu Published mới được
 
 payroll.Status = Paid
 UpdateAsync(payroll)
+
+// Realtime notifications (GAP-02)
+employee = GetByIdAsync(payroll.EmployeeId)
+if employee.UserId != null:
+    _ = _realtime.NotifyPayrollPaidAsync(employee.UserId.Value, {
+        payrollId: payroll.Id,
+        month:     payroll.Month,
+        year:      payroll.Year,
+        netSalary: payroll.NetSalary,
+        paidAt:    DateTime.UtcNow
+    }).ContinueWith(log if faulted)
+
+_ = _realtime.NotifyDashboardRefreshAsync(payroll.TenantId)
+    .ContinueWith(log if faulted)
+
 return { paid: true }
 ```
 
