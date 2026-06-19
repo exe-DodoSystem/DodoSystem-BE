@@ -1,640 +1,430 @@
-# SMEFLOW Backend — Kế hoạch Deploy lên Azure App Service
+# Deploy Plan — DodoSystem Backend (Lộ trình 6 tuần: WSL → VPS)
 
-> **Môi trường mục tiêu:** Azure App Service (Linux Docker) + Azure SQL Database + RabbitMQ (Azure Container Instance)
-> **CI/CD:** GitHub Actions → Docker Hub → Azure App Service
+> 👉 **Người mới hoàn toàn? ĐỌC [deploy_00_so_tay_khai_niem.md](deploy_00_so_tay_khai_niem.md) TRƯỚC.** Sổ tay đó giải thích mọi khái niệm (Docker, container, port, server, HTTPS...) bằng ví dụ đời thường, không cần gõ lệnh. Hiểu sổ tay rồi mới quay lại file này làm thật sẽ không bị ngợp.
 
----
-
-## Kiến trúc sau khi deploy
-
-```
-Developer push lên branch `main`
-        ↓
-GitHub Actions
-  ├─ Build Docker image (Dockerfile)
-  ├─ Push lên Docker Hub (free)
-  └─ Trigger Azure App Service restart
-        ↓
-Azure App Service (Linux, Single Container)
-  └─ Pull image mới từ Docker Hub
-        ↓
-  ┌─────────────────────────────────────────┐
-  │  smeflow-webapi container               │
-  │  - ASP.NET Core 8 API                   │
-  │  - Hangfire (SQL Server storage)        │
-  │  - SignalR                              │
-  │  - RabbitMQ consumer/publisher          │
-  └────────┬──────────────┬────────────────┘
-           │              │
-    Azure SQL DB    Azure Container Instance
-    (managed)       (RabbitMQ container)
-```
-
-> **Lưu ý quan trọng về Redis:** Hiện tại Redis chỉ dùng để lưu Hangfire jobs.
-> Plan này sẽ **chuyển Hangfire sang dùng SQL Server** (1 dòng code) → loại bỏ hoàn toàn dependency vào Redis → đơn giản hóa deployment đáng kể.
+> **Mục tiêu gốc:** Deploy dự án lên Ubuntu để học cách máy ảo (VM) chạy và DevOps cơ bản.
+> **Triết lý:** học theo tuần · tập trên cái nhỏ trước · WSL cho giai đoạn dev (rẻ, nhanh) → **VPS thật từ Tuần 4** (để học VM/SSH thật + có IP public cho VNPay/HTTPS).
+> Cập nhật: 2026-06-19
 
 ---
 
-## Checklist tổng quan
+## 0. Bức tranh tổng thể — Ta đang deploy cái gì?
 
-- [ ] **Phase 1** — Thay đổi code (4 việc)
-- [ ] **Phase 2** — Tạo Azure resources (5 việc)
-- [ ] **Phase 3** — Tạo Docker Hub repository (2 việc)
-- [ ] **Phase 4** — Cấu hình GitHub Actions (3 việc)
-- [ ] **Phase 5** — Cấu hình Azure App Settings (1 việc lớn)
-- [ ] **Phase 6** — Deploy lần đầu & kiểm tra (5 việc)
-- [ ] **Phase 7** — Việc cần làm khi FE deploy xong (2 việc)
+Đây **không phải** một app đơn lẻ mà là một **hệ thống nhiều service**. Hiểu kiến trúc trước khi deploy là bước quan trọng nhất.
+
+| Thành phần | Công nghệ | Cổng (container) | Vai trò | Public ra internet? |
+|------------|-----------|------------------|---------|---------------------|
+| **WebAPI** | ASP.NET Core 8 | 8080 | API chính + SignalR Hub realtime | ✅ (qua reverse proxy) |
+| **SQL Server** | MSSQL 2022 | 1433 | Database chính | ❌ chỉ nội bộ |
+| **Redis** | Redis 7 | 6379 | Cache + **Hangfire job storage** (background jobs!) | ❌ chỉ nội bộ |
+| **RabbitMQ** | RabbitMQ 3 | 5672 / 15672 | Message queue (email, payroll, payment, attendance) | ❌ (15672 chỉ mở khi debug) |
+
+**5 đặc thù của dự án cần nhớ suốt quá trình deploy:**
+
+1. **VNPay callback** (`/api/payment/callback/vnpay`) → cổng thanh toán gọi ngược về server, **bắt buộc URL public + HTTPS**. ⚠️ **WSL không có IP public** → không test callback thật trên WSL được, phải đợi Tuần 4 (VPS hoặc tunnel).
+2. **SignalR (WebSocket)** → reverse proxy phải bật header `Upgrade`/`Connection`, nếu không realtime sẽ rớt. Test-from-internet cũng cần IP public.
+3. **Secrets** → [appsettings.json](../SMEFLOWSystem.WebAPI/appsettings.json) đang có nhiều `SET-IN-USER-SECRETS` (Cloudinary, Face++, SMTP) + JWT secret mẫu. **Không bao giờ commit secret thật**; nạp qua `.env`.
+4. **SQL Server ngốn RAM** → container MSSQL cần ~2GB. WSL2/VM nên cấp **≥ 4–6GB RAM** nếu không sẽ crash hoặc swap nặng.
+5. **Background jobs** → Hangfire (storage trên **Redis**) chạy cron `attendance-resolution` (`*/15`), `monthly-payroll` (01:00 ngày 1), `tenant-expiration` (00:00 hằng ngày) + consumer RabbitMQ, tất cả chạy nền trong chính WebAPI → `restart: always` (đã có) để tự lên lại sau restart.
+
+**Tin tốt khi deploy Linux:**
+- **Migration tự chạy** lúc startup (có retry chờ SQL), tự seed Roles/Modules → **không cần migrate tay**. Chi tiết ở Tuần 3.
+- **Timezone đã xử lý cross-platform**: code thử `SE Asia Standard Time` (Windows) rồi `Asia/Ho_Chi_Minh` (Linux) ([WebApplicationExtensions.cs:167-176](../SMEFLOWSystem.WebAPI/Validator/WebApplicationExtensions.cs#L167-L176)) → giờ cron chạy đúng UTC+7 trên Ubuntu, không cần chỉnh.
+- **Fail-fast config**: thiếu `Jwt:Secret` hoặc `ConnectionStrings:Redis` là app **throw ngay lúc startup** → nếu container WebAPI exit liền sau khi lên, kiểm tra `.env` thiếu 2 giá trị này trước tiên.
 
 ---
 
-## Phase 1 — Thay đổi code
+## ⚠️ WSL ≠ Máy ảo (đọc trước khi bắt đầu)
 
-### 1.1 — Chuyển Hangfire storage: Redis → SQL Server
+Bạn đang dùng WSL nên ta tận dụng nó cho Tuần 1–3 (dev nhanh, miễn phí). Nhưng phải hiểu rõ giới hạn:
 
-**File:** [SMEFLOWSystem.WebAPI/Extensions/DependencyInjection.cs](../SMEFLOWSystem.WebAPI/Extensions/DependencyInjection.cs)
+- WSL **chia sẻ kernel với Windows**, không boot riêng, **không có IP public** → từ internet không chạm tới được.
+- Vì vậy **VNPay callback + SignalR-from-internet + HTTPS thật KHÔNG test được trên WSL.**
+- Để học đúng "máy ảo chạy như nào" (yêu cầu gốc) → **Tuần 4 chuyển sang VPS Ubuntu thật** (học SSH, firewall, IP public). Đây cũng là lúc bắt buộc cần IP public cho VNPay.
 
-Xóa toàn bộ block Hangfire cũ và thay bằng:
+**3 gotcha kỹ thuật của WSL với stack này:**
+1. **RAM:** WSL2 có thể ăn hết RAM Windows khi SQL Server chạy. Tạo `C:\Users\<bạn>\.wslconfig`:
+   ```ini
+   [wsl2]
+   memory=6GB
+   processors=4
+   ```
+   Rồi `wsl --shutdown` để áp dụng.
+2. **IP WSL đổi mỗi lần khởi động** → đừng hardcode IP; trong compose luôn gọi nhau bằng **tên service** (`sqlserver`, `redis`).
+3. **systemd mặc định tắt** trong WSL → bật nếu cần, trong `/etc/wsl.conf`:
+   ```ini
+   [boot]
+   systemd=true
+   ```
 
-```csharp
-// XÓA cái này:
-services.AddHangfire(cfg =>
-{
-    cfg.SetDataCompatibilityLevel(CompatibilityLevel.Version_170);
-    cfg.UseSimpleAssemblyNameTypeSerializer();
-    cfg.UseRecommendedSerializerSettings();
+---
 
-    var redisConnectionString = configuration.GetConnectionString("Redis");
-    if (string.IsNullOrWhiteSpace(redisConnectionString))
-    {
-        throw new InvalidOperationException("Missing config: ConnectionStrings:Redis");
-    }
-    cfg.UseRedisStorage(redisConnectionString);
-});
+## Lộ trình 6 tuần — tổng quan
 
-// THAY bằng cái này:
-services.AddHangfire(cfg =>
-{
-    cfg.SetDataCompatibilityLevel(CompatibilityLevel.Version_170);
-    cfg.UseSimpleAssemblyNameTypeSerializer();
-    cfg.UseRecommendedSerializerSettings();
-    cfg.UseSqlServerStorage(configuration.GetConnectionString("DefaultConnection"));
-});
+```
+Tuần 1: Linux + Docker (trên WSL)        ← làm chủ docker run/compose/logs/exec
+Tuần 2: Deploy 1 API ĐƠN GIẢN            ← API + SQL, tập nhỏ trước khi đụng dự án thật
+Tuần 3: Deploy DodoSystem (full stack)   ← WebAPI + SQL + Redis + RabbitMQ trên WSL
+Tuần 4: VPS THẬT + Nginx + Domain + HTTPS ← học VM/SSH, VNPay callback, SignalR WebSocket
+Tuần 5: CI/CD tự động                     ← GitHub Actions → VPS
+Tuần 6: Vận hành: Log, Backup, Hardening  ← monitoring, sao lưu DB, bảo mật
 ```
 
-Sau đó xóa package `Hangfire.Redis.StackExchange` khỏi WebAPI.csproj:
-```xml
-<!-- XÓA dòng này trong SMEFLOWSystem.WebAPI.csproj -->
-<PackageReference Include="Hangfire.Redis.StackExchange" Version="1.12.0" />
-```
+Mỗi tuần có: **🎯 Mục tiêu** · **📖 Lý thuyết tối thiểu** · **⌨️ Thực hành** · **📝 Bài tập** · **✅ Định nghĩa Hoàn thành (DoD)**.
 
-Thêm package thay thế vào WebAPI.csproj:
-```xml
-<PackageReference Include="Hangfire.SqlServer" Version="1.8.23" />
-```
+---
 
-Chạy lệnh:
+## Tuần 1 — Linux + Docker (trên WSL)
+
+### 🎯 Mục tiêu
+Làm chủ Docker & docker-compose. Chưa đụng Nginx/SSL/CI/CD.
+
+### 📖 Lý thuyết tối thiểu
+- **Image vs Container:** image là "ảnh đóng băng" read-only; container là instance đang chạy.
+- **Volume:** lưu data bền vững ngoài container (DB không mất khi container chết).
+- **Network:** service trong cùng compose gọi nhau **bằng tên service**, không phải `localhost`.
+- **Dockerfile multi-stage:** dự án dùng `sdk:8.0` để build → `aspnet:8.0` để chạy, xem [SMEFLOWSystem.WebAPI/Dockerfile](../SMEFLOWSystem.WebAPI/Dockerfile).
+
+### ⌨️ Thực hành — cài Docker trong WSL Ubuntu
 ```bash
-dotnet add SMEFLOWSystem.WebAPI package Hangfire.SqlServer --version 1.8.23
-dotnet remove SMEFLOWSystem.WebAPI package Hangfire.Redis.StackExchange
+sudo apt update && sudo apt upgrade -y
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker $USER        # chạy docker không cần sudo (mở lại terminal)
+docker --version && docker compose version
+
+# 5 lệnh xương sống phải thuộc lòng:
+docker run -d --name web -p 8080:80 nginx   # run
+curl localhost:8080                          # nginx chào
+docker logs web                              # logs
+docker exec -it web bash                     # exec (gõ exit để ra)
+docker rm -f web                             # dọn
 ```
 
+### 📝 Bài tập
+1. Chạy nginx, sửa file `index.html` bằng `docker exec`, reload thấy đổi.
+2. Chạy `docker run redis`, dùng `docker exec` vào gõ `redis-cli ping` → `PONG`.
+3. Giải thích bằng lời của bạn: image vs container vs volume vs network.
+
+### ✅ DoD
+- [ ] Docker chạy không cần sudo trong WSL.
+- [ ] Thuộc 5 lệnh: `run`, `compose up/down`, `logs`, `exec`, `ps`.
+- [ ] Đã đặt `.wslconfig` giới hạn RAM.
+
 ---
 
-### 1.2 — Bật Swagger trên Production
+## Tuần 2 — Deploy một API ĐƠN GIẢN (tập nhỏ trước)
 
-**File:** [SMEFLOWSystem.WebAPI/Validator/WebApplicationExtensions.cs](../SMEFLOWSystem.WebAPI/Validator/WebApplicationExtensions.cs)
+> Chưa đụng DodoSystem. Tập trên một API tối giản để hiểu pattern "API + DB qua compose" mà không bị nhiễu bởi Redis/RabbitMQ/SignalR.
 
-```csharp
-// Tìm đoạn này:
-if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+### 🎯 Mục tiêu
+Tự viết một compose 2 service (ASP.NET + SQL Server) và hiểu cách chúng kết nối, dữ liệu bền vững.
 
-// Đổi thành (bật mọi môi trường):
-app.UseSwagger();
-app.UseSwaggerUI();
+### 📖 Lý thuyết tối thiểu
+- Connection string trỏ **tên service** (`Server=db`) chứ không phải `localhost`.
+- Volume giữ data DB sau `down`/`up`.
+- `depends_on` + healthcheck: thứ tự khởi động.
+
+### ⌨️ Thực hành
+Tạo một Todo/Weather API ASP.NET tối giản (`dotnet new webapi`), kiến trúc:
 ```
-
----
-
-### 1.3 — Bật Hangfire Dashboard với authorization
-
-**File:** [SMEFLOWSystem.WebAPI/Validator/WebApplicationExtensions.cs](../SMEFLOWSystem.WebAPI/Validator/WebApplicationExtensions.cs)
-
-Thêm vào phương thức `UseWebApi`, sau `app.MapControllers()`:
-
-```csharp
-// Thêm using ở đầu file nếu chưa có:
-// using Hangfire;
-// using Hangfire.Dashboard;
-
-app.MapHangfireDashboard("/hangfire", new DashboardOptions
-{
-    Authorization = new[] { new HangfireAuthorizationFilter() },
-    DashboardTitle = "SMEFLOW Jobs"
-});
+ASP.NET  →  SQL Server
 ```
-
-Tạo class `HangfireAuthorizationFilter` trong thư mục `SMEFLOWSystem.WebAPI/Filters/`:
-
-```csharp
-// File: SMEFLOWSystem.WebAPI/Filters/HangfireAuthorizationFilter.cs
-using Hangfire.Dashboard;
-
-namespace SMEFLOWSystem.WebAPI.Filters;
-
-public class HangfireAuthorizationFilter : IDashboardAuthorizationFilter
-{
-    public bool Authorize(DashboardContext context)
-    {
-        var httpContext = context.GetHttpContext();
-
-        // Chỉ cho phép user đã đăng nhập và có role SystemAdmin
-        return httpContext.User.Identity?.IsAuthenticated == true
-            && httpContext.User.IsInRole("SystemAdmin");
-    }
-}
-```
-
-> **Truy cập:** `https://dodosystem.azurewebsites.net/hangfire` (phải đăng nhập với tài khoản SystemAdmin trước)
-
----
-
-### 1.4 — Tạo file `appsettings.Production.json`
-
-**File mới:** `SMEFLOWSystem.WebAPI/appsettings.Production.json`
-
-```json
-{
-  "Logging": {
-    "LogLevel": {
-      "Default": "Warning",
-      "Microsoft.AspNetCore": "Warning"
-    }
-  },
-  "Payment": {
-    "Mode": "Sandbox",
-    "Gateway": "VNPay"
-  }
-}
-```
-
-> Các secrets (JWT, Email, Cloudinary...) sẽ được set qua **Azure App Settings** ở Phase 5, không ghi vào file này.
-
----
-
-### 1.5 — Tạo file `.dockerignore`
-
-**File mới:** `.dockerignore` (ở root dự án, cùng cấp với `SMEFLOWSystem.sln`)
-
-```
-**/bin/
-**/obj/
-**/.vs/
-.git/
-.gitignore
-**/*.user
-**/*.suo
-.env
-.env.*
-docker-compose*.yml
-Claude-Plans/
-README.md
-```
-
----
-
-### 1.6 — Cập nhật `appsettings.json` (xóa Redis connection string)
-
-**File:** [SMEFLOWSystem.WebAPI/appsettings.json](../SMEFLOWSystem.WebAPI/appsettings.json)
-
-Xóa dòng Redis khỏi ConnectionStrings:
-```json
-// XÓA dòng này:
-"Redis": "localhost:6379"
-```
-
-Sau khi xóa, block ConnectionStrings chỉ còn:
-```json
-"ConnectionStrings": {
-  "DefaultConnection": "Server=localhost,1433;Database=SMEFLOWSystem;User Id=sa;Password=12345;TrustServerCertificate=true;MultipleActiveResultSets=true"
-}
-```
-
----
-
-### 1.7 — Build và test local trước khi deploy
-
-```bash
-dotnet build SMEFLOWSystem.sln
-dotnet run --project SMEFLOWSystem.WebAPI
-```
-
-Đảm bảo app chạy được local sau khi thay đổi Hangfire.
-
----
-
-## Phase 2 — Tạo Azure Resources
-
-> **Yêu cầu:** Đã có tài khoản Azure. Dùng Azure Portal (portal.azure.com).
-
-### 2.1 — Tạo Resource Group
-
-1. Vào Azure Portal → **Resource Groups** → **+ Create**
-2. Đặt tên: `rg-smeflow-prod`
-3. Region: **Southeast Asia** (Singapore, gần Việt Nam nhất)
-4. **Review + Create** → **Create**
-
----
-
-### 2.2 — Tạo Azure SQL Database
-
-1. Tìm **Azure SQL** → **+ Create** → **SQL Database** (Single database)
-2. **Basics tab:**
-   - Resource group: `rg-smeflow-prod`
-   - Database name: `SMEFLOWSystem`
-   - Server: **Create new**
-     - Server name: `smeflow-sqlserver` (phải unique toàn cầu, thêm số nếu trùng)
-     - Location: Southeast Asia
-     - Authentication: **SQL authentication**
-     - Admin login: `sqladmin`
-     - Password: _(đặt password mạnh, lưu lại)_
-3. **Compute + storage:**
-   - Click **Configure database**
-   - Chọn **Basic** (5 DTU, ~$4.90/month) hoặc **Serverless** (rẻ hơn nếu traffic thấp)
-4. **Networking tab:**
-   - Connectivity method: **Public endpoint**
-   - Allow Azure services and resources: **Yes**
-   - Add current client IP: **Yes** (để bạn kết nối từ máy local)
-5. **Review + Create** → **Create**
-
-**Sau khi tạo xong, lấy connection string:**
-- Vào resource SQL Database → **Connection strings** → tab **ADO.NET**
-- Copy chuỗi dạng: `Server=tcp:smeflow-sqlserver.database.windows.net,1433;Database=SMEFLOWSystem;User Id=sqladmin;Password={password};...`
-- **Bổ sung thêm** `TrustServerCertificate=true;MultipleActiveResultSets=true;` vào cuối
-
----
-
-### 2.3 — Tạo Azure Container Instance cho RabbitMQ
-
-1. Tìm **Container Instances** → **+ Create**
-2. **Basics tab:**
-   - Resource group: `rg-smeflow-prod`
-   - Container name: `smeflow-rabbitmq`
-   - Region: Southeast Asia
-   - Image source: **Docker Hub or other registry**
-   - Image: `rabbitmq:3-management`
-   - OS type: Linux
-3. **Size:** 0.5 vCPU, 0.5 GB RAM (~$5/month)
-4. **Networking tab:**
-   - DNS name label: `smeflow-rabbitmq` (tạo domain `smeflow-rabbitmq.southeastasia.azurecontainer.io`)
-   - Ports: mở `5672` (AMQP) và `15672` (management UI)
-   - Protocol: TCP
-5. **Environment variables:**
-   - `RABBITMQ_DEFAULT_USER` = `smeflow`
-   - `RABBITMQ_DEFAULT_PASS` = _(đặt password, lưu lại)_
-6. **Review + Create** → **Create**
-
-> **Lưu lại:** hostname của RabbitMQ = `smeflow-rabbitmq.southeastasia.azurecontainer.io`
-
----
-
-### 2.4 — Tạo App Service Plan
-
-1. Tìm **App Service Plans** → **+ Create**
-2. Resource group: `rg-smeflow-prod`
-3. Name: `plan-smeflow-prod`
-4. OS: **Linux**
-5. Region: Southeast Asia
-6. Pricing tier: **B1** (Basic, ~$13/month) — đủ để chạy demo
-7. **Review + Create** → **Create**
-
----
-
-### 2.5 — Tạo Azure App Service
-
-1. Tìm **App Services** → **+ Create** → **Web App**
-2. **Basics tab:**
-   - Resource group: `rg-smeflow-prod`
-   - Name: `dodosystem` (tạo URL: `https://dodosystem.azurewebsites.net`)
-   - Publish: **Docker Container**
-   - OS: **Linux**
-   - Region: Southeast Asia
-   - App Service Plan: `plan-smeflow-prod`
-3. **Docker tab:**
-   - Options: **Single Container**
-   - Image source: **Docker Hub**
-   - Access type: **Public**
-   - Image and tag: `<dockerhub-username>/smeflow-webapi:latest` _(điền sau khi tạo Docker Hub ở Phase 3)_
-4. **Review + Create** → **Create**
-
----
-
-## Phase 3 — Cấu hình Docker Hub
-
-### 3.1 — Tạo tài khoản Docker Hub
-
-1. Truy cập [hub.docker.com](https://hub.docker.com)
-2. Đăng ký tài khoản miễn phí
-3. Username: _(ghi lại, ví dụ: `dodosystem`)_
-
-### 3.2 — Tạo Access Token (dùng cho GitHub Actions)
-
-1. Docker Hub → Account Settings → **Security** → **New Access Token**
-2. Tên token: `github-actions`
-3. Permission: **Read, Write, Delete**
-4. **Generate** → **copy token ngay** (chỉ hiện 1 lần)
-5. Lưu lại: `DOCKERHUB_USERNAME` = tên đăng nhập, `DOCKERHUB_TOKEN` = token vừa copy
-
----
-
-## Phase 4 — Cấu hình GitHub Actions
-
-### 4.1 — Lấy Azure Publish Profile
-
-1. Azure Portal → App Service `dodosystem` → **Overview**
-2. Click **Get publish profile** → tải file `.PublishSettings`
-3. Mở file đó, copy **toàn bộ nội dung XML**
-
-### 4.2 — Set GitHub Secrets
-
-Vào GitHub repo → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
-
-Tạo các secrets sau:
-
-| Secret name | Giá trị |
-|-------------|---------|
-| `DOCKERHUB_USERNAME` | Username Docker Hub |
-| `DOCKERHUB_TOKEN` | Access token Docker Hub |
-| `AZURE_WEBAPP_PUBLISH_PROFILE` | Nội dung XML file publish profile |
-| `JWT_SECRET` | Chuỗi >= 32 ký tự bất kỳ (đặt mới cho production) |
-| `DB_CONNECTION_STRING` | Connection string Azure SQL Database (từ bước 2.2) |
-| `RABBITMQ_PASSWORD` | Password RabbitMQ đã đặt ở bước 2.3 |
-| `EMAIL_SMTP_PASSWORD` | Gmail App Password |
-| `CLOUDINARY_CLOUD_NAME` | Cloud name từ Cloudinary dashboard |
-| `CLOUDINARY_API_KEY` | API key từ Cloudinary |
-| `CLOUDINARY_API_SECRET` | API secret từ Cloudinary |
-| `FACEPLUSPLUS_API_KEY` | API key từ FacePlusPlus |
-| `FACEPLUSPLUS_API_SECRET` | API secret từ FacePlusPlus |
-
-### 4.3 — Tạo GitHub Actions Workflow
-
-Tạo file: `.github/workflows/deploy.yml`
-
+`docker-compose.yml` mẫu:
 ```yaml
-name: Build & Deploy to Azure App Service
-
-on:
-  push:
-    branches: [ main ]
-
-env:
-  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/smeflow-webapi
-
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: SMEFLOWSystem.WebAPI/Dockerfile
-          push: true
-          tags: |
-            ${{ env.IMAGE_NAME }}:latest
-            ${{ env.IMAGE_NAME }}:${{ github.sha }}
-
-      - name: Deploy to Azure App Service
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: dodosystem
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          images: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+services:
+  api:
+    build: .
+    ports: ["5000:8080"]
+    environment:
+      - ConnectionStrings__Default=Server=db;Database=Todo;User ID=sa;Password=${SA_PASS};TrustServerCertificate=True
+    depends_on: [db]
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment: [ACCEPT_EULA=Y, MSSQL_SA_PASSWORD=${SA_PASS}]
+    volumes: [todo_data:/var/opt/mssql]
+volumes: { todo_data: }
 ```
 
----
+### 📝 Bài tập
+1. API chạy, gọi được endpoint, lưu được 1 record xuống SQL.
+2. `docker compose down` rồi `up` → **dữ liệu còn nguyên** (chứng minh volume hoạt động).
+3. Đổi `Server=db` thành `Server=localhost` → quan sát nó **fail**, hiểu vì sao.
 
-## Phase 5 — Cấu hình Azure App Settings
-
-Đây là bước quan trọng nhất — set tất cả secrets/config cho app trên Azure.
-
-Vào: **Azure Portal → App Service `dodosystem` → Configuration → Application settings**
-
-Click **+ New application setting** cho từng dòng dưới đây:
-
-### Connection Strings
-
-| Name | Value |
-|------|-------|
-| `ConnectionStrings__DefaultConnection` | _(connection string Azure SQL từ bước 2.2)_ |
-
-### JWT
-
-| Name | Value |
-|------|-------|
-| `Jwt__Secret` | _(chuỗi >= 32 ký tự, dùng giá trị trong GitHub Secret `JWT_SECRET`)_ |
-| `Jwt__Issuer` | `SMEFLOW_Server` |
-| `Jwt__Audience` | `SMEFLOW_Client` |
-| `Jwt__AccessTokenExpiryMinutes` | `60` |
-| `Jwt__RefreshTokenExpiryDays` | `7` |
-
-### Email
-
-| Name | Value |
-|------|-------|
-| `EmailSettings__SmtpHost` | `smtp.gmail.com` |
-| `EmailSettings__SmtpPort` | `587` |
-| `EmailSettings__SmtpUsername` | `dodosystem1@gmail.com` |
-| `EmailSettings__SmtpPassword` | _(Gmail App Password)_ |
-| `EmailSettings__UseSsl` | `true` |
-| `EmailSettings__FromName` | `DodoSystem` |
-| `EmailSettings__FromEmail` | `dodosystem1@gmail.com` |
-
-### RabbitMQ
-
-| Name | Value |
-|------|-------|
-| `RabbitMQ__Host` | `smeflow-rabbitmq.southeastasia.azurecontainer.io` |
-| `RabbitMQ__Port` | `5672` |
-| `RabbitMQ__Username` | `smeflow` |
-| `RabbitMQ__Password` | _(password RabbitMQ đã đặt)_ |
-
-### Cloudinary
-
-| Name | Value |
-|------|-------|
-| `Cloudinary__CloudName` | _(từ Cloudinary dashboard)_ |
-| `Cloudinary__ApiKey` | _(từ Cloudinary dashboard)_ |
-| `Cloudinary__ApiSecret` | _(từ Cloudinary dashboard)_ |
-
-### FacePlusPlus
-
-| Name | Value |
-|------|-------|
-| `FacePlusPlus__ApiKey` | _(từ FacePlusPlus console)_ |
-| `FacePlusPlus__ApiSecret` | _(từ FacePlusPlus console)_ |
-| `FacePlusPlus__BaseUrl` | `https://api-us.faceplusplus.com` |
-| `FacePlusPlus__ConfidenceThreshold` | `80.0` |
-
-### VNPay
-
-| Name | Value |
-|------|-------|
-| `Payment__Mode` | `Sandbox` |
-| `Payment__Gateway` | `VNPay` |
-| `Payment__FrontendUrl` | `http://localhost:3000` _(cập nhật sau khi FE deploy)_ |
-| `Payment__VNPay__TmnCode` | `7BD2ILMB` |
-| `Payment__VNPay__HashSecret` | `BCJSBUREQ9UN22CDL8HHYOLXG30X3VI1` |
-| `Payment__VNPay__BaseUrl` | `https://sandbox.vnpayment.vn/paymentv2/vpcpay.html` |
-| `Payment__VNPay__CallbackUrl` | `/api/payment/callback/vnpay` |
-
-### CORS (tạm thời, cập nhật khi FE deploy)
-
-| Name | Value |
-|------|-------|
-| `Cors__AllowedOrigins__0` | `http://localhost:3000` |
-| `Cors__AllowedOrigins__1` | `http://localhost:5173` |
-
-### General
-
-| Name | Value |
-|------|-------|
-| `ASPNETCORE_ENVIRONMENT` | `Production` |
-| `ASPNETCORE_HTTP_PORTS` | `8080` |
-| `AttendanceResolution__Enabled` | `true` |
-| `AttendanceResolution__Cron` | `*/15 * * * *` |
-
-**Sau khi set xong** → click **Save** ở trên cùng.
+### ✅ DoD
+- [ ] API + SQL chạy bằng compose, kết nối được.
+- [ ] Data sống sót qua `down`/`up`.
+- [ ] Hiểu vì sao dùng tên service thay cho localhost.
 
 ---
 
-## Phase 6 — Deploy lần đầu & Kiểm tra
+## Tuần 3 — Deploy DodoSystem (full stack trên WSL)
 
-### 6.1 — Trigger deploy lần đầu
+> Bây giờ mới chuyển sang dự án thật. Vẫn chạy trên WSL.
+
+### 🎯 Mục tiêu
+Chạy được toàn bộ stack DodoSystem trên WSL và hiểu vai trò từng service. **Tách secret ra `.env`** (chuẩn bị cho Tuần 4).
+
+### 📖 Lý thuyết tối thiểu
+- ASP.NET Core đọc config theo thứ tự: `appsettings.json` → `appsettings.{Env}.json` → **biến môi trường (ghi đè)**. Dùng `__` cho cấp lồng nhau: `ConnectionStrings__DefaultConnection`.
+- 12-Factor: config nằm trong environment, không trong code.
+
+### ⌨️ Thực hành
+
+**Bước 1 — Tạo `.env` (KHÔNG commit, thêm vào `.gitignore`):**
+```dotenv
+MSSQL_SA_PASSWORD=<mật-khẩu-mạnh-ngẫu-nhiên>
+Jwt__Secret=<chuỗi-bí-mật-≥32-ký-tự>
+EmailSettings__SmtpPassword=<app-password-gmail>
+Cloudinary__CloudName=...
+Cloudinary__ApiKey=...
+Cloudinary__ApiSecret=...
+FacePlusPlus__ApiKey=...
+FacePlusPlus__ApiSecret=...
+Payment__VNPay__TmnCode=...
+Payment__VNPay__HashSecret=...
+```
+
+**Bước 2 — Sửa [docker-compose.yml](../docker-compose.yml) bỏ secret hardcode:**
+```yaml
+  sqlserver:
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=${MSSQL_SA_PASSWORD}
+  webapi:
+    env_file: [.env]
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development     # WSL còn để Development cho dễ debug; Production từ Tuần 4
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=SMEFLOWSystem;User ID=sa;Password=${MSSQL_SA_PASSWORD};Encrypt=False;TrustServerCertificate=True
+      - ConnectionStrings__Redis=redis:6379
+      - RabbitMQ__Host=rabbitmq
+```
+
+**Bước 3 — Chạy & kiểm tra:**
+```bash
+docker compose up -d --build
+docker compose ps              # tất cả Up, sqlserver healthy
+docker compose logs -f webapi  # theo dõi khởi động
+curl http://localhost:8085/swagger   # hoặc /health
+docker stats --no-stream             # xem RAM thật (chú ý SQL Server)
+```
+
+### 📝 Bài tập
+1. **Migration chạy thế nào? → ĐÃ KIỂM TRA: tự động, KHÔNG cần `dotnet ef database update` tay.**
+   - `app.UseWebApi()` gọi `InitializeDatabase()` → `db.Database.Migrate()` ([WebApplicationExtensions.cs:50-73](../SMEFLOWSystem.WebAPI/Validator/WebApplicationExtensions.cs#L50-L73)). DB tự tạo/cập nhật schema khi container WebAPI khởi động.
+   - Có **retry 12 lần × 5 giây** (chờ tối đa 60s) → an toàn với Docker khi SQL Server container chưa kịp sẵn sàng. Đây là lý do `up` lần đầu vẫn chạy được dù SQL khởi động chậm.
+   - Sau migration **tự seed** Roles (TenantAdmin, Manager, HRManager, SystemAdmin, Employee) + Modules (HR, ATTENDANCE, PAYROLL, DASHBOARD) — chỉ seed khi bảng rỗng.
+   - ✅ **Hệ quả khi deploy:** chỉ cần `docker compose up`, không có bước migrate thủ công.
+2. Tắt riêng `redis` → xem log WebAPI phản ứng. ⚠️ **Lưu ý: Redis KHÔNG chỉ là cache** — Hangfire dùng Redis làm storage cho background jobs ([DependencyInjection.cs:138](../SMEFLOWSystem.WebAPI/Extensions/DependencyInjection.cs#L138)). Redis chết → payroll hằng tháng, tenant-expiration, attendance-resolution chết theo. Redis là service **bắt buộc**, không optional.
+3. Mở tạm RabbitMQ UI `http://localhost:15672` (guest/guest), xem queue email/payroll/attendance.
+
+### ✅ DoD
+- [ ] `docker compose ps` tất cả Up; API trả lời.
+- [ ] Secret đã ra `.env`, `.env` không bị git theo dõi.
+- [ ] Hiểu vai trò từng service và cách migration chạy.
+
+---
+
+## Tuần 4 — VPS thật + Nginx + Domain + HTTPS
+
+> 🎓 Đây là lúc học **máy ảo thật** (đúng mục tiêu gốc) và là lúc **bắt buộc** rời WSL vì VNPay/SignalR/HTTPS cần **IP public**.
+
+### 🎯 Mục tiêu
+Dựng VPS Ubuntu, làm chủ SSH/firewall, đặt reverse proxy + domain + SSL, làm VNPay callback và SignalR WebSocket chạy thật.
+
+### 📖 Lý thuyết tối thiểu
+- **VPS = VM thật** chạy trên hypervisor của nhà cung cấp, có IP public, boot riêng — khác hẳn WSL.
+- **SSH key:** đăng nhập từ xa an toàn, không dùng password.
+- **Reverse proxy (Nginx):** nhận 80/443 từ internet → chuyển vào container WebAPI. Người dùng không chạm trực tiếp container.
+- **Let's Encrypt/Certbot:** SSL miễn phí, tự gia hạn.
+- **WebSocket proxy:** SignalR cần header `Upgrade`/`Connection`.
+
+### ⌨️ Thực hành
+
+**Bước 1 — Thuê VPS Ubuntu 22.04 (≥ 4GB RAM, 2 vCPU)** rồi học VM/SSH:
+```bash
+ssh-keygen -t ed25519 -C "dodo-deploy"
+ssh-copy-id deploy@<VPS_IP>
+ssh deploy@<VPS_IP>
+# Hardening cơ bản: tạo user sudo, tắt SSH bằng password & root login
+```
+
+**Bước 2 — Cài Docker + firewall (UFW):**
+```bash
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker $USER
+sudo apt install -y ufw nginx certbot python3-certbot-nginx
+sudo ufw default deny incoming && sudo ufw default allow outgoing
+sudo ufw allow OpenSSH && sudo ufw allow 80/tcp && sudo ufw allow 443/tcp
+sudo ufw enable
+# KHÔNG mở 1433/6379/5672/15672 ra internet
+```
+
+**Bước 3 — Copy dự án sang VPS** (câu "chỉ cần copy docker-compose.yml" thành hiện thực):
+```bash
+git clone <repo-url> dodo && cd dodo
+# tạo lại .env trên VPS, ĐỔI ASPNETCORE_ENVIRONMENT=Production
+docker compose up -d --build
+```
+
+**Bước 4 — Domain + Nginx + HTTPS** (trỏ A record `api.dodo.com` → IP VPS):
+```nginx
+server {
+    server_name api.dodo.com;
+    location / {
+        proxy_pass http://localhost:8085;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;       # SignalR WebSocket
+        proxy_set_header Connection "upgrade";        # SignalR WebSocket
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;   # để ASP.NET sinh callback https://
+    }
+}
+```
+```bash
+sudo ln -s /etc/nginx/sites-available/dodo /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d api.dodo.com    # tự cấu hình HTTPS + redirect
+```
+> Đảm bảo ASP.NET có **ForwardedHeaders middleware** để đọc đúng `X-Forwarded-Proto` → callback VNPay mới ra `https://`.
+
+> 💡 **Không muốn thuê VPS ngay?** Có thể dùng tunnel (`cloudflared`/`ngrok`) hở tạm WSL ra internet để test VNPay/SignalR — nhưng vẫn nên làm VPS để học VM/SSH thật.
+
+### 📝 Bài tập
+1. `https://api.dodo.com/swagger` → ổ khoá xanh, chứng chỉ hợp lệ.
+2. Client SignalR kết nối `wss://api.dodo.com/...` → giữ kết nối, không rớt.
+3. VNPay sandbox end-to-end: tạo payment → thanh toán thử → callback `https://api.dodo.com/api/payment/callback/vnpay` thành công.
+
+### ✅ DoD
+- [ ] SSH key-only, root/password login tắt; UFW chỉ 22/80/443.
+- [ ] API chạy HTTPS qua domain; SignalR `wss://` ổn định.
+- [ ] VNPay callback về tới server thành công.
+
+---
+
+## Tuần 5 — CI/CD tự động (GitHub Actions → VPS)
+
+> Dự án đã có skeleton [.github/workflows/ci-cd.yml](../.github/workflows/ci-cd.yml) (job build + "Deploy Placeholder"). Tuần này biến placeholder thành deploy thật.
+
+### 🎯 Mục tiêu
+`git push main` → tự build → SSH vào VPS → `docker compose up`.
+
+### 📖 Lý thuyết tối thiểu
+- **CI:** build + test mỗi commit (đã có job `build-and-test`).
+- **CD:** SSH vào VPS chạy script deploy.
+- **GitHub Secrets:** `VM_HOST`, `VM_USER`, `SSH_PRIVATE_KEY` lưu trong repo Settings, không để lộ trong YAML. Tạo **deploy key riêng cho CI**.
+
+### ⌨️ Thực hành — thay job `deploy`
+```yaml
+  deploy:
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to VPS over SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd ~/dodo
+            git pull origin main
+            docker compose up -d --build
+            docker image prune -f
+```
+
+### 📝 Bài tập
+1. Cấu hình 3 secrets, đổi job deploy.
+2. Push 1 commit nhỏ lên `main` → xác minh VPS tự cập nhật.
+3. Cho build fail có chủ đích → xác minh **không** deploy code hỏng.
+
+### ✅ DoD
+- [ ] Push `main` → app trên VPS tự cập nhật, không SSH tay.
+- [ ] Không secret nào lộ trong YAML.
+- [ ] Build fail thì pipeline dừng, không deploy.
+
+---
+
+## Tuần 6 — Vận hành: Log, Backup, Bảo mật
+
+### 🎯 Mục tiêu
+Biết hệ thống khoẻ không, cứu được dữ liệu khi sự cố, khoá lỗ hổng cơ bản.
+
+### ⌨️ Thực hành
+
+**Log & giám sát:**
+```bash
+docker compose logs -f --tail=100 webapi
+docker stats
+# Giới hạn log Docker khỏi đầy ổ — /etc/docker/daemon.json:
+# { "log-driver": "json-file", "log-opts": { "max-size": "10m", "max-file": "3" } }
+```
+
+**Backup SQL Server (cron hằng đêm):**
+```bash
+docker exec smeflow-sqlserver /opt/mssql-tools/bin/sqlcmd \
+  -S localhost -U sa -P "$MSSQL_SA_PASSWORD" \
+  -Q "BACKUP DATABASE [SMEFLOWSystem] TO DISK='/var/opt/mssql/backup/dodo_$(date +%F).bak'"
+# crontab: 2h sáng mỗi ngày, giữ 7 ngày gần nhất.
+```
+
+**Hardening:**
+- [ ] SSH key-only (Tuần 4). UFW chỉ 22/80/443.
+- [ ] Đổi **toàn bộ** secret mẫu: JWT secret, SA password, RabbitMQ `guest/guest` → user riêng.
+- [ ] `unattended-upgrades` tự vá bảo mật OS.
+- [ ] `fail2ban` chống brute-force SSH.
+
+### 📝 Bài tập
+1. Cron backup DB + **test restore** vào DB tạm (backup không test = không có backup).
+2. Xoá container WebAPI → đo thời gian phục hồi bằng `docker compose up -d`.
+3. Đổi RabbitMQ sang user riêng, cập nhật `.env`.
+
+### ✅ DoD
+- [ ] Backup DB tự động + đã test restore thành công.
+- [ ] Secret mẫu đã thay hết.
+- [ ] Log Docker giới hạn dung lượng, OS tự vá.
+
+---
+
+## 🎓 Bài tập tổng kết (nghiệm thu)
+
+**Dựng lại toàn bộ hệ thống từ một VPS trắng trong < 60 phút**, chỉ dùng ghi chú bạn tự viết trong plan này:
+- [ ] `https://api.dodo.com/swagger` truy cập được (HTTPS hợp lệ).
+- [ ] Đăng nhập lấy JWT → gọi 1 API có auth thành công.
+- [ ] SignalR realtime nhận event (vd `dashboard.refresh`).
+- [ ] VNPay sandbox → callback thành công.
+- [ ] Push `main` → CI/CD tự deploy.
+- [ ] Backup DB tự động + restore được.
+
+---
+
+## 📚 Phụ lục — Cheat sheet
 
 ```bash
-# Commit và push tất cả thay đổi từ Phase 1
-git add .
-git commit -m "chore: prepare for Azure App Service deployment"
-git push origin main
+# Docker compose
+docker compose up -d --build     # build + chạy nền
+docker compose ps                # trạng thái
+docker compose logs -f <svc>     # log
+docker compose down              # dừng (GIỮ volume)
+docker compose down -v           # dừng + XOÁ volume (MẤT DATA!)
+docker exec -it <ct> bash        # vào container
+
+# Hệ thống (VPS)
+htop ; df -h ; sudo ufw status
+journalctl -u nginx -f
+
+# WSL
+wsl --shutdown                   # áp dụng .wslconfig
 ```
 
-→ GitHub Actions sẽ tự chạy. Theo dõi tại tab **Actions** trên GitHub repo.
-
-Build lần đầu mất khoảng **5-8 phút**.
-
----
-
-### 6.2 — Kiểm tra App Service logs
-
-Nếu app bị lỗi, xem log tại:
-- Azure Portal → App Service `dodosystem` → **Log stream** (real-time)
-- Hoặc: **Diagnose and solve problems** → **Application Logs**
-
-Lỗi phổ biến cần check:
-- `Missing config: ...` → thiếu App Setting, kiểm tra lại Phase 5
-- `Cannot connect to SQL Server` → kiểm tra connection string và firewall Azure SQL
-- `Cannot connect to RabbitMQ` → kiểm tra Container Instance đang chạy không
-
----
-
-### 6.3 — Kiểm tra các endpoints
-
-Sau khi app start thành công:
-
+## ⚠️ Sai lầm thường gặp
+1. Tưởng WSL là VM → cố test VNPay callback trên WSL (không có IP public → bất khả thi).
+2. Để `ASPNETCORE_ENVIRONMENT=Development` trên VPS production → lộ stack trace.
+3. Quên block WebSocket trong Nginx → SignalR rớt liên tục.
+4. Quên `X-Forwarded-Proto` → callback VNPay ra `http://` → VNPay từ chối.
+5. WSL/VM < 4GB RAM → SQL Server crash.
+6. Commit `.env` lên git → lộ mật khẩu. Luôn `git status` trước khi commit.
+7. `docker compose down -v` nhầm → mất sạch database. Phân biệt rõ `down` vs `down -v`.
 ```
-✅ Swagger UI:      https://dodosystem.azurewebsites.net/swagger
-✅ Health check:    https://dodosystem.azurewebsites.net/api/auth/... (thử 1 endpoint bất kỳ)
-✅ Hangfire:        https://dodosystem.azurewebsites.net/hangfire  (login SystemAdmin trước)
-✅ SignalR hub:     https://dodosystem.azurewebsites.net/hubs/notifications
-```
-
----
-
-### 6.4 — Kiểm tra Database migration
-
-Lần đầu app chạy, `db.Database.Migrate()` sẽ tự tạo schema + seed Roles + Modules.
-Kiểm tra bằng cách:
-- Dùng Azure Data Studio hoặc SSMS kết nối tới Azure SQL Database
-- Server: `smeflow-sqlserver.database.windows.net`
-- Authentication: SQL Login (sqladmin / password đã đặt)
-- Xác nhận đã có đủ các bảng và data trong Roles, Modules
-
-**Nếu cần restore backup từ local:**
-1. Export từ local: dùng SSMS → Tasks → Generate Scripts (chọn data + schema)
-2. Chạy script đó trên Azure SQL Database
-
----
-
-### 6.5 — Đăng ký VNPay Callback URL
-
-Đăng nhập vào [sandbox.vnpayment.vn](https://sandbox.vnpayment.vn) với tài khoản merchant.
-Cập nhật **Return URL** thành:
-```
-https://dodosystem.azurewebsites.net/api/payment/callback/vnpay
-```
-
----
-
-## Phase 7 — Việc cần làm khi Frontend deploy xong
-
-### 7.1 — Cập nhật CORS
-
-Khi biết URL frontend (ví dụ: `https://dodosystem-fe.vercel.app`), vào:
-**Azure Portal → App Service → Configuration → Application settings**
-
-Cập nhật:
-```
-Cors__AllowedOrigins__0  →  https://dodosystem-fe.vercel.app
-Cors__AllowedOrigins__1  →  (xóa hoặc giữ localhost để dev)
-```
-
-Click **Save** → App Service tự restart.
-
-### 7.2 — Cập nhật Payment FrontendUrl
-
-```
-Payment__FrontendUrl  →  https://dodosystem-fe.vercel.app
-```
-
----
-
-## Tóm tắt chi phí ước tính
-
-| Service | Tier | Chi phí/tháng |
-|---------|------|--------------|
-| Azure App Service | B1 Linux | ~$13 |
-| Azure SQL Database | Basic 5 DTU | ~$5 |
-| Azure Container Instance (RabbitMQ) | 0.5 vCPU, 0.5 GB | ~$5 |
-| Docker Hub | Free | $0 |
-| GitHub Actions | Free (2000 min/month) | $0 |
-| **Tổng** | | **~$23/tháng** |
-
-> **Tip:** Azure cung cấp $200 free credit cho tài khoản mới — dùng để test miễn phí ~1 tháng đầu.
-
----
-
-## Lưu ý quan trọng
-
-1. **Không commit secrets** vào git — tất cả secrets đặt qua Azure App Settings hoặc GitHub Secrets.
-2. **`appsettings.json`** giữ nguyên cho local dev, không chứa production secrets.
-3. Khi app start lần đầu, **auto-migrate mất 30-60 giây** vì phải tạo toàn bộ schema.
-4. **SignalR** hoạt động tốt trên Azure App Service — App Service đã hỗ trợ WebSocket.
-5. **Hangfire Dashboard** chỉ vào được sau khi đăng nhập SystemAdmin qua API, lấy JWT token, rồi truy cập `/hangfire`.
-
----
-
-*Kế hoạch này được tạo dựa trên câu trả lời trong `deploy_questions.md`. Cập nhật lần cuối: 2026-06-03.*
