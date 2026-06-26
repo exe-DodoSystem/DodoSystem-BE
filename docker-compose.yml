@@ -49,6 +49,7 @@ services:
       - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=SMEFLOWSystem;User ID=sa;Password=YourStrong@Password123;Encrypt=False;TrustServerCertificate=True
       - ConnectionStrings__Redis=redis:6379
       - RabbitMQ__Host=rabbitmq
+      - Invite__OnboardingUrl=https://giaphu.xyz/onboard
     depends_on:
       - sqlserver
       - redis
