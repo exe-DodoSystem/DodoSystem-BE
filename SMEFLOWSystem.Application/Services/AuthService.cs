@@ -195,18 +195,18 @@ namespace SMEFLOWSystem.Application.Services
 
             var isSystemAdmin = user.UserRoles?.Any(ur => ur.Role != null
                                                         && string.Equals(ur.Role.Name, "SystemAdmin", StringComparison.OrdinalIgnoreCase)) == true;
-
+            var isModulesExpired = false;
             if (!isSystemAdmin)
             {
                 // Rule: block tenant login only when ALL modules are expired
                 var subs = await _moduleSubscriptionRepo.GetByTenantIgnoreTenantAsync(tenant.Id);
                 var now = DateTime.UtcNow;
+                
                 var hasValidModule = subs.Any(s => !s.IsDeleted
                                                    && (string.Equals(s.Status, StatusEnum.ModuleActive, StringComparison.OrdinalIgnoreCase)
                                                        || string.Equals(s.Status, StatusEnum.ModuleTrial, StringComparison.OrdinalIgnoreCase))
                                                    && s.EndDate > now);
-                if (!hasValidModule)
-                    throw new Exception("Hết hạn tất cả module, thanh toán để tiếp tục");
+                isModulesExpired = !hasValidModule; 
             }
 
             if (!string.Equals(tenant.Status, StatusEnum.TenantActive, StringComparison.OrdinalIgnoreCase)
@@ -214,9 +214,10 @@ namespace SMEFLOWSystem.Application.Services
                 && !string.Equals(tenant.Status, StatusEnum.TenantSuspended, StringComparison.OrdinalIgnoreCase))
                 throw new Exception("Tài khoản công ty chưa sẵn sàng để đăng nhập.");
 
-            var token = AuthHelper.GenerateJwtToken(user, _config);
+            var token = AuthHelper.GenerateJwtToken(user, _config, isModulesExpired);
             var userDto =  _mapper.Map<LoginUserDto>(user);
             userDto.Token = token;
+            userDto.IsExpired = isModulesExpired;
 
             // Issue refresh token for clients that support token refresh.
             var issued = await _refreshTokenService.IssueAsync(user.Id);

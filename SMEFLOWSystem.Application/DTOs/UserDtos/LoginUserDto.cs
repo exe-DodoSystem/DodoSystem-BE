@@ -12,8 +12,8 @@ namespace SMEFLOWSystem.Application.DTOs.UserDtos
         public string Phone { get; set; } = string.Empty;
         public bool IsActive { get; set; }
         public bool IsDeleted { get; set; }
-        public string Token { get; set; } = string.Empty;   
-
+        public string Token { get; set; } = string.Empty;
+        public bool IsExpired { get; set; } = false;
         public string RefreshToken { get; set; } = string.Empty;
 
         public string TenantName { get; set; } = string.Empty;

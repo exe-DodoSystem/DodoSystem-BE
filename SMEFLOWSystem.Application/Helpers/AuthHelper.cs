@@ -10,17 +10,18 @@ namespace SMEFLOWSystem.Application.Helpers
 {
     public static class AuthHelper
     {
-        public static string GenerateJwtToken(User user, IConfiguration config)
+        public static string GenerateJwtToken(User user, IConfiguration config, bool isExpired = false)
         {
             // 1. Tạo danh sách Claims cơ bản
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Email, user.Email),
-                new Claim(ClaimTypes.Name, user.FullName),
+                new Claim(ClaimTypes.Name, user.FullName),    
                 
                 // [QUAN TRỌNG NHẤT] Phải có TenantId để hệ thống biết User thuộc công ty nào
-                new Claim("tenantId", user.TenantId.ToString())
+                new Claim("tenantId", user.TenantId.ToString()),
+                new Claim("isExpired", isExpired.ToString().ToLower())
             };
 
             // 2. Thêm Roles vào Claims
