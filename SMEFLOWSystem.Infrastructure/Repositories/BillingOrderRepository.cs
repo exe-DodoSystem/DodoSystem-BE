@@ -32,6 +32,13 @@ public class BillingOrderRepository : IBillingOrderRepository
             .FirstOrDefaultAsync(o => o.Id == billingOrderId);
     }
 
+    public async Task<BillingOrder?> GetByOrderNumberIgnoreTenantAsync(string billingOrderNumber)
+    {
+        return await _context.BillingOrders
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(o => o.BillingOrderNumber == billingOrderNumber);
+    }
+
     public async Task<List<BillingOrder>> GetByTenantIdAsync(Guid tenantId)
     {
         return await _context.BillingOrders

@@ -239,6 +239,14 @@ public static class DependencyInjection
             _ = GetRequiredConfig(configuration, "Payment:VNPay:HashSecret");
             _ = GetRequiredConfig(configuration, "Payment:VNPay:BaseUrl");
         }
+        if ((paymentMode == "Sandbox" || paymentMode == "Production") && paymentGateway == "SePay")
+        {
+            _ = GetRequiredConfig(configuration, "Payment:SePay:ApiKey");
+            _ = GetRequiredConfig(configuration, "Payment:SePay:WebhookSecret");
+            _ = GetRequiredConfig(configuration, "Payment:SePay:BankAccountNumber");
+            _ = GetRequiredConfig(configuration, "Payment:SePay:BankAccountName");
+            _ = GetRequiredConfig(configuration, "Payment:SePay:BankCode");
+        }
     }
 
     private static string GetRequiredConfig(IConfiguration config, string key)

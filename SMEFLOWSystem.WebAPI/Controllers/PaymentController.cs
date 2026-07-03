@@ -6,6 +6,13 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.WebUtilities;
 using SMEFLOWSystem.SharedKernel.Interfaces;
+using Microsoft.AspNetCore.Authorization;
+using SMEFLOWSystem.Application.DTOs.PaymentDtos;
+using System.IO;
+using System.Text;
+using System.Security.Cryptography;
+using Newtonsoft.Json;
+using SMEFLOWSystem.Application.Interfaces.IRepositories;
 
 namespace SMEFLOWSystem.WebAPI.Controllers
 {
@@ -85,6 +92,108 @@ namespace SMEFLOWSystem.WebAPI.Controllers
                 Status = status,
                 CallbackUrl = callbackUrl
             });
+        }
+
+        /// <summary>[Dev only] Giả lập webhook thanh toán SePay thành công</summary>
+        [HttpPost("simulate/sepay/success")]
+        public async Task<IActionResult> SimulateSePaySuccess(
+            [FromServices] IBillingOrderRepository billingOrderRepo,
+            [FromQuery] Guid orderId, 
+            [FromQuery] string? transactionCode = null)
+        {
+            if (!_env.IsDevelopment())
+                return NotFound();
+
+            var order = await billingOrderRepo.GetByIdIgnoreTenantAsync(orderId);
+            if (order == null)
+                return NotFound(new { message = "Order not found" });
+
+            var discount = order.DiscountAmount ?? 0m;
+            var payable = order.TotalAmount - discount;
+            var code = transactionCode ?? $"SIM-{DateTime.UtcNow.Ticks.ToString().Substring(10)}";
+
+            var payload = new SePayWebhookPayload(
+                Id: DateTime.UtcNow.Ticks % 10000000,
+                Gateway: "MBBank",
+                TransactionDate: DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                AccountNumber: "123456789",
+                SubAccount: null,
+                TransferAmount: payable,
+                Accumulated: 99999999,
+                Code: code,
+                Content: $"DODO {order.BillingOrderNumber}",
+                ReferenceCode: code,
+                Description: "Simulated payment",
+                TransferType: "in"
+            );
+
+            var success = await _billingService.ProcessSePayWebhookAsync(payload);
+            return Ok(new
+            {
+                Success = success,
+                Payload = payload
+            });
+        }
+
+        /// <summary>Webhook nhận kết quả thanh toán từ SePay</summary>
+        [HttpPost("webhook/sepay")]
+        [AllowAnonymous]
+        public async Task<IActionResult> SePayWebhook()
+        {
+            var signatureHeader = Request.Headers["x-sepay-signature"].ToString();
+            
+            Request.EnableBuffering();
+            string rawBody;
+            using (var reader = new StreamReader(Request.Body, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, bufferSize: 1024, leaveOpen: true))
+            {
+                rawBody = await reader.ReadToEndAsync();
+                Request.Body.Position = 0;
+            }
+
+            // Verify API Key
+            var expectedApiKey = _config["Payment:SePay:ApiKey"];
+            if (!string.IsNullOrEmpty(expectedApiKey))
+            {
+                var authHeader = Request.Headers["Authorization"].ToString();
+                var providedKey = authHeader
+                    .Replace("Sepay ", "", StringComparison.OrdinalIgnoreCase)
+                    .Replace("Bearer ", "", StringComparison.OrdinalIgnoreCase)
+                    .Trim();
+
+                if (providedKey != expectedApiKey)
+                    return Unauthorized(new { success = false, message = "Invalid API Key" });
+            }
+
+            // Verify Signature
+            var expectedSecret = _config["Payment:SePay:WebhookSecret"];
+            if (!string.IsNullOrEmpty(expectedSecret))
+            {
+                if (string.IsNullOrEmpty(signatureHeader))
+                {
+                    return Unauthorized(new { success = false, message = "Missing signature header" });
+                }
+
+                var keyBytes = Encoding.UTF8.GetBytes(expectedSecret);
+                var payloadBytes = Encoding.UTF8.GetBytes(rawBody);
+
+                using var hmac = new HMACSHA256(keyBytes);
+                var hashBytes = hmac.ComputeHash(payloadBytes);
+                var computedSignature = Convert.ToHexString(hashBytes).ToLower();
+
+                if (!string.Equals(signatureHeader.Trim(), computedSignature, StringComparison.OrdinalIgnoreCase))
+                {
+                    return Unauthorized(new { success = false, message = "Invalid Signature" });
+                }
+            }
+
+            var payload = JsonConvert.DeserializeObject<SePayWebhookPayload>(rawBody);
+            if (payload == null)
+            {
+                return BadRequest(new { success = false, message = "Invalid JSON payload" });
+            }
+
+            var result = await _billingService.ProcessSePayWebhookAsync(payload);
+            return Ok(new { success = result });
         }
     }
 }

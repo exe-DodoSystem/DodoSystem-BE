@@ -8,6 +8,7 @@ using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Application.Interfaces.IServices;
 using SMEFLOWSystem.Core.Entities;
 using SMEFLOWSystem.SharedKernel.Interfaces;
+using SMEFLOWSystem.Application.DTOs.PaymentDtos;
 using System;
 using System.Globalization;
 using System.Linq;
@@ -62,6 +63,9 @@ namespace SMEFLOWSystem.Application.Services
         public Task<string> BuildSimulatedVNPaySuccessQueryStringAsync(Guid orderId, string? gatewayTransactionId = null)
             => _paymentService.BuildSimulatedVNPaySuccessQueryStringAsync(orderId, gatewayTransactionId);
 
+        public Task<bool> ProcessSePayWebhookAsync(SePayWebhookPayload payload)
+            => _paymentService.ProcessSePayWebhookAsync(payload);
+
         public async Task EnqueuePaymentLinkEmailAsync(Guid orderId, string adminEmail, string companyName, string? clientIp = null, string emailType = StatusEnum.EmailTypeNew)
         {
             var paymentUrl = await _paymentService.CreatePaymentUrlAsync(orderId, clientIp);
@@ -89,6 +93,58 @@ namespace SMEFLOWSystem.Application.Services
                 linesHtml.Append("</ul>");
             }
 
+            var gateway = _config["Payment:Gateway"];
+            var isSePay = string.Equals(gateway, "SePay", StringComparison.OrdinalIgnoreCase);
+            SePayPaymentInfoDto? sePayInfo = null;
+            if (isSePay)
+            {
+                try
+                {
+                    sePayInfo = JsonConvert.DeserializeObject<SePayPaymentInfoDto>(paymentUrl);
+                }
+                catch { }
+            }
+
+            string paymentActionHtml;
+            if (sePayInfo != null)
+            {
+                paymentActionHtml = $@"
+                    <p>Vui lòng chuyển khoản thanh toán bằng cách quét mã QR dưới đây hoặc chuyển khoản thủ công theo thông tin:</p>
+                    <table style='border-collapse: collapse; width: 100%; max-width: 500px; margin-bottom: 15px;'>
+                        <tr>
+                            <td style='padding: 8px; border: 1px solid #ddd; background-color: #f9f9f9; width: 40%;'><b>Ngân hàng nhận:</b></td>
+                            <td style='padding: 8px; border: 1px solid #ddd;'>{sePayInfo.BankCode}</td>
+                        </tr>
+                        <tr>
+                            <td style='padding: 8px; border: 1px solid #ddd; background-color: #f9f9f9;'><b>Số tài khoản:</b></td>
+                            <td style='padding: 8px; border: 1px solid #ddd;'><b>{sePayInfo.BankAccountNumber}</b></td>
+                        </tr>
+                        <tr>
+                            <td style='padding: 8px; border: 1px solid #ddd; background-color: #f9f9f9;'><b>Tên tài khoản:</b></td>
+                            <td style='padding: 8px; border: 1px solid #ddd;'>{sePayInfo.BankAccountName}</td>
+                        </tr>
+                        <tr>
+                            <td style='padding: 8px; border: 1px solid #ddd; background-color: #f9f9f9;'><b>Số tiền chuyển:</b></td>
+                            <td style='padding: 8px; border: 1px solid #ddd;'><b>{payable.ToString("N0", vi)} VND</b></td>
+                        </tr>
+                        <tr>
+                            <td style='padding: 8px; border: 1px solid #ddd; background-color: #f9f9f9;'><b>Nội dung chuyển khoản:</b></td>
+                            <td style='padding: 8px; border: 1px solid #ddd; color: #d9534f;'><b>{sePayInfo.TransferContent}</b></td>
+                        </tr>
+                    </table>
+                    <p style='color: #d9534f; font-weight: bold;'>⚠️ Quan trọng: Vui lòng ghi chính xác nội dung chuyển khoản ở trên để hệ thống tự động kích hoạt dịch vụ ngay lập tức.</p>
+                    <div style='margin-top: 15px;'>
+                        <img src='{sePayInfo.QrCodeUrl}' alt='Mã QR Thanh toán VietQR' style='max-width: 250px; border: 1px solid #ccc; padding: 5px; background: #fff;' />
+                    </div>";
+            }
+            else
+            {
+                paymentActionHtml = $@"
+                    <p>Vui lòng bấm vào link dưới đây để tiến hành thanh toán:</p>
+                    <a href='{paymentUrl}' style='padding: 10px 20px; background-color: #28a745; color: white; text-decoration: none; display: inline-block; border-radius: 4px;'>THANH TOÁN ĐƠN HÀNG</a>
+                    <p>Hoặc copy link: {paymentUrl}</p>";
+            }
+
             string emailBody;
             string emailSubject;
 
@@ -112,9 +168,7 @@ namespace SMEFLOWSystem.Application.Services
                     <p>Giảm giá: <b>{discount.ToString("N0", vi)} VND</b></p>
                     <p>Cần thanh toán: <b>{payable.ToString("N0", vi)} VND</b></p>
                     <hr/>
-                    <p>Nếu bạn muốn thanh toán ngay, vui lòng bấm vào link dưới đây:</p>
-                    <a href='{paymentUrl}' style='padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none;'>THANH TOÁN (TUỲ CHỌN)</a>
-                    <p>Hoặc copy link: {paymentUrl}</p>";
+                    {paymentActionHtml}";
             }
             else if (emailType == StatusEnum.EmailTypeAdditional)
             {
@@ -131,9 +185,7 @@ namespace SMEFLOWSystem.Application.Services
                     <p>Giảm giá: <b>{discount.ToString("N0", vi)} VND</b></p>
                     <p>Cần thanh toán: <b>{payable.ToString("N0", vi)} VND</b></p>
                     <hr/>
-                    <p>Vui lòng bấm vào link dưới đây để tiến hành thanh toán và kích hoạt ngay module mới:</p>
-                    <a href='{paymentUrl}' style='padding: 10px 20px; background-color: #17a2b8; color: white; text-decoration: none;'>THANH TOÁN ĐƠN HÀNG MUA THÊM</a>
-                    <p>Hoặc copy link: {paymentUrl}</p>";
+                    {paymentActionHtml}";
             }
             else if (emailType == StatusEnum.EmailTypeRenewal)
             {
@@ -149,9 +201,7 @@ namespace SMEFLOWSystem.Application.Services
                     <p>Giảm giá: <b>{discount.ToString("N0", vi)} VND</b></p>
                     <p>Cần thanh toán: <b>{payable.ToString("N0", vi)} VND</b></p>
                     <hr/>
-                    <p>Vui lòng bấm vào link dưới đây để tiến hành thanh toán và duy trì dịch vụ:</p>
-                    <a href='{paymentUrl}' style='padding: 10px 20px; background-color: #ffc107; color: black; text-decoration: none;'>THANH TOÁN GIA HẠN</a>
-                    <p>Hoặc copy link: {paymentUrl}</p>";
+                    {paymentActionHtml}";
             }
             else // emailType == StatusEnum.EmailTypeNew or default
             {
@@ -167,9 +217,7 @@ namespace SMEFLOWSystem.Application.Services
                     <p>Giảm giá: <b>{discount.ToString("N0", vi)} VND</b></p>
                     <p>Cần thanh toán: <b>{payable.ToString("N0", vi)} VND</b></p>
                     <hr/>
-                    <p>Vui lòng bấm vào link dưới đây để tiến hành thanh toán (Thanh toán để được kích hoạt sử dụng dịch vụ):</p>
-                    <a href='{paymentUrl}' style='padding: 10px 20px; background-color: #28a745; color: white; text-decoration: none;'>THANH TOÁN ĐƠN HÀNG</a>
-                    <p>Hoặc copy link: {paymentUrl}</p>";
+                    {paymentActionHtml}";
             }
 
             var currentTenant = await _tenantRepository.GetByIdIgnoreTenantAsync(order.TenantId);
