@@ -23,6 +23,15 @@ public class EmployeeRepository : IEmployeeRepository
             .FirstOrDefaultAsync(e => e.Id == id);
     }
 
+    public Task<Employee?> GetByIdIncludeDeletedAsync(Guid id, Guid tenantId)
+    {
+        return _context.Employees
+            .IgnoreQueryFilters()
+            .Include(e => e.Department)
+            .Include(e => e.Position)
+            .FirstOrDefaultAsync(e => e.Id == id && e.TenantId == tenantId);
+    }
+
     public Task<Employee?> GetByUserIdAsync(Guid userId)
     {
         return _context.Employees

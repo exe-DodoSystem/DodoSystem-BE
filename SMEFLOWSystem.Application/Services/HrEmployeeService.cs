@@ -20,6 +20,7 @@ public class HrEmployeeService : IHrEmployeeService
     private readonly IMapper _mapper;
     private readonly IUserRepository _userRepo;
     private readonly IEmployeeSalaryHistoryRepository _salaryHistoryRepo;
+    private readonly ICurrentTenantService _currentTenantService;
 
     public HrEmployeeService(
         IEmployeeRepository employeeRepo,
@@ -29,7 +30,8 @@ public class HrEmployeeService : IHrEmployeeService
         IHrAuthorizationService hrAuth,
         IMapper mapper,
         IUserRepository userRepo,
-        IEmployeeSalaryHistoryRepository salaryHistoryRepo)
+        IEmployeeSalaryHistoryRepository salaryHistoryRepo,
+        ICurrentTenantService currentTenantService)
     {
         _employeeRepo = employeeRepo;
         _departmentRepo = departmentRepo;
@@ -39,6 +41,7 @@ public class HrEmployeeService : IHrEmployeeService
         _mapper = mapper;
         _userRepo = userRepo;
         _salaryHistoryRepo = salaryHistoryRepo;
+        _currentTenantService = currentTenantService;
     }
 
     public async Task<PagedResultDto<EmployeeDto>> GetPagedAsync(EmployeeQueryDto query)
@@ -205,10 +208,30 @@ public class HrEmployeeService : IHrEmployeeService
             if (!request.ResignationDate.HasValue)
                 throw new ArgumentException("ResignationDate is required when Status=Resigned");
             emp.ResignationDate = request.ResignationDate.Value;
+
+            if (emp.UserId.HasValue)
+            {
+                var user = await _userRepo.GetUserByIdAsync(emp.UserId.Value);
+                if (user != null)
+                {
+                    user.IsActive = false;
+                    await _userRepo.UpdateUserAsync(user);
+                }
+            }
         }
         else
         {
             emp.ResignationDate = null;
+
+            if (emp.UserId.HasValue)
+            {
+                var user = await _userRepo.GetUserByIdAsync(emp.UserId.Value);
+                if (user != null && !user.IsActive && !user.IsDeleted)
+                {
+                    user.IsActive = true;
+                    await _userRepo.UpdateUserAsync(user);
+                }
+            }
         }
 
         emp.UpdatedAt = DateTime.UtcNow;
@@ -224,8 +247,6 @@ public class HrEmployeeService : IHrEmployeeService
         var emp = await _employeeRepo.GetByIdAsync(id) ?? throw new KeyNotFoundException("Employee not found");
         await _hrAuth.EnsureEmployeeAccessAsync(emp);
 
-        emp.Status = StatusEnum.EmployeeResigned;
-        emp.ResignationDate ??= DateOnly.FromDateTime(DateTime.UtcNow);
         emp.IsDeleted = true;
         emp.UpdatedAt = DateTime.UtcNow;
         await _employeeRepo.UpdateAsync(emp);
@@ -234,6 +255,47 @@ public class HrEmployeeService : IHrEmployeeService
         {
             await _userRepo.SoftDeleteUserAndFreeEmailAsync(emp.UserId.Value);
         }
+    }
+
+    public async Task<EmployeeDto> RestoreAsync(Guid id)
+    {
+        _currentUser.EnsureHrAccess();
+        var tenantId = _currentTenantService.TenantId ?? throw new UnauthorizedAccessException("Tenant ID is missing.");
+
+        var emp = await _employeeRepo.GetByIdIncludeDeletedAsync(id, tenantId)
+            ?? throw new KeyNotFoundException("Employee not found");
+
+        await _hrAuth.EnsureEmployeeAccessAsync(emp);
+
+        emp.IsDeleted = false;
+        emp.Status = StatusEnum.EmployeeWorking; // Reset to working status
+        emp.ResignationDate = null;
+        emp.UpdatedAt = DateTime.UtcNow;
+        await _employeeRepo.UpdateAsync(emp);
+
+        if (emp.UserId.HasValue)
+        {
+            var user = await _userRepo.GetByIdIgnoreTenantAsync(emp.UserId.Value);
+            if (user != null && user.TenantId == tenantId)
+            {
+                user.IsDeleted = false;
+                user.IsActive = true;
+
+                if (!string.IsNullOrEmpty(user.Email) && user.Email.Contains(".deleted_"))
+                {
+                    var index = user.Email.IndexOf(".deleted_");
+                    var originalEmail = user.Email.Substring(0, index);
+                    if (!await _userRepo.IsEmailExistAsync(originalEmail))
+                    {
+                        user.Email = originalEmail;
+                    }
+                }
+
+                await _userRepo.UpdateUserIgnoreTenantAsync(user);
+            }
+        }
+
+        return _mapper.Map<EmployeeDto>(emp);
     }
 
     private async Task ValidateDepartmentPositionAsync(Guid? departmentId, Guid? positionId)

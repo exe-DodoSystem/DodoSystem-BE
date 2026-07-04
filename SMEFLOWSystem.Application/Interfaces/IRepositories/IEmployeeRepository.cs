@@ -5,6 +5,7 @@ namespace SMEFLOWSystem.Application.Interfaces.IRepositories;
 public interface IEmployeeRepository
 {
     Task<Employee?> GetByIdAsync(Guid id);
+    Task<Employee?> GetByIdIncludeDeletedAsync(Guid id, Guid tenantId);
     Task<Employee?> GetByUserIdAsync(Guid userId);
     Task<List<Employee>> GetAllActiveEmployeeByTenantId(Guid tenantId);
     Task<List<Employee>> GetByIdsAsync(List<Guid> employeeIds);

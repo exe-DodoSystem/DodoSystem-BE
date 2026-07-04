@@ -115,6 +115,28 @@ public class HrEmployeesController : ControllerBase
         }
     }
 
+    /// <summary>[TenantAdmin, HRManager] Khôi phục nhân viên đã xóa</summary>
+    [HttpPatch("{id:guid}/restore")]
+    public async Task<ActionResult<EmployeeDto>> Restore([FromRoute] Guid id)
+    {
+        try
+        {
+            return Ok(await _service.RestoreAsync(id));
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return StatusCode(403, new { error = "Bạn không có quyền truy cập" });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
     /// <summary>
     /// Lấy tất cả nhân viên trong một phòng ban (không phân trang) - Dành cho Manager để xem danh sách nhân viên trực thuộc
     /// </summary>
