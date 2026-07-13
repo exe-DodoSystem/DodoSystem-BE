@@ -9,8 +9,8 @@ public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
     public void Configure(EntityTypeBuilder<RefreshToken> entity)
     {
         entity.HasKey(e => e.Id).HasName("PK__RefreshToken__3214EC07");
-        entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-        entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+        entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
+        entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         entity.Property(e => e.TokenHash).IsRequired().HasMaxLength(128);
         entity.Property(e => e.RevokeReason).HasMaxLength(255);
         entity.HasIndex(e => new { e.TenantId, e.UserId }, "IX_RefreshTokens_Tenant_User");
@@ -27,8 +27,8 @@ public class InviteConfiguration : IEntityTypeConfiguration<Invite>
     {
         entity.HasKey(e => e.Id).HasName("PK__Invites__3214EC07ABCDEF12");
         entity.HasIndex(e => e.Token, "UQ_Invite_Token").IsUnique();
-        entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-        entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+        entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
+        entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         entity.Property(e => e.Email).IsRequired().HasMaxLength(255);
         entity.Property(e => e.Token).IsRequired().HasMaxLength(255);
         entity.Property(e => e.ExpiryDate).IsRequired();
@@ -61,8 +61,8 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
     {
         entity.HasKey(e => e.Id).HasName("PK__Users__3214EC07D3CEC114");
         entity.HasIndex(e => new { e.TenantId, e.Email }, "UQ_Users_Email_Tenant").IsUnique();
-        entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-        entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+        entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
+        entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         entity.Property(e => e.Email).IsRequired().HasMaxLength(255);
         entity.Property(e => e.FullName).IsRequired().HasMaxLength(255);
         entity.Property(e => e.IsActive).HasDefaultValue(true);

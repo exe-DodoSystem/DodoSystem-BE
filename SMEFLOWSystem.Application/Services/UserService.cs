@@ -1,6 +1,5 @@
 ﻿using AutoMapper;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Identity.Client;
 using Newtonsoft.Json;
 using SharedKernel.DTOs;
 using ShareKernel.Common.Enum;

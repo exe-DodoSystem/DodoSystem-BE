@@ -1,0 +1,6 @@
+services:
+  webapi:
+    build:
+      context: .
+      dockerfile: SMEFLOWSystem.WebAPI/Dockerfile
+    image: dodosystem-api:local

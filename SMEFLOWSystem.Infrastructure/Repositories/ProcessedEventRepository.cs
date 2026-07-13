@@ -1,4 +1,4 @@
-using Microsoft.Data.SqlClient;
+using Npgsql;
 using Microsoft.EntityFrameworkCore;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Core.Entities;
@@ -42,7 +42,7 @@ public class ProcessedEventRepository : IProcessedEventRepository
 
     private static bool IsUniqueConstraintViolation(DbUpdateException ex)
     {
-        return ex.InnerException is SqlException sqlEx
-               && (sqlEx.Number == 2601 || sqlEx.Number == 2627);
+        return ex.InnerException is PostgresException postgresException
+               && postgresException.SqlState == PostgresErrorCodes.UniqueViolation;
     }
 }

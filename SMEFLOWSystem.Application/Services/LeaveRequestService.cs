@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using ShareKernel.Common.Enum;
 using SMEFLOWSystem.Application.DTOs.Leave;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;

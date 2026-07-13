@@ -10,8 +10,8 @@ namespace SMEFLOWSystem.Infrastructure.Data.Configurations;
 //     {
 //         entity.HasKey(e => e.Id).HasName("PK__Attendan__3214EC07446D18B6");
 //         entity.HasIndex(e => new { e.TenantId, e.EmployeeId, e.WorkDate }, "UQ_Attendance_Per_Day").IsUnique();
-//         entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-//         entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+//         entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
+//         entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 //         entity.Property(e => e.Notes).HasMaxLength(255);
 //         entity.Property(e => e.Status).IsRequired().HasMaxLength(30).HasDefaultValue("Present");
 //         entity.Property(e => e.CheckInSelfieUrl).HasMaxLength(1000);
@@ -29,10 +29,10 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
     public void Configure(EntityTypeBuilder<Customer> entity)
     {
         entity.HasKey(e => e.Id).HasName("PK__Customer__3214EC07B17A5536");
-        entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+        entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
         entity.Property(e => e.Address).HasMaxLength(500);
         entity.Property(e => e.CompanyName).HasMaxLength(255); 
-        entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+        entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         entity.Property(e => e.Email).HasMaxLength(100); 
         entity.Property(e => e.IsDeleted).HasDefaultValue(false);
         entity.Property(e => e.Name).IsRequired().HasMaxLength(255);
@@ -48,8 +48,8 @@ public class DepartmentConfiguration : IEntityTypeConfiguration<Department>
     public void Configure(EntityTypeBuilder<Department> entity)
     {
         entity.HasKey(e => e.Id).HasName("PK__Departme__3214EC070252CA08");
-        entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-        entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+        entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
+        entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         entity.Property(e => e.IsDeleted).HasDefaultValue(false);
         entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
         entity.HasOne(d => d.Tenant).WithMany(p => p.Departments).HasForeignKey(d => d.TenantId).OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("FK_Departments_Tenants");
@@ -61,9 +61,9 @@ public class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
     public void Configure(EntityTypeBuilder<Employee> entity)
     {
         entity.HasKey(e => e.Id).HasName("PK__Employee__3214EC07C73E2C13");
-        entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+        entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
         entity.Property(e => e.BaseSalary).HasColumnType("decimal(18, 2)");
-        entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+        entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         entity.Property(e => e.Email).HasMaxLength(100);  
         entity.Property(e => e.FullName).IsRequired().HasMaxLength(255);
         entity.Property(e => e.IsDeleted).HasDefaultValue(false);
@@ -82,7 +82,7 @@ public class PayrollConfiguration : IEntityTypeConfiguration<Payroll>
     {
         entity.HasKey(e => e.Id).HasName("PK__Payrolls__3214EC07E77CFA45");
         entity.HasIndex(e => new { e.TenantId, e.EmployeeId, e.Year, e.Month }, "UQ_Payroll_Month").IsUnique();
-        entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+        entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
         entity.Property(e => e.BaseSalarySnapshot).HasColumnType("decimal(18, 2)");
         entity.Property(e => e.BasePay).HasColumnType("decimal(18, 2)");
         entity.Property(e => e.TotalOTHours).HasDefaultValue(0m).HasColumnType("decimal(18, 2)");
@@ -93,7 +93,7 @@ public class PayrollConfiguration : IEntityTypeConfiguration<Payroll>
         entity.Property(e => e.StructuredBonus).HasDefaultValue(0m).HasColumnType("decimal(18, 2)");
         entity.Property(e => e.StructuredDeduction).HasDefaultValue(0m).HasColumnType("decimal(18, 2)");
         entity.Property(e => e.NetSalary).HasDefaultValue(0m).HasColumnType("decimal(18, 2)");
-        entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+        entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         entity.Property(e => e.Notes).HasMaxLength(255);
         entity.Property(e => e.Status).IsRequired().HasDefaultValue(ShareKernel.Common.Enum.PayrollStatus.Draft);
         entity.HasOne(d => d.Employee).WithMany(p => p.Payrolls).HasForeignKey(d => d.EmployeeId).OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("FK_Payrolls_Employees");
@@ -106,8 +106,8 @@ public class PositionConfiguration : IEntityTypeConfiguration<Position>
     public void Configure(EntityTypeBuilder<Position> entity)
     {
         entity.HasKey(e => e.Id).HasName("PK__Position__3214EC07176C885B");
-        entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-        entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+        entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
+        entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         entity.Property(e => e.IsDeleted).HasDefaultValue(false);
         entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
         entity.HasOne(d => d.Department).WithMany(p => p.Positions).HasForeignKey(d => d.DepartmentId).OnDelete(DeleteBehavior.ClientSetNull).HasConstraintName("FK_Positions_Departments");
@@ -120,8 +120,8 @@ public class TenantConfiguration : IEntityTypeConfiguration<Tenant>
     public void Configure(EntityTypeBuilder<Tenant> entity)
     {
         entity.HasKey(e => e.Id).HasName("PK__Tenants__3214EC0740A20BD5");
-        entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-        entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+        entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
+        entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         entity.Property(e => e.IsDeleted).HasDefaultValue(false);
         entity.Property(e => e.Name).IsRequired().HasMaxLength(255);
         entity.Property(e => e.Status).IsRequired().HasMaxLength(50).HasDefaultValue("Active");
@@ -138,7 +138,7 @@ public class ManagerDepartmentConfiguration : IEntityTypeConfiguration<ManagerDe
 
         entity.Property(e => e.AssignedAt)
             .IsRequired()
-            .HasDefaultValueSql("(getdate())");
+            .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
         entity.Property(e => e.AssignedByUserId)
             .IsRequired();

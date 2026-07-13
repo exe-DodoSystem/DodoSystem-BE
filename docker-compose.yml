@@ -1,62 +1,101 @@
 services:
-  rabbitmq:
-    image: rabbitmq:3-management
-    container_name: smeflow-rabbitmq
-    ports:
-      - "5672:5672"
-      - "15672:15672"
+  postgres:
+    image: postgres:16-alpine
+    container_name: dodo-postgres
+    command: ["postgres", "-c", "shared_buffers=64MB", "-c", "max_connections=30", "-c", "work_mem=2MB", "-c", "maintenance_work_mem=32MB"]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 20s
-    restart: always
+    restart: unless-stopped
+    mem_limit: 256m
+    shm_size: 64mb
+    cpus: 0.60
+    security_opt:
+      - no-new-privileges:true
 
   redis:
-    image: redis:7
-    container_name: smeflow-redis
-    ports:
-      - "6379:6379"
+    image: redis:7-alpine
+    container_name: dodo-redis
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "48mb", "--maxmemory-policy", "noeviction"]
     volumes:
       - redis_data:/data
-    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    mem_limit: 96m
+    cpus: 0.20
+    security_opt:
+      - no-new-privileges:true
 
-  sqlserver:
-    image: mcr.microsoft.com/mssql/server:2022-latest
-    container_name: smeflow-sqlserver
+  rabbitmq:
+    image: rabbitmq:4.3.2-alpine
+    container_name: dodo-rabbitmq
     environment:
-      - ACCEPT_EULA=Y
-      - MSSQL_SA_PASSWORD=YourStrong@Password123
-    ports:
-      - "1433:1433"
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
     volumes:
-      - sqlserver_data:/var/opt/mssql
-    restart: always
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./rabbitmq.conf:/etc/rabbitmq/conf.d/99-dodo.conf:ro
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    mem_limit: 192m
+    cpus: 0.30
+    security_opt:
+      - no-new-privileges:true
 
   webapi:
-    image: smeflow-webapi:latest
-    build:
-      context: .
-      dockerfile: SMEFLOWSystem.WebAPI/Dockerfile
-    container_name: smeflow-webapi
-    ports:
-      - "8085:8080"
+    image: ghcr.io/${GHCR_OWNER}/dodosystem-api:${IMAGE_TAG:-latest}
+    container_name: dodo-webapi
+    env_file:
+      - .env
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=SMEFLOWSystem;User ID=sa;Password=YourStrong@Password123;Encrypt=False;TrustServerCertificate=True
-      - ConnectionStrings__Redis=redis:6379
-      - RabbitMQ__Host=rabbitmq
-      - Invite__OnboardingUrl=https://giaphu.xyz/onboard
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};Pooling=true;Minimum Pool Size=0;Maximum Pool Size=15;Timeout=15;Command Timeout=30
+      ConnectionStrings__Redis: redis:6379,abortConnect=false
+      RabbitMQ__Host: rabbitmq
+      RabbitMQ__Port: 5672
+      RabbitMQ__Username: ${RABBITMQ_USER}
+      RabbitMQ__Password: ${RABBITMQ_PASSWORD}
+    ports:
+      - "127.0.0.1:8085:8080"
     depends_on:
-      - sqlserver
-      - redis
-      - rabbitmq
-    restart: always
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+    mem_limit: 384m
+    cpus: 1.00
+    security_opt:
+      - no-new-privileges:true
 
 volumes:
-  rabbitmq_data:
+  postgres_data:
   redis_data:
-  sqlserver_data:
+  rabbitmq_data:
