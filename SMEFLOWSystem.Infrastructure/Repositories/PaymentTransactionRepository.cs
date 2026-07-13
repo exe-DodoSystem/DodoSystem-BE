@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Data.SqlClient;
+using Npgsql;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Core.Entities;
 using SMEFLOWSystem.Infrastructure.Data;
@@ -50,9 +50,8 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
 
         private static bool IsUniqueConstraintViolation(DbUpdateException ex)
         {
-            // SQL Server duplicate key: 2601 (unique index) / 2627 (unique constraint)
-            return ex.InnerException is SqlException sqlEx
-                && (sqlEx.Number == 2601 || sqlEx.Number == 2627);
+            return ex.InnerException is PostgresException postgresException
+                && postgresException.SqlState == PostgresErrorCodes.UniqueViolation;
         }
     }
 }

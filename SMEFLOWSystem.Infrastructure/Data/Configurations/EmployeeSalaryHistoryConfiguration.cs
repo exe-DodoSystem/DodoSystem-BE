@@ -10,11 +10,11 @@ namespace SMEFLOWSystem.Infrastructure.Data.Configurations
         {
             entity.ToTable("EmployeeSalaryHistories");
             entity.HasKey(e => e.Id);
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
 
             entity.Property(e => e.OldSalary).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.NewSalary).HasColumnType("decimal(18, 2)");
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(e => e.Reason).HasMaxLength(500);
 
             entity.HasOne(d => d.Employee)

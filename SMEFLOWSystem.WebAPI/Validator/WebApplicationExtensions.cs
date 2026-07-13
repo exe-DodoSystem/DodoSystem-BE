@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Hosting;
 using System.Linq;
 using SMEFLOWSystem.WebAPI.Middleware;
@@ -22,6 +24,11 @@ public static class WebApplicationExtensions
             app.UseSwaggerUI();
         }
 
+        app.UseForwardedHeaders(new ForwardedHeadersOptions
+        {
+            ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+        });
+
         if (!app.Environment.IsDevelopment() && !app.Environment.IsStaging())
         {
             app.UseHttpsRedirection();
@@ -42,6 +49,7 @@ public static class WebApplicationExtensions
         // Schedule recurring jobs (daily at 00:00 Vietnam time)
         ScheduleRecurringJobs(app);
 
+        app.MapHealthChecks("/health");
         app.MapControllers();
 
         return app;

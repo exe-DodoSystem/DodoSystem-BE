@@ -14,16 +14,22 @@ namespace SMEFLOWSystem.Infrastructure.Data
     {
         public SMEFLOWSystemContext CreateDbContext(string[] args)
         {
-            // đọc appsettings.json từ WebAPI
+            var currentDirectory = Directory.GetCurrentDirectory();
+            var webApiDirectory = Directory.Exists(Path.Combine(currentDirectory, "SMEFLOWSystem.WebAPI"))
+                ? Path.Combine(currentDirectory, "SMEFLOWSystem.WebAPI")
+                : Path.GetFullPath(Path.Combine(currentDirectory, "../SMEFLOWSystem.WebAPI"));
+
             var configuration = new ConfigurationBuilder()
-                .SetBasePath(Path.Combine(Directory.GetCurrentDirectory(), "../SMEFLOWSystem.WebAPI"))
+                .SetBasePath(webApiDirectory)
                 .AddJsonFile("appsettings.json", optional: false)
                 .Build();
 
+            var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
+                ?? configuration.GetConnectionString("DefaultConnection")
+                ?? throw new InvalidOperationException("Missing DefaultConnection connection string.");
+
             var optionsBuilder = new DbContextOptionsBuilder<SMEFLOWSystemContext>();
-            optionsBuilder.UseSqlServer(
-                configuration.GetConnectionString("DefaultConnection")
-            );
+            optionsBuilder.UseNpgsql(connectionString);
 
             return new SMEFLOWSystemContext(optionsBuilder.Options, new DesignTimeTenantService());
         }

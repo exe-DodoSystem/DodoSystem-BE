@@ -139,6 +139,17 @@ public static class DependencyInjection
         });
         services.AddHangfireServer();
 
+        services.AddHealthChecks()
+            .AddNpgSql(
+                configuration.GetConnectionString("DefaultConnection")
+                    ?? throw new InvalidOperationException("Missing PostgreSQL connection string"),
+                name: "postgres")
+            .AddRedis(
+                configuration.GetConnectionString("Redis")
+                    ?? throw new InvalidOperationException("Missing Redis connection string"),
+                name: "redis")
+            .AddRabbitMQ(name: "rabbitmq");
+
         var jwtSecret = GetRequiredConfig(configuration, "Jwt:Secret");
         services
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

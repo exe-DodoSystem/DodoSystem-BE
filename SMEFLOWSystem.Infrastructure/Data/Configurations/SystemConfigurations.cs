@@ -10,7 +10,7 @@ public class OutboxMessageConfiguration : IEntityTypeConfiguration<OutboxMessage
     {
         entity.HasKey(e => e.Id).HasName("PK_OutboxMessages");
         entity.ToTable("OutboxMessages");
-        entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+        entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
         entity.Property(e => e.EventId).IsRequired();
         entity.Property(e => e.EventType).IsRequired().HasMaxLength(255);
         entity.Property(e => e.Exchange).IsRequired().HasMaxLength(150);
@@ -19,9 +19,9 @@ public class OutboxMessageConfiguration : IEntityTypeConfiguration<OutboxMessage
         entity.Property(e => e.CorrelationId).HasMaxLength(128);
         entity.Property(e => e.Status).IsRequired().HasMaxLength(20).HasDefaultValue("Pending");
         entity.Property(e => e.RetryCount).HasDefaultValue(0);
-        entity.Property(e => e.OccurredOnUtc).HasDefaultValueSql("(getutcdate())");
+        entity.Property(e => e.OccurredOnUtc).HasDefaultValueSql("timezone('utc', now())");
         entity.Property(e => e.LastError).HasMaxLength(4000);
-        entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
+        entity.Property(e => e.CreatedAt).HasDefaultValueSql("timezone('utc', now())");
         
         entity.HasIndex(e => e.EventId).HasDatabaseName("UX_OutboxMessages_EventId").IsUnique();
         entity.HasIndex(e => new { e.Status, e.NextAttemptOnUtc }).HasDatabaseName("IX_OutboxMessages_Status_NextAttemptOnUtc");
@@ -37,11 +37,11 @@ public class ProcessedEventConfiguration : IEntityTypeConfiguration<ProcessedEve
     {
         entity.HasKey(e => e.Id).HasName("PK_ProcessedEvents");
         entity.ToTable("ProcessedEvents");
-        entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+        entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
         entity.Property(e => e.EventId).IsRequired();
         entity.Property(e => e.ConsumerName).IsRequired().HasMaxLength(200);
-        entity.Property(e => e.ProcessedAtUtc).HasDefaultValueSql("(getutcdate())");
-        entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
+        entity.Property(e => e.ProcessedAtUtc).HasDefaultValueSql("timezone('utc', now())");
+        entity.Property(e => e.CreatedAt).HasDefaultValueSql("timezone('utc', now())");
         entity.HasIndex(e => new { e.EventId, e.ConsumerName }).HasDatabaseName("UX_ProcessedEvents_EventId_Consumer").IsUnique();
         entity.HasIndex(e => e.ProcessedAtUtc).HasDatabaseName("IX_ProcessedEvents_ProcessedAtUtc");
     }
@@ -52,8 +52,8 @@ public class TenantAttendanceSettingConfiguration : IEntityTypeConfiguration<Ten
     public void Configure(EntityTypeBuilder<TenantAttendanceSetting> entity)
     {
         entity.HasKey(e => e.Id).HasName("PK__TenantAttendanceSetting__3214EC07");
-        entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-        entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+        entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
+        entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         entity.Property(e => e.CheckInRadiusMeters).HasDefaultValue(100);
         entity.Property(e => e.LateThresholdMinutes).HasDefaultValue(10);
         entity.Property(e => e.EarlyLeaveThresholdMinutes).HasDefaultValue(10);
@@ -70,8 +70,8 @@ public class NotificationConfiguration : IEntityTypeConfiguration<Notification>
     public void Configure(EntityTypeBuilder<Notification> entity)
     {
         entity.HasKey(e => e.Id).HasName("PK__Notifications__3214EC07");
-        entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-        entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+        entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
+        entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         entity.Property(e => e.Title).IsRequired().HasMaxLength(255);
         entity.Property(e => e.Message).IsRequired().HasMaxLength(2000);
         entity.Property(e => e.Type).IsRequired().HasMaxLength(50).HasDefaultValue("General");
