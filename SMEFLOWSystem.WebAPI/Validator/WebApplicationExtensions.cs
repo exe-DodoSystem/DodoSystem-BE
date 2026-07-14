@@ -18,7 +18,7 @@ public static class WebApplicationExtensions
 {
     public static WebApplication UseWebApi(this WebApplication app)
     {
-        if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
+        if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
         {
             app.UseSwagger();
             app.UseSwaggerUI();
@@ -29,7 +29,7 @@ public static class WebApplicationExtensions
             ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
         });
 
-        if (!app.Environment.IsDevelopment() && !app.Environment.IsStaging())
+        if (!app.Environment.IsDevelopment() && !app.Environment.IsProduction())
         {
             app.UseHttpsRedirection();
         }
