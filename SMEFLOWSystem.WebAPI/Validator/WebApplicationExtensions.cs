@@ -33,7 +33,7 @@ public static class WebApplicationExtensions
         {
             app.UseHttpsRedirection();
         }
-
+        app.UseRouting();
         app.UseCors("AllowFE");
         app.UseAuthentication();
         app.UseAuthorization();
