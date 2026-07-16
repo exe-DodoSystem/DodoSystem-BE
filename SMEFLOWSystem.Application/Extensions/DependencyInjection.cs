@@ -18,7 +18,7 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
-        services.AddAutoMapper(typeof(RoleMappingProfile).Assembly);
+        services.AddAutoMapper(_ => { }, typeof(RoleMappingProfile).Assembly);
 
         services.AddValidatorsFromAssemblyContaining<RegisterRequestDtoValidator>();
 
