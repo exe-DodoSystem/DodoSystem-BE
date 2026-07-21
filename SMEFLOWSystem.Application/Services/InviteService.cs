@@ -119,7 +119,7 @@ namespace SMEFLOWSystem.Application.Services
             var onboardingUrl = _configuration["Invite:OnboardingUrl"];
             var tokenText = string.IsNullOrWhiteSpace(onboardingUrl)
                 ? token
-                : $"{onboardingUrl.TrimEnd('/')}/{token}";
+                : $"{onboardingUrl.TrimEnd('/')}?token={Uri.EscapeDataString(token)}";
             var emailEvent = new EmailNotificationRequestedEvent
             {
                 EventId = Guid.NewGuid(),
