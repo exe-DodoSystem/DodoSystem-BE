@@ -51,6 +51,7 @@ public static class DependencyInjection
         services.AddScoped<IInviteRepository, InviteRepository>();
         services.AddScoped<IModuleRepository, ModuleRepository>();
         services.AddScoped<IModuleSubscriptionRepository, ModuleSubscriptionRepository>();
+        services.AddScoped<ISystemAnalyticsReadRepository, SystemAnalyticsReadRepository>();
         services.AddScoped<IBillingOrderModuleRepository, BillingOrderModuleRepository>();
         services.AddScoped<IOrderRepository, OrderRepository>();
         services.AddScoped<IBillingOrderRepository, BillingOrderRepository>();

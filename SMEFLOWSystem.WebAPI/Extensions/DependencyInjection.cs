@@ -117,6 +117,24 @@ public static class DependencyInjection
         });
 
         services.Configure<AttendanceResolutionOptions>(configuration.GetSection("AttendanceResolution"));
+        services.AddOptions<SystemAnalyticsOptions>()
+            .Bind(configuration.GetSection(SystemAnalyticsOptions.SectionName))
+            .Validate(
+                options => string.Equals(
+                    options.BusinessTimezone,
+                    SystemAnalyticsOptions.SupportedTimezone,
+                    StringComparison.OrdinalIgnoreCase),
+                $"SystemAnalytics:BusinessTimezone must be '{SystemAnalyticsOptions.SupportedTimezone}'.")
+            .Validate(options => options.DefaultRangeDays > 0, "SystemAnalytics:DefaultRangeDays must be greater than zero.")
+            .Validate(options => options.MaxRangeMonths > 0, "SystemAnalytics:MaxRangeMonths must be greater than zero.")
+            .Validate(options => options.CacheSeconds > 0, "SystemAnalytics:CacheSeconds must be greater than zero.")
+            .Validate(options => options.OrderOverdueGraceHours >= 0, "SystemAnalytics:OrderOverdueGraceHours cannot be negative.")
+            .Validate(options => options.ActionCenterMaxItems > 0, "SystemAnalytics:ActionCenterMaxItems must be greater than zero.")
+            .Validate(options => options.ForecastMinimumMonths > 0, "SystemAnalytics:ForecastMinimumMonths must be greater than zero.")
+            .Validate(
+                options => options.ForecastMaximumPeriods is >= 1 and <= 6,
+                "SystemAnalytics:ForecastMaximumPeriods must be between 1 and 6.")
+            .ValidateOnStart();
 
         services.Configure<EmailSettings>(configuration.GetSection("EmailSettings"));
         services.Configure<CloudinarySettings>(configuration.GetSection("Cloudinary"));

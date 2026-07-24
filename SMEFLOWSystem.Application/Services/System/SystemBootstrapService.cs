@@ -4,6 +4,7 @@ using SMEFLOWSystem.Application.Helpers;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Application.Interfaces.IServices.System;
 using SMEFLOWSystem.Core.Entities;
+using SMEFLOWSystem.SharedKernel.Common;
 
 namespace SMEFLOWSystem.Application.Services.System;
 
@@ -66,7 +67,7 @@ public class SystemBootstrapService : ISystemBootstrapService
             var tenant = new Tenant
             {
                 Id = Guid.NewGuid(),
-                Name = "SYSTEM",
+                Name = SystemTenantConstants.Name,
                 Status = StatusEnum.TenantActive,
                 SubscriptionEndDate = null,
                 OwnerUserId = null,
