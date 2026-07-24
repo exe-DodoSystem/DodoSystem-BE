@@ -112,5 +112,19 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
 
             return (items, totalCount);
         }
+
+        public async Task UpdateStatusIgnoreTenantAsync(
+            Guid tenantId,
+            string status,
+            DateTime updatedAtUtc,
+            CancellationToken cancellationToken)
+        {
+            var tenant = await _context.Tenants
+                .IgnoreQueryFilters()
+                .SingleAsync(x => x.Id == tenantId && !x.IsDeleted, cancellationToken);
+            tenant.Status = status;
+            tenant.UpdatedAt = updatedAtUtc;
+            await _context.SaveChangesAsync(cancellationToken);
+        }
     }
 }

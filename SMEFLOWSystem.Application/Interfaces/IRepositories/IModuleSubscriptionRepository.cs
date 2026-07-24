@@ -10,4 +10,10 @@ public interface IModuleSubscriptionRepository
     Task<List<ModuleSubscription>> GetByTenantIgnoreTenantAsync(Guid tenantId);
     Task<List<ModuleSubscription>> GetByTenantIdAsync(Guid tenantId);
     Task<List<ModuleSubscription>> GetAllIgnoreTenantAsync();
+    Task<ModuleSubscription?> GetByIdIgnoreTenantAsync(
+        Guid subscriptionId,
+        CancellationToken cancellationToken);
+    Task SaveSystemAdminChangesAsync(
+        ModuleSubscription subscription,
+        CancellationToken cancellationToken);
 }

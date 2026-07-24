@@ -18,7 +18,7 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
-        services.AddAutoMapper(typeof(RoleMappingProfile).Assembly);
+        services.AddAutoMapper(_ => { }, typeof(RoleMappingProfile).Assembly);
 
         services.AddValidatorsFromAssemblyContaining<RegisterRequestDtoValidator>();
 
@@ -59,9 +59,13 @@ public static class DependencyInjection
         services.AddScoped<AttendanceResolutionRecurringJob>();
 
         services.AddScoped<ISystemBootstrapService, SystemBootstrapService>();
+        services.AddScoped<ISystemBootstrapResetService, SystemBootstrapResetService>();
         services.AddScoped<ISystemTenantService, SystemTenantService>();
         services.AddScoped<ISystemDashboardService, SystemDashboardService>();
         services.AddScoped<ISystemAnalyticsService, SystemAnalyticsService>();
+        services.AddScoped<ISystemSubscriptionService, SystemSubscriptionService>();
+        services.AddScoped<ISystemBillingService, SystemBillingService>();
+
         return services;
     }
 }

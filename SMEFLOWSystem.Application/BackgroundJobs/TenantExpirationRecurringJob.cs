@@ -2,6 +2,7 @@ using ShareKernel.Common.Enum;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Application.Interfaces.IServices;
 using SMEFLOWSystem.Core.Entities;
+using SMEFLOWSystem.Application.Helpers;
 
 namespace SMEFLOWSystem.Application.BackgroundJobs;
 
@@ -45,10 +46,7 @@ public class TenantExpirationRecurringJob
             if (subs.Count == 0)
                 continue;
 
-            var hasValidModule = subs.Any(s => !s.IsDeleted
-                                               && (string.Equals(s.Status, StatusEnum.ModuleActive, StringComparison.OrdinalIgnoreCase)
-                                                   || string.Equals(s.Status, StatusEnum.ModuleTrial, StringComparison.OrdinalIgnoreCase))
-                                               && s.EndDate > now);
+            var hasValidModule = subs.Any(s => ModuleSubscriptionRules.IsUsable(s, now));
             if (hasValidModule)
                 continue;
 
@@ -65,10 +63,7 @@ public class TenantExpirationRecurringJob
                 if (freshTenant == null) return;
 
                 var freshSubs = await _moduleSubscriptionRepo.GetByTenantIgnoreTenantAsync(freshTenant.Id);
-                var freshHasValidModule = freshSubs.Any(s => !s.IsDeleted
-                                                             && (string.Equals(s.Status, StatusEnum.ModuleActive, StringComparison.OrdinalIgnoreCase)
-                                                             || string.Equals(s.Status, StatusEnum.ModuleTrial, StringComparison.OrdinalIgnoreCase))
-                                                             && s.EndDate > now);
+                var freshHasValidModule = freshSubs.Any(s => ModuleSubscriptionRules.IsUsable(s, now));
                 if (freshHasValidModule)
                     return;
 

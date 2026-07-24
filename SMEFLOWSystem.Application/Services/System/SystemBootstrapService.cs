@@ -45,7 +45,7 @@ public class SystemBootstrapService : ISystemBootstrapService
         if (string.IsNullOrWhiteSpace(fullName))
             throw new ArgumentException("FullName là bắt buộc");
 
-        var systemRole = await _roleRepository.GetRoleByNameAsync("SystemAdmin");
+        var systemRole = await _roleRepository.GetRoleByNameAsync(RoleConstants.SystemAdmin);
         if (systemRole == null)
             throw new InvalidOperationException("Thiếu role SystemAdmin. Hãy chạy seed roles trước.");
 

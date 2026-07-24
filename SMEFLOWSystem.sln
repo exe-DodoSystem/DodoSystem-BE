@@ -15,6 +15,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SMEFLOWSystem.WebAPI", "SME
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VNPAY.NET", "VNPAY.NET\VNPAY.NET.csproj", "{EF59F997-6F1C-4B7A-84CF-A1FF18B4418B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SMEFLOWSystem.Tests", "SMEFLOWSystem.Tests\SMEFLOWSystem.Tests.csproj", "{02B25C5A-D9D8-4D8F-ADCC-DBD7FE9F5703}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -45,6 +47,10 @@ Global
 		{EF59F997-6F1C-4B7A-84CF-A1FF18B4418B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EF59F997-6F1C-4B7A-84CF-A1FF18B4418B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EF59F997-6F1C-4B7A-84CF-A1FF18B4418B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{02B25C5A-D9D8-4D8F-ADCC-DBD7FE9F5703}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{02B25C5A-D9D8-4D8F-ADCC-DBD7FE9F5703}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{02B25C5A-D9D8-4D8F-ADCC-DBD7FE9F5703}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{02B25C5A-D9D8-4D8F-ADCC-DBD7FE9F5703}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Distributed;
-using ShareKernel.Common.Enum;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
+using SMEFLOWSystem.Application.Helpers;
 using SMEFLOWSystem.SharedKernel.Interfaces;
 using System.Globalization;
 using System.Text.Json;
@@ -12,11 +12,9 @@ public class ModuleAccessMiddleware
 {
     private readonly RequestDelegate _next;
 
-    private const int SubscriptionCacheSeconds = 300;
     private const int ModuleCacheSeconds = 3600;
 
     private sealed record ModuleCacheEntry(int Id);
-    private sealed record SubscriptionCacheEntry(string Status, DateTime EndDate);
 
     private static readonly (string Prefix, string ModuleCode)[] ProtectedPrefixes =
     {
@@ -90,31 +88,22 @@ public class ModuleAccessMiddleware
             return;
         }
 
-        var subCacheKey = $"moduleSub:tenant:{tenantId.Value}:module:{moduleEntry.Id}";
-        var subEntry = await GetFromDistributedCacheAsync<SubscriptionCacheEntry>(cache, subCacheKey);
-
-        if (subEntry == null)
-        {
-            var sub = await moduleSubscriptionRepo.GetByTenantAndModuleIgnoreTenantAsync(tenantId.Value, moduleEntry.Id);
-            if (sub != null)
-            {
-                subEntry = new SubscriptionCacheEntry(sub.Status ?? string.Empty, sub.EndDate);
-                await SetInDistributedCacheAsync(cache, subCacheKey, subEntry, TimeSpan.FromSeconds(SubscriptionCacheSeconds));
-            }
-        }
-
-        if (subEntry == null)
+        // Subscription state is security-sensitive. Read it directly so a SystemAdmin
+        // suspension takes effect immediately instead of waiting for a cache entry to expire.
+        var subscription = await moduleSubscriptionRepo
+            .GetByTenantAndModuleIgnoreTenantAsync(tenantId.Value, moduleEntry.Id);
+        if (subscription == null)
         {
             await WriteJsonErrorAsync(context, StatusCodes.Status403Forbidden, $"Bạn chưa đăng ký module {required.ModuleCode}");
             return;
         }
 
-        var now = DateTime.UtcNow;
-        var validStatus = string.Equals(subEntry.Status, StatusEnum.ModuleActive, StringComparison.OrdinalIgnoreCase)
-                          || string.Equals(subEntry.Status, StatusEnum.ModuleTrial, StringComparison.OrdinalIgnoreCase);
-        if (!validStatus || subEntry.EndDate <= now)
+        if (!ModuleSubscriptionRules.IsUsable(subscription, DateTime.UtcNow))
         {
-            await WriteJsonErrorAsync(context, StatusCodes.Status403Forbidden, $"Module {required.ModuleCode} đã hết hạn");
+            await WriteJsonErrorAsync(
+                context,
+                StatusCodes.Status403Forbidden,
+                $"Module {required.ModuleCode} đang tạm ngưng, chưa bắt đầu hoặc đã hết hạn");
             return;
         }
 

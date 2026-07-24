@@ -26,8 +26,12 @@ namespace SMEFLOWSystem.WebAPI.Filters
                 return;
             }
 
-            var subscription = await _moduleSubscriptionService.GetMyByModuleCodeAsync(attribute.ModuleCode);
-            if (subscription == null)
+            // Let the endpoint's authentication/authorization policy produce 401.
+            if (context.HttpContext.User.Identity?.IsAuthenticated != true)
+                return;
+
+            var hasAccess = await _moduleSubscriptionService.HasUsableModuleAsync(attribute.ModuleCode);
+            if (!hasAccess)
             {
                 context.Result = new ObjectResult(new
                 {

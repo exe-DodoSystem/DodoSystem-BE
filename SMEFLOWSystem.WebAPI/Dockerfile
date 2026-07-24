@@ -9,6 +9,7 @@ COPY SMEFLOWSystem.Infrastructure/SMEFLOWSystem.Infrastructure.csproj SMEFLOWSys
 COPY SMEFLOWSystem.SharedKernel/SMEFLOWSystem.SharedKernel.csproj SMEFLOWSystem.SharedKernel/
 COPY SMEFLOWSystem.Core/SMEFLOWSystem.Core.csproj SMEFLOWSystem.Core/
 COPY VNPAY.NET/VNPAY.NET.csproj VNPAY.NET/
+COPY SMEFLOWSystem.Tests/SMEFLOWSystem.Tests.csproj SMEFLOWSystem.Tests/
 
 RUN dotnet restore SMEFLOWSystem.sln
 

@@ -21,6 +21,7 @@
     <ProjectReference Include="..\SMEFLOWSystem.Application\SMEFLOWSystem.Application.csproj" />
     <ProjectReference Include="..\SMEFLOWSystem.Infrastructure\SMEFLOWSystem.Infrastructure.csproj" />
     <ProjectReference Include="..\SMEFLOWSystem.WebAPI\SMEFLOWSystem.WebAPI.csproj" />
+
   </ItemGroup>
 
   <ItemGroup>

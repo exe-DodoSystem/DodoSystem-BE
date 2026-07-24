@@ -20,5 +20,10 @@ namespace SMEFLOWSystem.Application.Interfaces.IRepositories
         Task<Tenant?> GetByOwnerUserIdIgnoreAsync(Guid ownerId);
 
         Task<(List<Tenant> Items, int TotalCount)> GetPagedIgnoreTenantAsync(int pageNumber, int pageSize);
+        Task UpdateStatusIgnoreTenantAsync(
+            Guid tenantId,
+            string status,
+            DateTime updatedAtUtc,
+            CancellationToken cancellationToken);
     }
 }

@@ -4,6 +4,7 @@ using SMEFLOWSystem.Application.DTOs.ModuleDtos;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Application.Interfaces.IServices;
 using SMEFLOWSystem.SharedKernel.Interfaces;
+using SMEFLOWSystem.Application.Helpers;
 
 namespace SMEFLOWSystem.Application.Services;
 
@@ -54,6 +55,18 @@ public class ModuleSubscriptionService : IModuleSubscriptionService
 
         var sub = await _moduleSubscriptionRepo.GetByTenantAndModuleIgnoreTenantAsync(tenantId, module.Id);
         return (sub == null || sub.IsDeleted) ? null : _mapper.Map<ModuleSubscriptionDto>(sub);
+    }
+
+    public async Task<bool> HasUsableModuleAsync(string code)
+    {
+        var tenantId = GetTenantIdOrThrow();
+        var module = await _moduleRepo.GetByCodeAsync(code);
+        if (module == null)
+            return false;
+
+        var subscription = await _moduleSubscriptionRepo
+            .GetByTenantAndModuleIgnoreTenantAsync(tenantId, module.Id);
+        return ModuleSubscriptionRules.IsUsable(subscription, DateTime.UtcNow);
     }
 
     public async Task<bool> CancelMyModuleSubscriptionAsync(int moduleId)

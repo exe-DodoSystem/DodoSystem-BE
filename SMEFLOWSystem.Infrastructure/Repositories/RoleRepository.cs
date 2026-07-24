@@ -29,7 +29,15 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
 
         public async Task<bool> ExistByNameAsync(string name)
         {
-            return await _context.Roles.AnyAsync(r => r.Name == name); 
+            var normalized = name.Trim().ToLower();
+            return await _context.Roles.AnyAsync(r => r.Name.ToLower() == normalized);
+        }
+
+        public async Task<bool> ExistsByNameExceptIdAsync(string name, int excludedRoleId)
+        {
+            var normalized = name.Trim().ToLower();
+            return await _context.Roles.AnyAsync(
+                r => r.Id != excludedRoleId && r.Name.ToLower() == normalized);
         }
 
         public async Task<List<Role>> GetAllRolesAsync()
@@ -47,7 +55,7 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
             return await _context.Roles.FirstOrDefaultAsync(r => r.Name == name);
         }
 
-        public async Task<Role?> UpdateRoleAsync(int id, string name, string description, bool isSystemRole)
+        public async Task<Role?> UpdateRoleAsync(int id, string name, string description)
         {
             var role = await _context.Roles.FirstOrDefaultAsync(r => r.Id == id);
             if (role == null)
@@ -56,8 +64,6 @@ namespace SMEFLOWSystem.Infrastructure.Repositories
             }
             role.Name = name;
             role.Description = description;
-            role.IsSystemRole = isSystemRole;
-
             await _context.SaveChangesAsync();
             return role;
         }

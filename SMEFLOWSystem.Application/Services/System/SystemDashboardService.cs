@@ -1,4 +1,3 @@
-using ShareKernel.Common.Enum;
 using SMEFLOWSystem.Application.DTOs.SystemDtos;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Application.Interfaces.IServices.System;
@@ -7,66 +6,93 @@ namespace SMEFLOWSystem.Application.Services.System;
 
 public class SystemDashboardService : ISystemDashboardService
 {
-    private readonly IModuleSubscriptionRepository _moduleSubscriptionRepository;
+    private readonly ISystemDashboardReadRepository _readRepository;
 
-    public SystemDashboardService(IModuleSubscriptionRepository moduleSubscriptionRepository)
+    public SystemDashboardService(ISystemDashboardReadRepository readRepository)
     {
-        _moduleSubscriptionRepository = moduleSubscriptionRepository;
+        _readRepository = readRepository;
     }
 
-    public async Task<List<ModuleUsageStatDto>> GetModuleUsageStatisticsAsync(int? month, int? year)
+    public Task<SystemDashboardOverviewDto> GetOverviewAsync(
+        int? month,
+        int? year,
+        CancellationToken cancellationToken = default)
     {
-        var targetMonth = month ?? DateTime.UtcNow.Month;
-        var targetYear = year ?? DateTime.UtcNow.Year;
-        
-        var startOfMonth = new DateTime(targetYear, targetMonth, 1, 0, 0, 0, DateTimeKind.Utc);
-        var endOfMonth = startOfMonth.AddMonths(1).AddSeconds(-1);
-
-        var subscriptions = await _moduleSubscriptionRepository.GetAllIgnoreTenantAsync();
-
-        var stats = subscriptions
-            .Where(s => s.StartDate <= endOfMonth && s.EndDate >= startOfMonth && 
-                        (s.Status == StatusEnum.ModuleActive || s.Status == StatusEnum.ModuleTrial))
-            .GroupBy(s => new { s.ModuleId, ModuleName = s.Module?.Name ?? "Unknown" })
-            .Select(g => new ModuleUsageStatDto
-            {
-                Month = targetMonth,
-                Year = targetYear,
-                ModuleId = g.Key.ModuleId,
-                ModuleName = g.Key.ModuleName,
-                ActiveCompaniesCount = g.Select(x => x.TenantId).Distinct().Count()
-            })
-            .ToList();
-
-        return stats;
+        var period = GetPeriod(month, year);
+        return _readRepository.GetOverviewAsync(
+            period.Start,
+            period.End,
+            DateOnly.FromDateTime(DateTime.UtcNow),
+            cancellationToken);
     }
 
-    public async Task<List<ModuleCancellationStatDto>> GetModuleCancellationStatisticsAsync(int? month, int? year)
+    public Task<List<ModuleUsageStatDto>> GetModuleUsageStatisticsAsync(
+        int? month,
+        int? year,
+        CancellationToken cancellationToken = default)
     {
-        var targetMonth = month ?? DateTime.UtcNow.Month;
-        var targetYear = year ?? DateTime.UtcNow.Year;
+        var period = GetPeriod(month, year);
+        return _readRepository.GetModuleUsageAsync(period.Start, period.End, cancellationToken);
+    }
 
-        var startOfMonth = new DateTime(targetYear, targetMonth, 1, 0, 0, 0, DateTimeKind.Utc);
-        var endOfMonth = startOfMonth.AddMonths(1).AddSeconds(-1);
+    public Task<List<ModuleCancellationStatDto>> GetModuleCancellationStatisticsAsync(
+        int? month,
+        int? year,
+        CancellationToken cancellationToken = default)
+    {
+        var period = GetPeriod(month, year);
+        return _readRepository.GetModuleCancellationsAsync(period.Start, period.End, cancellationToken);
+    }
 
-        var subscriptions = await _moduleSubscriptionRepository.GetAllIgnoreTenantAsync();
+    public Task<List<ModuleExpirationStatDto>> GetModuleExpirationStatisticsAsync(
+        int? month,
+        int? year,
+        CancellationToken cancellationToken = default)
+    {
+        var period = GetPeriod(month, year);
+        return _readRepository.GetModuleExpirationsAsync(period.Start, period.End, cancellationToken);
+    }
 
-        var stats = subscriptions
-            .Where(s => 
-                (s.Status == StatusEnum.ModuleSuspended && s.UpdatedAt >= startOfMonth && s.UpdatedAt <= endOfMonth) ||
-                (s.EndDate >= startOfMonth && s.EndDate <= endOfMonth)
-            )
-            .GroupBy(s => new { s.ModuleId, ModuleName = s.Module?.Name ?? "Unknown" })
-            .Select(g => new ModuleCancellationStatDto
-            {
-                Month = targetMonth,
-                Year = targetYear,
-                ModuleId = g.Key.ModuleId,
-                ModuleName = g.Key.ModuleName,
-                CancelledCompaniesCount = g.Select(x => x.TenantId).Distinct().Count()
-            })
-            .ToList();
+    public Task<SystemModuleTrendDto> GetModuleTrendsAsync(
+        SystemModuleTrendQueryDto query,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        var from = GetRequiredMonth(query.FromMonth, query.FromYear, "from");
+        var to = GetRequiredMonth(query.ToMonth, query.ToYear, "to");
+        if (from > to)
+            throw new ArgumentException("The trend start month must not be later than the end month.");
 
-        return stats;
+        var monthCount = ((to.Year - from.Year) * 12) + to.Month - from.Month + 1;
+        if (monthCount > 24)
+            throw new ArgumentException("The trend range cannot exceed 24 months.");
+
+        return _readRepository.GetModuleTrendsAsync(from, to.AddMonths(1), cancellationToken);
+    }
+
+    private static (DateTime Start, DateTime End) GetPeriod(int? month, int? year)
+    {
+        var now = DateTime.UtcNow;
+        var targetMonth = month ?? now.Month;
+        var targetYear = year ?? now.Year;
+
+        if (targetMonth is < 1 or > 12)
+            throw new ArgumentOutOfRangeException(nameof(month), "Month must be between 1 and 12.");
+
+        if (targetYear < 2020 || targetYear > now.Year + 1)
+            throw new ArgumentOutOfRangeException(nameof(year), $"Year must be between 2020 and {now.Year + 1}.");
+
+        var start = new DateTime(targetYear, targetMonth, 1, 0, 0, 0, DateTimeKind.Utc);
+        return (start, start.AddMonths(1));
+    }
+
+    private static DateTime GetRequiredMonth(int month, int year, string parameterName)
+    {
+        var now = DateTime.UtcNow;
+        if (month is < 1 or > 12)
+            throw new ArgumentOutOfRangeException(parameterName, "Month must be between 1 and 12.");
+        if (year < 2020 || year > now.Year + 1)
+            throw new ArgumentOutOfRangeException(parameterName, $"Year must be between 2020 and {now.Year + 1}.");
+        return new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Utc);
     }
 }
