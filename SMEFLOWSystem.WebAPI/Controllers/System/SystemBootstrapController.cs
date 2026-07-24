@@ -61,14 +61,20 @@ public class SystemBootstrapController : ControllerBase
         }
     }
 
-    /// <summary>[SystemAdmin] Reset bootstrap identity trong Development/Staging</summary>
+    /// <summary>[SystemAdmin] Reset bootstrap identity trong môi trường được bật maintenance gate</summary>
     [HttpDelete("reset")]
     [Authorize(Policy = PolicyNames.SystemAdmin)]
     public async Task<IActionResult> Reset(
         [FromBody] SystemBootstrapResetRequestDto request,
         CancellationToken cancellationToken)
     {
-        var environmentAllowed = _environment.IsDevelopment() || _environment.IsStaging();
+        var nonProductionEnvironmentAllowed =
+            _environment.IsDevelopment() || _environment.IsStaging();
+        var productionEnvironmentAllowed =
+            _environment.IsProduction()
+            && _configuration.GetValue<bool>("SystemBootstrap:AllowProductionReset");
+        var environmentAllowed =
+            nonProductionEnvironmentAllowed || productionEnvironmentAllowed;
         var configAllowed = _configuration.GetValue<bool>("SystemBootstrap:AllowReset");
         if (!environmentAllowed || !configAllowed)
             return NotFound();
