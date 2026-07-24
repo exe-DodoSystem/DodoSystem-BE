@@ -44,7 +44,10 @@ public class ModuleSubscriptionRepository : IModuleSubscriptionRepository
     public Task<List<ModuleSubscription>> GetByTenantIgnoreTenantAsync(Guid tenantId)
         => _context.ModuleSubscriptions
             .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Include(x => x.Module)
             .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+            .OrderBy(x => x.Module!.Name)
             .ToListAsync();
 
     public async Task<List<ModuleSubscription>> GetByTenantIdAsync(Guid tenantId)
@@ -61,5 +64,21 @@ public class ModuleSubscriptionRepository : IModuleSubscriptionRepository
             .Include(x => x.Module)
             .Where(x => !x.IsDeleted)
             .ToListAsync();
+    }
+
+    public Task<ModuleSubscription?> GetByIdIgnoreTenantAsync(
+        Guid subscriptionId,
+        CancellationToken cancellationToken)
+        => _context.ModuleSubscriptions
+            .IgnoreQueryFilters()
+            .Include(subscription => subscription.Module)
+            .Include(subscription => subscription.Tenant)
+            .FirstOrDefaultAsync(subscription => subscription.Id == subscriptionId, cancellationToken);
+
+    public async Task SaveSystemAdminChangesAsync(
+        ModuleSubscription subscription,
+        CancellationToken cancellationToken)
+    {
+        await _context.SaveChangesAsync(cancellationToken);
     }
 }

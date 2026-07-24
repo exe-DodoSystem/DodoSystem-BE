@@ -202,10 +202,7 @@ namespace SMEFLOWSystem.Application.Services
                 var subs = await _moduleSubscriptionRepo.GetByTenantIgnoreTenantAsync(tenant.Id);
                 var now = DateTime.UtcNow;
                 
-                var hasValidModule = subs.Any(s => !s.IsDeleted
-                                                   && (string.Equals(s.Status, StatusEnum.ModuleActive, StringComparison.OrdinalIgnoreCase)
-                                                       || string.Equals(s.Status, StatusEnum.ModuleTrial, StringComparison.OrdinalIgnoreCase))
-                                                   && s.EndDate > now);
+                var hasValidModule = subs.Any(s => ModuleSubscriptionRules.IsUsable(s, now));
                 isModulesExpired = !hasValidModule; 
             }
 

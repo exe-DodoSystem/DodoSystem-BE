@@ -11,8 +11,8 @@ namespace SMEFLOWSystem.Application.Interfaces.IServices
 {
     public interface IRoleService
     {
-        Task<Role> AddRoleAsync(RoleUpdatedDto role);
-        Task<Role> UpdateRoleAsync(int id, RoleUpdatedDto updatedDto);
+        Task<Role> AddRoleAsync(RoleCreateDto role);
+        Task<Role> UpdateRoleAsync(int id, RoleUpdateDto updatedDto);
         Task<Role> GetRoleByIdAsync(int id);
         Task<IEnumerable<RoleDto>> GetAllRolesAsync();
         Task<PagedResultDto<RoleDto>> GetAllRolesPagingAsync(PagingRequestDto request);

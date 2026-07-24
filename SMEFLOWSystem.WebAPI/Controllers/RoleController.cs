@@ -45,7 +45,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
 
         [Authorize(Policy = PolicyNames.SystemAdmin)]
         [HttpPost]
-        public async Task<IActionResult> CreateRole([FromBody] RoleUpdatedDto roleDto)
+        public async Task<IActionResult> CreateRole([FromBody] RoleCreateDto roleDto)
         {
             try
             {
@@ -54,14 +54,18 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             }
             catch (ArgumentException ex)
             {
-                return BadRequest(new { error = ex.Message });
+                return Problem(statusCode: 400, title: "Invalid role", detail: ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Problem(statusCode: 409, title: "Role conflict", detail: ex.Message);
             }
         }
         /// <summary>[SystemAdmin] Cập nhật thông tin Role</summary>
 
         [Authorize(Policy = PolicyNames.SystemAdmin)]
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateRole(int id, [FromBody] RoleUpdatedDto roleDto)
+        public async Task<IActionResult> UpdateRole(int id, [FromBody] RoleUpdateDto roleDto)
         {
             try
             {
@@ -74,7 +78,15 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             }
             catch (ArgumentException ex)
             {
-                return BadRequest(new { error = ex.Message });
+                return Problem(statusCode: 400, title: "Invalid role", detail: ex.Message);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return Problem(statusCode: 404, title: "Role not found", detail: ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Problem(statusCode: 409, title: "Role conflict", detail: ex.Message);
             }
         }
         /// <summary>Lấy danh sách Roles có phân trang</summary>

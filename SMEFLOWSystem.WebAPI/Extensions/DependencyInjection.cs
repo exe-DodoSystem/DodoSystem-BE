@@ -2,6 +2,7 @@ using FluentValidation.AspNetCore;
 using Hangfire;
 using Hangfire.Redis.StackExchange;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,6 +17,7 @@ using SMEFLOWSystem.WebAPI.Converters;
 using SMEFLOWSystem.WebAPI.Hubs;
 using SMEFLOWSystem.WebAPI.Filters;
 using SMEFLOWSystem.WebAPI.Services;
+using SMEFLOWSystem.WebAPI.Authorization;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
@@ -86,6 +88,7 @@ public static class DependencyInjection
         });
 
         services.AddHttpContextAccessor();
+        services.AddScoped<IAuthorizationHandler, ActiveSystemAdminHandler>();
         services.AddAuthorization(options =>
         {
             options.AddPolicy(PolicyNames.TenantAdmin, policy =>
@@ -101,7 +104,10 @@ public static class DependencyInjection
                 policy.RequireRole(RoleConstants.Employee));
 
             options.AddPolicy(PolicyNames.SystemAdmin, policy =>
-                policy.RequireRole(RoleConstants.SystemAdmin));
+            {
+                policy.RequireRole(RoleConstants.SystemAdmin);
+                policy.AddRequirements(new ActiveSystemAdminRequirement());
+            });
 
             // Composite policies
             options.AddPolicy(PolicyNames.HrAccess, policy =>

@@ -174,10 +174,7 @@ namespace SMEFLOWSystem.Application.Services
 
             var sub = await _moduleSubscriptionRepository.GetByTenantAndModuleIgnoreTenantAsync(invite.TenantId, module.Id);
             var now = DateTime.UtcNow;
-            var validStatus = sub != null
-                              && (string.Equals(sub.Status, StatusEnum.ModuleActive, StringComparison.OrdinalIgnoreCase)
-                                  || string.Equals(sub.Status, StatusEnum.ModuleTrial, StringComparison.OrdinalIgnoreCase))
-                              && sub.EndDate > now;
+            var validStatus = ModuleSubscriptionRules.IsUsable(sub, now);
             if (!validStatus)
                 throw new UnauthorizedAccessException("Bạn chưa đăng ký module HR");
 

@@ -59,8 +59,11 @@ public static class DependencyInjection
         services.AddScoped<AttendanceResolutionRecurringJob>();
 
         services.AddScoped<ISystemBootstrapService, SystemBootstrapService>();
+        services.AddScoped<ISystemBootstrapResetService, SystemBootstrapResetService>();
         services.AddScoped<ISystemTenantService, SystemTenantService>();
         services.AddScoped<ISystemDashboardService, SystemDashboardService>();
+        services.AddScoped<ISystemSubscriptionService, SystemSubscriptionService>();
+        services.AddScoped<ISystemBillingService, SystemBillingService>();
         return services;
     }
 }

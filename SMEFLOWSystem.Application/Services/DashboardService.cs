@@ -79,12 +79,7 @@ namespace SMEFLOWSystem.Application.Services
         {
             try
             {
-                var sub = await _moduleSubscription.GetMyByModuleCodeAsync(moduleCode);
-                if (sub == null) return false;
-                var now = DateTime.UtcNow;
-                return (string.Equals(sub.Status, StatusEnum.ModuleActive, StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(sub.Status, StatusEnum.ModuleTrial, StringComparison.OrdinalIgnoreCase))
-                       && sub.EndDate > now;
+                return await _moduleSubscription.HasUsableModuleAsync(moduleCode);
             }
             catch (Exception ex) when (ex is KeyNotFoundException || ex is UnauthorizedAccessException)
             {
