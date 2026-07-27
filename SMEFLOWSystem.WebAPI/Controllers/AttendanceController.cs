@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using SMEFLOWSystem.SharedKernel.Common;
 using SMEFLOWSystem.Application.DTOs.AttendanceDtos;
+using SMEFLOWSystem.Application.Exceptions;
 using SMEFLOWSystem.Application.Interfaces.IServices;
 using SMEFLOWSystem.WebAPI.Helpers;
 
@@ -37,15 +38,8 @@ public class AttendanceController : ControllerBase
             return Unauthorized(new { Error = "User is not authenticated correctly." });
         }
 
-        try
-        {
-            var result = await _service.SubmitPunchAsync(userId, request);
-            return Ok(new { Data = result, Message = "Punch submitted successfully" });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return MapSubmitPunchError(ex);
-        }
+        var result = await _service.SubmitPunchAsync(userId, request);
+        return Ok(new { Data = result, Message = "Punch submitted successfully" });
     }
 
     /// <summary>Gửi yêu cầu chấm công (multipart/form-data) kèm ảnh selfie</summary>
@@ -59,29 +53,10 @@ public class AttendanceController : ControllerBase
             return Unauthorized(new { Error = "User is not authenticated correctly." });
         }
 
-        try
-        {
-            request.SelfieBase64 ??=
-                await FormFileHelper.ToBase64DataUriAsync(selfie);
-            var result = await _service.SubmitPunchAsync(userId, request);
-            return Ok(new { Data = result, Message = "Punch submitted successfully" });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return MapSubmitPunchError(ex);
-        }
-    }
-
-    private IActionResult MapSubmitPunchError(InvalidOperationException exception)
-    {
-        if (exception.Message.StartsWith(
-            "Employee not found",
-            StringComparison.Ordinal))
-        {
-            return NotFound(new { Error = exception.Message });
-        }
-
-        return BadRequest(new { Error = exception.Message });
+        request.SelfieBase64 ??=
+            await FormFileHelper.ToBase64DataUriAsync(selfie);
+        var result = await _service.SubmitPunchAsync(userId, request);
+        return Ok(new { Data = result, Message = "Punch submitted successfully" });
     }
 
     /// <summary>Lấy thông tin chấm công hôm nay của user đăng nhập</summary>
@@ -92,15 +67,8 @@ public class AttendanceController : ControllerBase
         if (!Guid.TryParse(userIdClaim, out var userId))
             return Unauthorized();
 
-        try
-        {
-            var result = await _service.GetMyTodayStatusAsync(userId);
-            return Ok(new { Data = result });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return NotFound(new { Error = ex.Message });
-        }
+        var result = await _service.GetMyTodayStatusAsync(userId);
+        return Ok(new { Data = result });
     }
 
     /// <summary>Lấy lịch sử chấm công của user đăng nhập theo tháng/năm</summary>
@@ -111,15 +79,8 @@ public class AttendanceController : ControllerBase
         if (!Guid.TryParse(userIdClaim, out var userId))
             return Unauthorized();
 
-        try
-        {
-            var result = await _service.GetMyHistoryAsync(userId, month, year);
-            return Ok(new { Data = result });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return NotFound(new { Error = ex.Message });
-        }
+        var result = await _service.GetMyHistoryAsync(userId, month, year);
+        return Ok(new { Data = result });
     }
 
     /// <summary>[Admin, HR] Chấm công bằng tay cho nhân viên</summary>
@@ -127,15 +88,8 @@ public class AttendanceController : ControllerBase
     [Authorize(Policy = PolicyNames.AdminOrHr)]
     public async Task<IActionResult> ManualPunch([FromBody] ManualPunchRequestDto request)
     {
-        try
-        {
-            var result = await _service.ManualPunchAsync(request);
-            return Ok(new { Data = result, Message = "Chấm công bằng tay thành công (HR Manual Punch)." });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { Error = ex.Message });
-        }
+        var result = await _service.ManualPunchAsync(request);
+        return Ok(new { Data = result, Message = "Chấm công bằng tay thành công (HR Manual Punch)." });
     }
 
     /// <summary>[Admin, HR] Tính toán lại công cho nhân viên trong 1 khoảng thời gian</summary>
@@ -143,20 +97,23 @@ public class AttendanceController : ControllerBase
     [Authorize(Policy = PolicyNames.AdminOrHr)]
     public async Task<IActionResult> RecalculateAttendance(Guid employeeId, [FromQuery] string fromDate, [FromQuery] string toDate)
     {
-        try
+        if (!DateOnly.TryParse(fromDate, out var from) ||
+            !DateOnly.TryParse(toDate, out var to))
         {
-            var from = DateOnly.Parse(fromDate);
-            var to = DateOnly.Parse(toDate);
-
-            if (from > to) return BadRequest(new { Error = "Từ ngày không thể lớn hơn Đến ngày" });
-
-            await _service.RecalculateAttendanceAsync(employeeId, from, to);
-            return Ok(new { Message = $"Đã phát lệnh chạy lại Engine từ ngày {from} đến ngày {to}. Kết quả sẽ có sau ít phút." });
+            throw new BusinessRuleException(
+                "Ngày bắt đầu hoặc ngày kết thúc không hợp lệ.",
+                "ATTENDANCE_INVALID_DATE_RANGE");
         }
-        catch (Exception ex)
+
+        if (from > to)
         {
-            return BadRequest(new { Error = ex.Message });
+            throw new BusinessRuleException(
+                "Từ ngày không thể lớn hơn Đến ngày",
+                "ATTENDANCE_INVALID_DATE_RANGE");
         }
+
+        await _service.RecalculateAttendanceAsync(employeeId, from, to);
+        return Ok(new { Message = $"Đã phát lệnh chạy lại Engine từ ngày {from} đến ngày {to}. Kết quả sẽ có sau ít phút." });
     }
 
     /// <summary>Gửi yêu cầu giải trình công (Appeal)</summary>
@@ -167,15 +124,8 @@ public class AttendanceController : ControllerBase
         if (!Guid.TryParse(userIdClaim, out var userId))
             return Unauthorized();
 
-        try
-        {
-            var result = await _service.SubmitAppealAsync(userId, request);
-            return Ok(new { Data = result, Message = "Đã gửi yêu cầu giải trình công thành công." });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Error = ex.Message });
-        }
+        var result = await _service.SubmitAppealAsync(userId, request);
+        return Ok(new { Data = result, Message = "Đã gửi yêu cầu giải trình công thành công." });
     }
 
     /// <summary>Lấy danh sách các yêu cầu giải trình của user đăng nhập</summary>
@@ -186,15 +136,8 @@ public class AttendanceController : ControllerBase
         if (!Guid.TryParse(userIdClaim, out var userId))
             return Unauthorized();
 
-        try
-        {
-            var result = await _service.GetMyAppealsAsync(userId);
-            return Ok(new { Data = result });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Error = ex.Message });
-        }
+        var result = await _service.GetMyAppealsAsync(userId);
+        return Ok(new { Data = result });
     }
 
     /// <summary>[Admin, HR] Lấy danh sách các yêu cầu giải trình đang chờ duyệt</summary>
@@ -202,15 +145,8 @@ public class AttendanceController : ControllerBase
     [Authorize(Policy = PolicyNames.AdminOrHr)]
     public async Task<IActionResult> GetPendingAppeals()
     {
-        try
-        {
-            var result = await _service.GetPendingAppealsAsync();
-            return Ok(new { Data = result });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Error = ex.Message });
-        }
+        var result = await _service.GetPendingAppealsAsync();
+        return Ok(new { Data = result });
     }
 
     /// <summary>[Admin, HR] Xử lý (Duyệt/Từ chối) yêu cầu giải trình</summary>
@@ -222,16 +158,9 @@ public class AttendanceController : ControllerBase
         if (!Guid.TryParse(userIdClaim, out var hrUserId))
             return Unauthorized();
 
-        try
-        {
-            var result = await _service.ProcessAppealAsync(hrUserId, appealId, request);
-            var statusStr = request.IsApproved ? "Duyệt" : "Từ chối";
-            return Ok(new { Data = result, Message = $"Đã {statusStr} yêu cầu giải trình thành công." });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Error = ex.Message });
-        }
+        var result = await _service.ProcessAppealAsync(hrUserId, appealId, request);
+        var statusStr = request.IsApproved ? "Duyệt" : "Từ chối";
+        return Ok(new { Data = result, Message = $"Đã {statusStr} yêu cầu giải trình thành công." });
     }
 
     /// <summary>[Admin, HR] Lấy báo cáo chấm công tháng của tất cả nhân viên</summary>
@@ -239,18 +168,7 @@ public class AttendanceController : ControllerBase
     [Authorize(Policy = PolicyNames.HrAccess)]
     public async Task<IActionResult> GetHRMonthlyReport([FromQuery] int month, [FromQuery] int year)
     {
-        try
-        {
-            var result = await _service.GetHRMonthlyReportAsync(month, year);
-            return Ok(new { Data = result });
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            return Unauthorized(new { Error = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Error = ex.Message });
-        }
+        var result = await _service.GetHRMonthlyReportAsync(month, year);
+        return Ok(new { Data = result });
     }
 }

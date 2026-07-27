@@ -28,19 +28,9 @@ public class HrManualTimesheetsController : ControllerBase
     [Authorize(Policy = PolicyNames.AdminOrHr)]
     public async Task<IActionResult> UpsertManualTimesheet([FromBody] ManualMonthlyTimesheetUpsertDto request)
     {
-        var tenantId = _currentTenantService.TenantId;
-        if (!tenantId.HasValue)
-            return Unauthorized(new { Error = "Không tìm thấy tenant" });
-
-        try
-        {
-            var result = await _service.UpsertAsync(tenantId.Value, request);
-            return Ok(new { Data = result, Message = "Lưu bảng công nhập tay thành công." });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Error = ex.Message });
-        }
+        var tenantId = RequireTenantId();
+        var result = await _service.UpsertAsync(tenantId, request);
+        return Ok(new { Data = result, Message = "Lưu bảng công nhập tay thành công." });
     }
 
     /// <summary>[Admin, HR, Manager] Lấy danh sách bảng công nhập tay theo tháng/năm</summary>
@@ -48,19 +38,9 @@ public class HrManualTimesheetsController : ControllerBase
     [Authorize(Policy = PolicyNames.HrAccess)]
     public async Task<IActionResult> GetManualTimesheets([FromQuery] int month, [FromQuery] int year)
     {
-        var tenantId = _currentTenantService.TenantId;
-        if (!tenantId.HasValue)
-            return Unauthorized(new { Error = "Không tìm thấy tenant" });
-
-        try
-        {
-            var result = await _service.GetByMonthAsync(tenantId.Value, month, year);
-            return Ok(new { Data = result });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Error = ex.Message });
-        }
+        var tenantId = RequireTenantId();
+        var result = await _service.GetByMonthAsync(tenantId, month, year);
+        return Ok(new { Data = result });
     }
 
     /// <summary>[Admin, HR] Xóa bảng công nhập tay theo ID</summary>
@@ -68,22 +48,21 @@ public class HrManualTimesheetsController : ControllerBase
     [Authorize(Policy = PolicyNames.AdminOrHr)]
     public async Task<IActionResult> DeleteManualTimesheet(Guid id)
     {
-        var tenantId = _currentTenantService.TenantId;
-        if (!tenantId.HasValue)
-            return Unauthorized(new { Error = "Không tìm thấy tenant" });
+        var tenantId = RequireTenantId();
+        var success = await _service.DeleteAsync(tenantId, id);
+        if (!success)
+        {
+            throw new KeyNotFoundException(
+                "Không tìm thấy bảng công hoặc không có quyền xóa.");
+        }
 
-        try
-        {
-            var success = await _service.DeleteAsync(tenantId.Value, id);
-            if (!success)
-            {
-                return NotFound(new { Message = "Không tìm thấy bảng công hoặc không có quyền xóa." });
-            }
-            return Ok(new { Message = "Xóa bảng công nhập tay thành công." });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Error = ex.Message });
-        }
+        return Ok(new { Message = "Xóa bảng công nhập tay thành công." });
+    }
+
+    private Guid RequireTenantId()
+    {
+        return _currentTenantService.TenantId
+            ?? throw new UnauthorizedAccessException(
+                "Không tìm thấy tenant.");
     }
 }

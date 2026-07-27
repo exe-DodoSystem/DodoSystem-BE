@@ -28,15 +28,8 @@ namespace SMEFLOWSystem.WebAPI.Controllers
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterRequestDto request)
         {
-            try
-            {
-                var result = await _authService.RegisterTenantAsync(request);
-                return Ok("Đăng ký công ty thành công");
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { Error = ex.Message });
-            }
+            await _authService.RegisterTenantAsync(request);
+            return Ok("Đăng ký công ty thành công");
         }
 
 
@@ -44,15 +37,8 @@ namespace SMEFLOWSystem.WebAPI.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
         {
-            try
-            {
-                var user = await _authService.LoginAsync(request);
-                return Ok(user);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { Error = ex.Message });
-            }
+            var user = await _authService.LoginAsync(request);
+            return Ok(user);
         }
 
         /// <summary>Đổi mật khẩu (dành cho user đã đăng nhập)</summary>
@@ -63,18 +49,12 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (userIdClaim == null || !Guid.TryParse(userIdClaim, out var userId))
                 return Unauthorized("Không tìm thấy user");
-            try
-            {
-                var (isSuccess, message) = await _authService.ChangePasswordAsync(userId, request);
-                if (isSuccess)
-                    return Ok(new { Message = message });
-                else
-                    return BadRequest(new { Error = message });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { Error = ex.Message });
-            }
+
+            var (isSuccess, message) = await _authService.ChangePasswordAsync(userId, request);
+            if (isSuccess)
+                return Ok(new { Message = message });
+
+            return BadRequest(new { Error = message });
         }
 
         /// <summary>Yêu cầu gửi OTP quên mật khẩu</summary>

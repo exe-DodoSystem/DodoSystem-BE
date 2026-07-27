@@ -10,5 +10,10 @@ namespace SMEFLOWSystem.Application.DTOs.AttendanceDtos
         public string? DeviceId { get; set; }
         public string? PunchType { get; set; } = "Auto";
         public bool IsMockLocation { get; set; } = false; // Phát hiện fake GPS từ mobile app
+        /// <summary>
+        /// Khóa idempotency do client sinh. Giữ nguyên giá trị này khi retry
+        /// cùng một thao tác chấm công.
+        /// </summary>
+        public string? ClientRequestId { get; set; }
     }
 }

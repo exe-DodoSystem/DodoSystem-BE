@@ -16,6 +16,7 @@ using System.Security.Cryptography;
 using SMEFLOWSystem.Application.Events.Payments;
 using SMEFLOWSystem.Application.Events.Notification;
 using SMEFLOWSystem.Application.DTOs.PaymentDtos;
+using SMEFLOWSystem.Application.Exceptions;
 using System.Text.RegularExpressions;
 
 namespace SMEFLOWSystem.Application.Services
@@ -69,15 +70,20 @@ namespace SMEFLOWSystem.Application.Services
         public async Task<string> CreatePaymentUrlAsync(Guid orderId, string? clientIp = null)
         {
             var billingOrder = await _billingOrderRepo.GetByIdIgnoreTenantAsync(orderId);
-            if (billingOrder == null) throw new Exception("Không tìm thấy đơn thanh toán");
+            if (billingOrder == null)
+                throw new KeyNotFoundException("Không tìm thấy đơn thanh toán");
 
             if (!string.Equals(billingOrder.PaymentStatus, StatusEnum.PaymentPending, StringComparison.OrdinalIgnoreCase)
                 || !string.Equals(billingOrder.Status, StatusEnum.OrderPending, StringComparison.OrdinalIgnoreCase))
             {
-                throw new Exception("Đơn thanh toán không ở trạng thái chờ thanh toán");
+                throw new ConflictException(
+                    "Đơn thanh toán không ở trạng thái chờ thanh toán",
+                    "PAYMENT_ORDER_NOT_PENDING");
             }
 
-            var gateway = _config["Payment:Gateway"] ?? throw new Exception("Missing config: Payment:Gateway");
+            var gateway = _config["Payment:Gateway"]
+                ?? throw new InvalidOperationException(
+                    "Missing config: Payment:Gateway");
             if (gateway == "VNPay")
             {
                 return CreateVNPayUrl(billingOrder, clientIp);
@@ -86,7 +92,8 @@ namespace SMEFLOWSystem.Application.Services
             {
                 return CreateSePayPaymentInfo(billingOrder);
             }
-            throw new Exception($"Unsupported payment gateway: {gateway}");
+            throw new InvalidOperationException(
+                $"Unsupported payment gateway: {gateway}");
         }
 
         public async Task<string?> ProcessVNPayCallbackAsync(IQueryCollection query)
@@ -107,7 +114,8 @@ namespace SMEFLOWSystem.Application.Services
 
             // Callback has no tenant context -> bypass tenant filters when loading order.
             var orderForTenant = await _billingOrderRepo.GetByIdIgnoreTenantAsync(orderId);
-            if (orderForTenant == null) throw new Exception("Không tìm thấy đơn thanh toán");
+            if (orderForTenant == null)
+                throw new KeyNotFoundException("Không tìm thấy đơn thanh toán");
 
             // Validate amount — VNPay returns amount in minor units (x100)
             var vnpAmountStr = query
@@ -116,10 +124,14 @@ namespace SMEFLOWSystem.Application.Services
                 .FirstOrDefault();
 
             if (string.IsNullOrWhiteSpace(vnpAmountStr))
-                throw new Exception("Missing vnp_Amount");
+                throw new BusinessRuleException(
+                    "Missing vnp_Amount",
+                    "PAYMENT_AMOUNT_REQUIRED");
 
             if (!long.TryParse(vnpAmountStr, out var amountMinor) || amountMinor <= 0)
-                throw new Exception("Invalid vnp_Amount");
+                throw new BusinessRuleException(
+                    "Invalid vnp_Amount",
+                    "PAYMENT_INVALID_AMOUNT");
 
             var amount = amountMinor / 100m;
 
@@ -127,10 +139,14 @@ namespace SMEFLOWSystem.Application.Services
             var discount = orderForTenant.DiscountAmount ?? 0m;
             var expectedPayable = orderForTenant.TotalAmount - discount;
             if (expectedPayable <= 0m)
-                throw new Exception("Đơn thanh toán không hợp lệ (số tiền phải > 0)");
+                throw new BusinessRuleException(
+                    "Đơn thanh toán không hợp lệ (số tiền phải > 0)",
+                    "PAYMENT_INVALID_ORDER_AMOUNT");
             var expectedMinor = checked((long)decimal.Round(expectedPayable * 100m, 0, MidpointRounding.AwayFromZero));
             if (amountMinor != expectedMinor)
-                throw new Exception("Số tiền thanh toán không khớp đơn hàng");
+                throw new BusinessRuleException(
+                    "Số tiền thanh toán không khớp đơn hàng",
+                    "PAYMENT_AMOUNT_MISMATCH");
 
             var vnpResponseCode = query
                 .Where(q => q.Key.Equals("vnp_ResponseCode", StringComparison.OrdinalIgnoreCase))
@@ -152,7 +168,9 @@ namespace SMEFLOWSystem.Application.Services
                 if (existingInside != null) return;
 
                 var order = await _billingOrderRepo.GetByIdIgnoreTenantAsync(orderId);
-                if (order == null) throw new Exception("Không tìm thấy đơn thanh toán");
+                if (order == null)
+                    throw new KeyNotFoundException(
+                        "Không tìm thấy đơn thanh toán");
 
                 var paymentTransaction = new PaymentTransaction
                 {
@@ -233,17 +251,24 @@ namespace SMEFLOWSystem.Application.Services
         public async Task<string> BuildSimulatedVNPaySuccessQueryStringAsync(Guid orderId, string? gatewayTransactionId = null)
         {
             var order = await _billingOrderRepo.GetByIdIgnoreTenantAsync(orderId);
-            if (order == null) throw new Exception("Không tìm thấy đơn thanh toán");
+            if (order == null)
+                throw new KeyNotFoundException("Không tìm thấy đơn thanh toán");
 
             var discount = order.DiscountAmount ?? 0m;
             var payable = order.TotalAmount - discount;
             if (payable <= 0m)
-                throw new Exception("Đơn thanh toán không hợp lệ (số tiền phải > 0)");
+                throw new BusinessRuleException(
+                    "Đơn thanh toán không hợp lệ (số tiền phải > 0)",
+                    "PAYMENT_INVALID_ORDER_AMOUNT");
 
             var expectedMinor = checked((long)decimal.Round(payable * 100m, 0, MidpointRounding.AwayFromZero));
 
-            var tmnCode = _config["Payment:VNPay:TmnCode"] ?? throw new Exception("Missing config: Payment:VNPay:TmnCode");
-            var hashSecret = _config["Payment:VNPay:HashSecret"] ?? throw new Exception("Missing config: Payment:VNPay:HashSecret");
+            var tmnCode = _config["Payment:VNPay:TmnCode"]
+                ?? throw new InvalidOperationException(
+                    "Missing config: Payment:VNPay:TmnCode");
+            var hashSecret = _config["Payment:VNPay:HashSecret"]
+                ?? throw new InvalidOperationException(
+                    "Missing config: Payment:VNPay:HashSecret");
 
             var vnTime = TimeZoneInfo.ConvertTimeFromUtc(
                 DateTime.UtcNow,
@@ -278,18 +303,20 @@ namespace SMEFLOWSystem.Application.Services
         {
             string? ownerEmail = null;
             string? tenantName = null;
-            bool shouldSendEmail = false;
 
             await _transaction.ExecuteAsync(async () =>
             {
                 var order = await _billingOrderRepo.GetByIdIgnoreTenantAsync(orderId);
-                if (order == null) throw new Exception("Không tìm thấy đơn thanh toán");
+                if (order == null)
+                    throw new KeyNotFoundException(
+                        "Không tìm thấy đơn thanh toán");
 
                 if (!string.Equals(order.PaymentStatus, StatusEnum.PaymentPaid, StringComparison.OrdinalIgnoreCase))
                     return;
 
                 var tenant = await _tenantRepo.GetByIdIgnoreTenantAsync(order.TenantId);
-                if (tenant == null) throw new Exception("Không tìm thấy tenant");
+                if (tenant == null)
+                    throw new KeyNotFoundException("Không tìm thấy tenant");
 
                 tenantName = tenant.Name;
 
@@ -299,7 +326,8 @@ namespace SMEFLOWSystem.Application.Services
 
                 var orderModules = await _billingOrderModuleRepo.GetByBillingOrderIdIgnoreTenantAsync(order.Id);
                 if (orderModules.Count == 0)
-                    throw new Exception("Đơn thanh toán không có module nào");
+                    throw new InvalidOperationException(
+                        "Đơn thanh toán không có module nào");
 
                 var now = DateTime.UtcNow;
                 DateTime maxEndDate = now;
@@ -360,7 +388,9 @@ namespace SMEFLOWSystem.Application.Services
             var discount = order.DiscountAmount ?? 0m;
             var payable = order.TotalAmount - discount;
             if (payable <= 0m)
-                throw new Exception("Đơn thanh toán không hợp lệ (số tiền phải > 0)");
+                throw new BusinessRuleException(
+                    "Đơn thanh toán không hợp lệ (số tiền phải > 0)",
+                    "PAYMENT_INVALID_ORDER_AMOUNT");
 
             var ipAddress = clientIp ?? "127.0.0.1";
 
@@ -387,10 +417,18 @@ namespace SMEFLOWSystem.Application.Services
         /// </summary>
         private void InitializeVnpay()
         {
-            var vnpUrl = _config["Payment:VNPay:BaseUrl"] ?? throw new Exception("Missing config: Payment:VNPay:BaseUrl");
-            var tmnCode = _config["Payment:VNPay:TmnCode"] ?? throw new Exception("Missing config: Payment:VNPay:TmnCode");
-            var hashSecret = _config["Payment:VNPay:HashSecret"] ?? throw new Exception("Missing config: Payment:VNPay:HashSecret");
-            var callbackUrl = _config["Payment:VNPay:CallbackUrl"] ?? throw new Exception("Missing config: Payment:VNPay:CallbackUrl");
+            var vnpUrl = _config["Payment:VNPay:BaseUrl"]
+                ?? throw new InvalidOperationException(
+                    "Missing config: Payment:VNPay:BaseUrl");
+            var tmnCode = _config["Payment:VNPay:TmnCode"]
+                ?? throw new InvalidOperationException(
+                    "Missing config: Payment:VNPay:TmnCode");
+            var hashSecret = _config["Payment:VNPay:HashSecret"]
+                ?? throw new InvalidOperationException(
+                    "Missing config: Payment:VNPay:HashSecret");
+            var callbackUrl = _config["Payment:VNPay:CallbackUrl"]
+                ?? throw new InvalidOperationException(
+                    "Missing config: Payment:VNPay:CallbackUrl");
 
             _vnpay.Initialize(tmnCode, hashSecret, vnpUrl, callbackUrl);
         }
@@ -398,17 +436,22 @@ namespace SMEFLOWSystem.Application.Services
         private string CreateSePayPaymentInfo(BillingOrder order)
         {
             var bankAccount = _config["Payment:SePay:BankAccountNumber"]
-                ?? throw new Exception("Missing config: Payment:SePay:BankAccountNumber");
+                ?? throw new InvalidOperationException(
+                    "Missing config: Payment:SePay:BankAccountNumber");
             var bankName = _config["Payment:SePay:BankAccountName"]
-                ?? throw new Exception("Missing config: Payment:SePay:BankAccountName");
+                ?? throw new InvalidOperationException(
+                    "Missing config: Payment:SePay:BankAccountName");
             var bankCode = _config["Payment:SePay:BankCode"]
-                ?? throw new Exception("Missing config: Payment:SePay:BankCode");
+                ?? throw new InvalidOperationException(
+                    "Missing config: Payment:SePay:BankCode");
             var prefix = _config["Payment:SePay:PaymentContentPrefix"] ?? "DODO";
 
             var discount = order.DiscountAmount ?? 0m;
             var payable = order.TotalAmount - discount;
             if (payable <= 0m)
-                throw new Exception("Đơn thanh toán không hợp lệ (số tiền phải > 0)");
+                throw new BusinessRuleException(
+                    "Đơn thanh toán không hợp lệ (số tiền phải > 0)",
+                    "PAYMENT_INVALID_ORDER_AMOUNT");
 
             // Nội dung CK: "DODO SUB-xxxxxxx" (dùng BillingOrderNumber)
             var transferContent = $"{prefix} {order.BillingOrderNumber}";

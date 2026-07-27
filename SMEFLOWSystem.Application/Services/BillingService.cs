@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using ShareKernel.Common.Enum;
 using SMEFLOWSystem.Application.Events.Notification;
+using SMEFLOWSystem.Application.Exceptions;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Application.Interfaces.IServices;
 using SMEFLOWSystem.Core.Entities;
@@ -71,7 +72,8 @@ namespace SMEFLOWSystem.Application.Services
             var paymentUrl = await _paymentService.CreatePaymentUrlAsync(orderId, clientIp);
 
             var order = await _billingOrderRepo.GetByIdIgnoreTenantAsync(orderId);
-            if (order == null) throw new Exception("Không tìm thấy đơn thanh toán");
+            if (order == null)
+                throw new KeyNotFoundException("Không tìm thấy đơn thanh toán");
 
             var orderLines = await _billingOrderModuleRepo.GetByBillingOrderIdIgnoreTenantAsync(orderId);
             var moduleIds = orderLines.Select(x => x.ModuleId).Distinct().ToArray();

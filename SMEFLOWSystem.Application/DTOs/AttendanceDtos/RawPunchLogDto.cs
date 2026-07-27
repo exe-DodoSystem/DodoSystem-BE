@@ -10,5 +10,6 @@ namespace SMEFLOWSystem.Application.DTOs.AttendanceDtos
         public string? DeviceId { get; set; }
         public bool IsProcessed { get; set; }
         public string PunchType { get; set; } = "Auto";
+        public string? ClientRequestId { get; set; }
     }
 }

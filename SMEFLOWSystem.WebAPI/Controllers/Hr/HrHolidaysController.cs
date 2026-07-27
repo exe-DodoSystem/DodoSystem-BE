@@ -25,15 +25,8 @@ public class HrHolidaysController : ControllerBase
     [Authorize(Policy = PolicyNames.AdminOrHr)]
     public async Task<IActionResult> CreatePublicHoliday([FromBody] CreatePublicHolidayDto request)
     {
-        try
-        {
-            var result = await _service.CreatePublicHolidayAsync(request);
-            return Ok(new { Data = result, Message = "Tạo ngày nghỉ lễ thành công." });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Error = ex.Message });
-        }
+        var result = await _service.CreatePublicHolidayAsync(request);
+        return Ok(new { Data = result, Message = "Tạo ngày nghỉ lễ thành công." });
     }
 
     /// <summary>[Admin, HR] Lấy danh sách các ngày nghỉ lễ</summary>
@@ -41,15 +34,8 @@ public class HrHolidaysController : ControllerBase
     [Authorize(Policy = PolicyNames.HrAccess)]
     public async Task<IActionResult> GetPublicHolidays()
     {
-        try
-        {
-            var result = await _service.GetPublicHolidaysAsync();
-            return Ok(new { Data = result });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Error = ex.Message });
-        }
+        var result = await _service.GetPublicHolidaysAsync();
+        return Ok(new { Data = result });
     }
 
     /// <summary>[Admin, HR] Xóa ngày nghỉ lễ theo ID</summary>
@@ -57,14 +43,7 @@ public class HrHolidaysController : ControllerBase
     [Authorize(Policy = PolicyNames.AdminOrHr)]
     public async Task<IActionResult> DeletePublicHoliday(Guid id)
     {
-        try
-        {
-            await _service.DeletePublicHolidayAsync(id);
-            return Ok(new { Message = "Xóa ngày nghỉ lễ thành công." });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Error = ex.Message });
-        }
+        await _service.DeletePublicHolidayAsync(id);
+        return Ok(new { Message = "Xóa ngày nghỉ lễ thành công." });
     }
 }

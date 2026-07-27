@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using SMEFLOWSystem.Application.Interfaces.IServices;
+using SMEFLOWSystem.WebAPI.Exceptions;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -33,13 +34,14 @@ namespace SMEFLOWSystem.WebAPI.Filters
             var hasAccess = await _moduleSubscriptionService.HasUsableModuleAsync(attribute.ModuleCode);
             if (!hasAccess)
             {
-                context.Result = new ObjectResult(new
-                {
-                    message = $"Module '{attribute.ModuleCode}' chưa được kích hoạt trong subscription của bạn."
-                })
-                {
-                    StatusCode = 403
-                };
+                var problem = ApiProblemDetailsFactory.Create(
+                    context.HttpContext,
+                    StatusCodes.Status403Forbidden,
+                    "Forbidden",
+                    $"Module '{attribute.ModuleCode}' chưa được kích hoạt trong subscription của bạn.",
+                    "MODULE_ACCESS_FORBIDDEN");
+                context.Result =
+                    ApiProblemDetailsFactory.CreateResult(problem);
             }
         }
     }

@@ -68,7 +68,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
                     ? $"{frontendUrl}/payment/success?orderId={vnp_TxnRef}"
                     : $"{frontendUrl}/payment/failed?orderId={vnp_TxnRef}");
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return Redirect($"{frontendUrl}/payment/error");
             }

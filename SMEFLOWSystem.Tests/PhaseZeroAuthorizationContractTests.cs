@@ -78,7 +78,7 @@ public sealed class PhaseZeroAuthorizationContractTests
             nameof(IManualMonthlyTimesheetRepository.GetByTenantMonthYearAsync));
     }
 
-    [KnownBugFact("BE-MGR-06")]
+    [Fact]
     [Trait("Phase", "0")]
     [Trait("Gap", "BE-MGR-06")]
     public void WebApi_HasAGlobalExceptionHandler()

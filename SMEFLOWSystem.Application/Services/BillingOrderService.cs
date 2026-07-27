@@ -1,6 +1,7 @@
 using AutoMapper;
 using ShareKernel.Common.Enum;
 using SMEFLOWSystem.Application.DTOs.ModuleDtos;
+using SMEFLOWSystem.Application.Exceptions;
 using SMEFLOWSystem.Application.Helpers;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Application.Interfaces.IServices;
@@ -38,11 +39,15 @@ public class BillingOrderService : IBillingOrderService
         DateTime? prorateUntilUtc = null)
     {
         if (moduleIds == null || moduleIds.Count == 0)
-            throw new Exception("Vui lòng chọn ít nhất 1 module!");
+            throw new BusinessRuleException(
+                "Vui lòng chọn ít nhất 1 module!",
+                "BILLING_MODULE_REQUIRED");
 
         var modules = await _moduleRepo.GetByIdsAsync(moduleIds);
         if (modules.Count != moduleIds.Distinct().Count())
-            throw new Exception("Có module không tồn tại hoặc đang bị tắt!");
+            throw new BusinessRuleException(
+                "Có module không tồn tại hoặc đang bị tắt!",
+                "BILLING_INVALID_MODULE");
 
         var existingSubscriptions = await _moduleSubscriptionRepo.GetByTenantIdAsync(tenantId);
         var now = DateTime.UtcNow;
@@ -54,7 +59,9 @@ public class BillingOrderService : IBillingOrderService
             if (existingSub != null && existingSub.EndDate > now)
             {
                 var moduleCode = modules.First(m => m.Id == moduleId).Code;
-                throw new Exception($"Module {moduleCode} đã được đăng ký và còn hạn đến {existingSub.EndDate:dd/MM/yyyy}!");
+                throw new ConflictException(
+                    $"Module {moduleCode} đã được đăng ký và còn hạn đến {existingSub.EndDate:dd/MM/yyyy}!",
+                    "BILLING_MODULE_ALREADY_ACTIVE");
             }
         }
 

@@ -3,6 +3,7 @@ using Hangfire;
 using Hangfire.Redis.StackExchange;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,6 +19,8 @@ using SMEFLOWSystem.WebAPI.Hubs;
 using SMEFLOWSystem.WebAPI.Filters;
 using SMEFLOWSystem.WebAPI.Services;
 using SMEFLOWSystem.WebAPI.Authorization;
+using SMEFLOWSystem.WebAPI.Exceptions;
+using SMEFLOWSystem.WebAPI.OpenApi;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
@@ -43,6 +46,32 @@ public static class DependencyInjection
             {
                 options.JsonSerializerOptions.Converters.Add(new TimeSpanJsonConverter());
             });
+        services.AddProblemDetails();
+        services.AddExceptionHandler<ApiExceptionHandler>();
+        services.Configure<ApiBehaviorOptions>(options =>
+        {
+            options.InvalidModelStateResponseFactory = actionContext =>
+            {
+                var errors = actionContext.ModelState
+                    .Where(entry => entry.Value?.Errors.Count > 0)
+                    .ToDictionary(
+                        entry => entry.Key,
+                        entry => entry.Value!.Errors
+                            .Select(error =>
+                                string.IsNullOrWhiteSpace(error.ErrorMessage)
+                                    ? "The supplied value is invalid."
+                                    : error.ErrorMessage)
+                            .ToArray());
+                var problem = ApiProblemDetailsFactory.Create(
+                    actionContext.HttpContext,
+                    StatusCodes.Status400BadRequest,
+                    "Validation failed",
+                    "One or more validation errors occurred.",
+                    "VALIDATION_ERROR",
+                    errors);
+                return ApiProblemDetailsFactory.CreateResult(problem);
+            };
+        });
         services.AddFluentValidationAutoValidation();
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen(c =>
@@ -77,6 +106,7 @@ public static class DependencyInjection
                     Array.Empty<string>()
                 }
             });
+            c.OperationFilter<ProblemDetailsResponseOperationFilter>();
 
             // Thêm cấu hình đọc file XML comments
             var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
@@ -206,6 +236,27 @@ public static class DependencyInjection
                             context.Token = accessToken;
                         }
                         return Task.CompletedTask;
+                    },
+                    OnChallenge = async context =>
+                    {
+                        context.HandleResponse();
+                        await ApiProblemDetailsFactory.WriteAsync(
+                            context.HttpContext,
+                            StatusCodes.Status401Unauthorized,
+                            "Unauthorized",
+                            "Authentication is required.",
+                            "UNAUTHORIZED",
+                            context.HttpContext.RequestAborted);
+                    },
+                    OnForbidden = context =>
+                    {
+                        return ApiProblemDetailsFactory.WriteAsync(
+                            context.HttpContext,
+                            StatusCodes.Status403Forbidden,
+                            "Forbidden",
+                            "You do not have permission to access this resource.",
+                            "FORBIDDEN",
+                            context.HttpContext.RequestAborted);
                     }
                 };
             });

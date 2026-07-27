@@ -1,11 +1,14 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using ShareKernel.Common.Enum;
 using SMEFLOWSystem.Application.DTOs;
 using SMEFLOWSystem.Application.DTOs.AttendanceDtos;
+using SMEFLOWSystem.Application.Exceptions;
 using SMEFLOWSystem.Application.Extensions;
 using SMEFLOWSystem.Application.Helpers;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Application.Interfaces.IServices;
+using SMEFLOWSystem.Application.Options;
 using SMEFLOWSystem.Core.Entities;
 using SMEFLOWSystem.SharedKernel.Interfaces;
 using System;
@@ -30,6 +33,9 @@ namespace SMEFLOWSystem.Application.Services
         private readonly ILogger<AttendanceService> _logger;
         private readonly IHrAuthorizationService _hrAuth;
         private readonly ICurrentUserService _currentUser;
+        private readonly AttendanceResolutionOptions _attendanceOptions;
+
+        private const int MaxClientRequestIdLength = 100;
 
         private static readonly TimeZoneInfo VietnamTimeZone = GetVietnamTimeZone();
 
@@ -55,7 +61,8 @@ namespace SMEFLOWSystem.Application.Services
             IRealtimeNotificationService realtime,
             ILogger<AttendanceService> logger,
             IHrAuthorizationService hrAuth,
-            ICurrentUserService currentUser)
+            ICurrentUserService currentUser,
+            IOptions<AttendanceResolutionOptions> attendanceOptions)
         {
             _punchLogRepo = punchLogRepo;
             _employeeRepository = employeeRepository;
@@ -70,6 +77,7 @@ namespace SMEFLOWSystem.Application.Services
             _logger = logger;
             _hrAuth = hrAuth;
             _currentUser = currentUser;
+            _attendanceOptions = attendanceOptions.Value;
         }
 
         public async Task<RawPunchLogDto> SubmitPunchAsync(Guid userId, SubmitPunchRequestDto request)
@@ -77,15 +85,34 @@ namespace SMEFLOWSystem.Application.Services
             var employee = await _employeeRepository.GetByUserIdAsync(userId);
             if (employee == null)
             {
-                throw new InvalidOperationException("Employee not found for current user.");
+                throw new KeyNotFoundException("Employee not found for current user.");
+            }
+
+            var tenantId = _currentTenantService.TenantId ?? employee.TenantId;
+            var clientRequestId =
+                NormalizeClientRequestId(request.ClientRequestId);
+            request.ClientRequestId = clientRequestId;
+
+            if (clientRequestId != null)
+            {
+                var existing =
+                    await _punchLogRepo.GetByClientRequestIdAsync(
+                        tenantId,
+                        employee.Id,
+                        clientRequestId);
+                if (existing != null)
+                {
+                    return ToRawPunchLogDto(existing);
+                }
             }
 
             if (request.IsMockLocation)
             {
-                throw new InvalidOperationException("FakeGPS: Phát hiện sử dụng phần mềm giả mạo vị trí. Vui lòng tắt Fake GPS!");
+                throw new BusinessRuleException(
+                    "FakeGPS: Phát hiện sử dụng phần mềm giả mạo vị trí. Vui lòng tắt Fake GPS!",
+                    "ATTENDANCE_FAKE_GPS");
             }
 
-            var tenantId = _currentTenantService.TenantId ?? employee.TenantId;
             var attendanceSetting = await _attendanceSettingRepository.GetByTenantIdAsync(tenantId);
 
             // Geofencing Validation
@@ -93,7 +120,9 @@ namespace SMEFLOWSystem.Application.Services
             {
                 if (!request.Latitude.HasValue || !request.Longitude.HasValue)
                 {
-                    throw new InvalidOperationException("BatBuocGPS: Vui lòng bật định vị GPS để chấm công.");
+                    throw new BusinessRuleException(
+                        "BatBuocGPS: Vui lòng bật định vị GPS để chấm công.",
+                        "ATTENDANCE_GPS_REQUIRED");
                 }
 
                 var distance = GeoHelper.DistanceInMeters(
@@ -102,38 +131,83 @@ namespace SMEFLOWSystem.Application.Services
 
                 if (distance > attendanceSetting.CheckInRadiusMeters)
                 {
-                    throw new InvalidOperationException($"NgoaiVung: Bạn đang ở ngoài vùng chấm công cho phép (Cách {Math.Round(distance)}m). Bán kính cho phép là {attendanceSetting.CheckInRadiusMeters}m.");
+                    throw new BusinessRuleException(
+                        $"NgoaiVung: Bạn đang ở ngoài vùng chấm công cho phép (Cách {Math.Round(distance)}m). Bán kính cho phép là {attendanceSetting.CheckInRadiusMeters}m.",
+                        "ATTENDANCE_OUTSIDE_GEOFENCE");
+                }
+            }
+
+            var punchType = request.PunchType ?? "Auto";
+            if (clientRequestId == null)
+            {
+                _logger.LogInformation(
+                    "Submit punch without ClientRequestId for tenant {TenantId}, employee {EmployeeId}; applying legacy dedup window of {DedupWindowMinutes} minutes.",
+                    tenantId,
+                    employee.Id,
+                    _attendanceOptions.DedupWindowMinutes);
+
+                if (_attendanceOptions.DedupWindowMinutes > 0)
+                {
+                    var sinceUtc = DateTime.UtcNow.AddMinutes(
+                        -_attendanceOptions.DedupWindowMinutes);
+                    var recent =
+                        await _punchLogRepo.GetLatestByEmployeePunchTypeAsync(
+                            tenantId,
+                            employee.Id,
+                            punchType,
+                            sinceUtc);
+                    if (recent != null)
+                    {
+                        return ToRawPunchLogDto(recent);
+                    }
                 }
             }
 
             if (string.IsNullOrWhiteSpace(request.SelfieUrl) && !string.IsNullOrWhiteSpace(request.SelfieBase64))
             {
-                request.SelfieUrl = await _cloudinary.UploadBase64Async(request.SelfieBase64, "attendance/selfies");
+                try
+                {
+                    request.SelfieUrl = await _cloudinary.UploadBase64Async(
+                        request.SelfieBase64,
+                        "attendance/selfies");
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    throw new DownstreamServiceException(
+                        "Dịch vụ tải ảnh chấm công hiện không khả dụng.",
+                        "ATTENDANCE_IMAGE_UPLOAD_UNAVAILABLE",
+                        serviceUnavailable: true,
+                        ex);
+                }
             }
 
             var punch = new RawPunchLog()
             {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
                 EmployeeId = employee.Id,
+                ClientRequestId = clientRequestId,
                 Timestamp = DateTime.UtcNow,
                 DeviceId = request.DeviceId,
-                PunchType = request.PunchType ?? "Auto",
+                PunchType = punchType,
                 Latitude = request.Latitude,
                 Longitude = request.Longitude,
                 SelfieUrl = request.SelfieUrl,
                 IsProcessed = false 
             };
 
-            await _punchLogRepo.AddAsync(punch);
+            var (storedPunch, isNew) =
+                await _punchLogRepo.AddIdempotentAsync(punch);
 
-            if (employee.UserId != null)
+            if (isNew && employee.UserId != null)
             {
                 _ = _realtime.NotifyPunchReceivedAsync(
                         employee.UserId.Value,
                         new
                         {
                             received = true,
-                            punchType = punch.PunchType,
-                            timestamp = punch.Timestamp,
+                            punchType = storedPunch.PunchType,
+                            timestamp = storedPunch.Timestamp,
                             message = "Đã ghi nhận chấm công, đang chờ xử lý..."
                         })
                     .ContinueWith(t =>
@@ -143,6 +217,35 @@ namespace SMEFLOWSystem.Application.Services
                     });
             }
 
+            return ToRawPunchLogDto(storedPunch);
+        }
+
+        private static string? NormalizeClientRequestId(
+            string? clientRequestId)
+        {
+            if (string.IsNullOrWhiteSpace(clientRequestId))
+            {
+                return null;
+            }
+
+            var normalized = clientRequestId.Trim();
+            if (Guid.TryParse(normalized, out var requestGuid))
+            {
+                normalized = requestGuid.ToString("D");
+            }
+
+            if (normalized.Length > MaxClientRequestIdLength)
+            {
+                throw new BusinessRuleException(
+                    $"ClientRequestId không được vượt quá {MaxClientRequestIdLength} ký tự.",
+                    "ATTENDANCE_INVALID_CLIENT_REQUEST_ID");
+            }
+
+            return normalized;
+        }
+
+        private static RawPunchLogDto ToRawPunchLogDto(RawPunchLog punch)
+        {
             return new RawPunchLogDto
             {
                 Id = punch.Id,
@@ -150,7 +253,8 @@ namespace SMEFLOWSystem.Application.Services
                 Timestamp = punch.Timestamp,
                 DeviceId = punch.DeviceId,
                 IsProcessed = punch.IsProcessed,
-                PunchType = punch.PunchType
+                PunchType = punch.PunchType,
+                ClientRequestId = punch.ClientRequestId
             };
         }
 
@@ -159,7 +263,7 @@ namespace SMEFLOWSystem.Application.Services
             var employee = await _employeeRepository.GetByUserIdAsync(userId);
             if (employee == null)
             {
-                throw new InvalidOperationException("Employee not found for current user.");
+                throw new KeyNotFoundException("Employee not found for current user.");
             }
 
             var tenantId = _currentTenantService.TenantId ?? employee.TenantId;
@@ -236,7 +340,7 @@ namespace SMEFLOWSystem.Application.Services
             var employee = await _employeeRepository.GetByUserIdAsync(userId);
             if (employee == null)
             {
-                throw new InvalidOperationException("Employee not found for current user.");
+                throw new KeyNotFoundException("Employee not found for current user.");
             }
 
             var timesheets = await _dailyTimesheetRepository.GetByEmployeeMonthAsync(employee.Id, month, year);
@@ -275,7 +379,7 @@ namespace SMEFLOWSystem.Application.Services
         {
             var employee = await _employeeRepository.GetByIdAsync(request.EmployeeId);
             if (employee == null)
-                throw new InvalidOperationException("Employee not found.");
+                throw new KeyNotFoundException("Employee not found.");
 
             if (!_currentUser.IsAdmin() && !_currentUser.IsHrManager())
             {
@@ -361,19 +465,26 @@ namespace SMEFLOWSystem.Application.Services
             if (tenantId == null) throw new UnauthorizedAccessException("Tenant ID is missing.");
 
             var employee = await _employeeRepository.GetByUserIdAsync(userId);
-            if (employee == null) throw new Exception("Employee not found");
+            if (employee == null)
+                throw new KeyNotFoundException("Employee not found");
 
             // GAP-05: Validation ngày giải trình
             var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, VietnamTimeZone));
             if (request.WorkDate > today) 
-                throw new InvalidOperationException("Không thể giải trình cho ngày tương lai.");
+                throw new BusinessRuleException(
+                    "Không thể giải trình cho ngày tương lai.",
+                    "ATTENDANCE_APPEAL_FUTURE_DATE");
             if (today.DayNumber - request.WorkDate.DayNumber > 30) 
-                throw new InvalidOperationException("Không thể giải trình cho ngày quá hạn 30 ngày.");
+                throw new BusinessRuleException(
+                    "Không thể giải trình cho ngày quá hạn 30 ngày.",
+                    "ATTENDANCE_APPEAL_EXPIRED");
 
             // GAP-04: Tránh trùng đơn đang chờ duyệt
             var existingPending = await _appealRepository.GetPendingByEmployeeDateAsync(employee.Id, request.WorkDate);
             if (existingPending != null) 
-                throw new InvalidOperationException("Đã có đơn giải trình đang chờ duyệt cho ngày này.");
+                throw new ConflictException(
+                    "Đã có đơn giải trình đang chờ duyệt cho ngày này.",
+                    "ATTENDANCE_APPEAL_ALREADY_PENDING");
 
             var appeal = new TimesheetAppeal
             {
@@ -461,7 +572,7 @@ namespace SMEFLOWSystem.Application.Services
 
             var appeal = await _appealRepository.GetByIdAsync(appealId);
             if (appeal == null || appeal.TenantId != tenantId.Value)
-                throw new Exception("Appeal not found");
+                throw new KeyNotFoundException("Appeal not found");
 
             if (!_currentUser.IsAdmin() && !_currentUser.IsHrManager())
             {
@@ -470,11 +581,13 @@ namespace SMEFLOWSystem.Application.Services
             }
 
             if (appeal.Status != "PendingApproval")
-                throw new Exception("This appeal has already been processed.");
+                throw new ConflictException(
+                    "This appeal has already been processed.",
+                    "ATTENDANCE_APPEAL_ALREADY_PROCESSED");
 
             var hrUser = await _employeeRepository.GetByUserIdAsync(hrUserId);
             if (hrUser == null && !_currentUser.IsAdmin()) 
-                throw new Exception("HR Employee record not found.");
+                throw new KeyNotFoundException("HR Employee record not found.");
 
             var setting = await _attendanceSettingRepository.GetByTenantIdAsync(tenantId.Value);
             var cutOffTime = setting?.DayStartCutOffTime ?? new TimeSpan(4, 0, 0);
@@ -778,7 +891,7 @@ namespace SMEFLOWSystem.Application.Services
             var holiday = await _publicHolidayRepository.GetByIdAsync(id);
             if (holiday == null || holiday.TenantId != tenantId.Value)
             {
-                throw new InvalidOperationException("Holiday not found or unauthorized.");
+                throw new KeyNotFoundException("Holiday not found.");
             }
 
             await _publicHolidayRepository.DeleteAsync(holiday);

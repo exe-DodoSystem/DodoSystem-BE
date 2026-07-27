@@ -1,10 +1,14 @@
 using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging.Abstractions;
 using SMEFLOWSystem.Application.DTOs;
 using SMEFLOWSystem.Application.DTOs.AttendanceDtos;
+using SMEFLOWSystem.Application.Exceptions;
 using SMEFLOWSystem.Application.Interfaces.IServices;
 using SMEFLOWSystem.WebAPI.Controllers;
+using SMEFLOWSystem.WebAPI.Exceptions;
 
 namespace SMEFLOWSystem.Tests;
 
@@ -24,14 +28,18 @@ public sealed class PhaseZeroAttendanceContractTests
         string message)
     {
         var controller =
-            CreateController(new InvalidOperationException(message));
+            CreateController(new BusinessRuleException(
+                message,
+                "ATTENDANCE_VALIDATION_FAILED"));
 
-        var result = multipart
-            ? await controller.SubmitPunchForm(new SubmitPunchRequestDto(), null)
-            : await controller.SubmitPunch(new SubmitPunchRequestDto());
+        using var problem = await ExecuteThroughExceptionHandlerAsync(
+            controller,
+            multipart);
 
-        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
-        Assert.Equal(message, ReadStringProperty(badRequest.Value, "Error"));
+        Assert.Equal(StatusCodes.Status400BadRequest, controller.Response.StatusCode);
+        Assert.Equal(message, problem.RootElement.GetProperty("error").GetString());
+        Assert.False(string.IsNullOrWhiteSpace(
+            problem.RootElement.GetProperty("traceId").GetString()));
     }
 
     [Theory]
@@ -43,17 +51,19 @@ public sealed class PhaseZeroAttendanceContractTests
         bool multipart)
     {
         var controller = CreateController(
-            new InvalidOperationException(
+            new KeyNotFoundException(
                 "Employee not found for current user."));
 
-        var result = multipart
-            ? await controller.SubmitPunchForm(new SubmitPunchRequestDto(), null)
-            : await controller.SubmitPunch(new SubmitPunchRequestDto());
+        using var problem = await ExecuteThroughExceptionHandlerAsync(
+            controller,
+            multipart);
 
-        var notFound = Assert.IsType<NotFoundObjectResult>(result);
+        Assert.Equal(StatusCodes.Status404NotFound, controller.Response.StatusCode);
         Assert.Equal(
             "Employee not found for current user.",
-            ReadStringProperty(notFound.Value, "Error"));
+            problem.RootElement.GetProperty("error").GetString());
+        Assert.False(string.IsNullOrWhiteSpace(
+            problem.RootElement.GetProperty("traceId").GetString()));
     }
 
     [Theory]
@@ -96,6 +106,35 @@ public sealed class PhaseZeroAttendanceContractTests
                 }
             }
         };
+    }
+
+    private static async Task<JsonDocument> ExecuteThroughExceptionHandlerAsync(
+        AttendanceController controller,
+        bool multipart)
+    {
+        controller.Response.Body = new MemoryStream();
+
+        try
+        {
+            _ = multipart
+                ? await controller.SubmitPunchForm(
+                    new SubmitPunchRequestDto(),
+                    null)
+                : await controller.SubmitPunch(new SubmitPunchRequestDto());
+        }
+        catch (Exception exception)
+        {
+            var handler = new ApiExceptionHandler(
+                NullLogger<ApiExceptionHandler>.Instance);
+            var handled = await handler.TryHandleAsync(
+                controller.HttpContext,
+                exception,
+                CancellationToken.None);
+            Assert.True(handled);
+        }
+
+        controller.Response.Body.Position = 0;
+        return await JsonDocument.ParseAsync(controller.Response.Body);
     }
 
     private static string? ReadStringProperty(object? value, string propertyName)

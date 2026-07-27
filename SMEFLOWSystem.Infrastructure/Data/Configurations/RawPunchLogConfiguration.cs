@@ -6,6 +6,9 @@ namespace SMEFLOWSystem.Infrastructure.Data.Configurations;
 
 public class RawPunchLogConfiguration : IEntityTypeConfiguration<RawPunchLog>
 {
+    public const string IdempotencyIndexName =
+        "UX_RawPunchLogs_Tenant_Employee_ClientRequestId";
+
     public void Configure(EntityTypeBuilder<RawPunchLog> builder)
     {
         builder.ToTable("RawPunchLogs");
@@ -18,6 +21,19 @@ public class RawPunchLogConfiguration : IEntityTypeConfiguration<RawPunchLog>
 
         builder.Property(e => e.Timestamp)
             .IsRequired();
+
+        builder.Property(e => e.ClientRequestId)
+            .HasMaxLength(100);
+
+        builder.HasIndex(e => new
+            {
+                e.TenantId,
+                e.EmployeeId,
+                e.ClientRequestId
+            })
+            .IsUnique()
+            .HasDatabaseName(IdempotencyIndexName)
+            .HasFilter("\"ClientRequestId\" IS NOT NULL");
             
         // Index TỐI QUAN TRỌNG: 
         // Khi Job chạy, nó sẽ select theo EmployeeId và khoảng thời gian (Timestamp)

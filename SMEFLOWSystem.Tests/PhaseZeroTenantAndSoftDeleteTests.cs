@@ -147,7 +147,7 @@ public sealed class PhaseZeroTenantAndSoftDeleteTests
         Assert.NotNull(await repository.GetByIdAsync(deleted.Id));
     }
 
-    [KnownBugFact("BE-ATT-01")]
+    [Fact]
     [Trait("Phase", "0")]
     [Trait("Gap", "BE-ATT-01")]
     public void SubmitPunchContract_ExposesClientRequestId()
@@ -155,7 +155,7 @@ public sealed class PhaseZeroTenantAndSoftDeleteTests
         Assert.NotNull(typeof(SubmitPunchRequestDto).GetProperty("ClientRequestId"));
     }
 
-    [KnownBugFact("BE-ATT-01")]
+    [Fact]
     [Trait("Phase", "0")]
     [Trait("Gap", "BE-ATT-01")]
     public async Task RawPunchLogModel_HasUniqueClientRequestIdIndex()
@@ -165,13 +165,23 @@ public sealed class PhaseZeroTenantAndSoftDeleteTests
         var property = entityType?.FindProperty("ClientRequestId");
 
         Assert.NotNull(property);
+        Assert.Equal(100, property!.GetMaxLength());
 
         var uniqueIndex = entityType!.GetIndexes()
             .SingleOrDefault(index =>
                 index.IsUnique &&
-                index.Properties.Contains(property!));
+                index.Properties.Select(item => item.Name).SequenceEqual(
+                    new[]
+                    {
+                        "TenantId",
+                        "EmployeeId",
+                        "ClientRequestId"
+                    }));
 
         Assert.NotNull(uniqueIndex);
+        Assert.Equal(
+            "\"ClientRequestId\" IS NOT NULL",
+            uniqueIndex!.GetFilter());
     }
 
     private static Shift Shift(Guid tenantId, string code, bool isDeleted)

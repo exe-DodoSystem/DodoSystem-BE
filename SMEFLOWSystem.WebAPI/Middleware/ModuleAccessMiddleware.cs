@@ -3,6 +3,7 @@ using Microsoft.Extensions.Caching.Distributed;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Application.Helpers;
 using SMEFLOWSystem.SharedKernel.Interfaces;
+using SMEFLOWSystem.WebAPI.Exceptions;
 using System.Globalization;
 using System.Text.Json;
 
@@ -65,7 +66,7 @@ public class ModuleAccessMiddleware
         var tenantId = currentTenantService.TenantId;
         if (!tenantId.HasValue)
         {
-            await WriteJsonErrorAsync(context, StatusCodes.Status403Forbidden, "Thiếu TenantId");
+            await WriteForbiddenAsync(context, "Thiếu TenantId");
             return;
         }
 
@@ -84,7 +85,9 @@ public class ModuleAccessMiddleware
 
         if (moduleEntry == null)
         {
-            await WriteJsonErrorAsync(context, StatusCodes.Status403Forbidden, $"Module '{required.ModuleCode}' chưa được cấu hình");
+            await WriteForbiddenAsync(
+                context,
+                $"Module '{required.ModuleCode}' chưa được cấu hình");
             return;
         }
 
@@ -94,15 +97,16 @@ public class ModuleAccessMiddleware
             .GetByTenantAndModuleIgnoreTenantAsync(tenantId.Value, moduleEntry.Id);
         if (subscription == null)
         {
-            await WriteJsonErrorAsync(context, StatusCodes.Status403Forbidden, $"Bạn chưa đăng ký module {required.ModuleCode}");
+            await WriteForbiddenAsync(
+                context,
+                $"Bạn chưa đăng ký module {required.ModuleCode}");
             return;
         }
 
         if (!ModuleSubscriptionRules.IsUsable(subscription, DateTime.UtcNow))
         {
-            await WriteJsonErrorAsync(
+            await WriteForbiddenAsync(
                 context,
-                StatusCodes.Status403Forbidden,
                 $"Module {required.ModuleCode} đang tạm ngưng, chưa bắt đầu hoặc đã hết hạn");
             return;
         }
@@ -110,12 +114,17 @@ public class ModuleAccessMiddleware
         await _next(context);
     }
 
-    private static async Task WriteJsonErrorAsync(HttpContext context, int statusCode, string message)
+    private static Task WriteForbiddenAsync(
+        HttpContext context,
+        string message)
     {
-        context.Response.StatusCode = statusCode;
-        context.Response.ContentType = "application/json; charset=utf-8";
-        var payload = JsonSerializer.Serialize(new { error = message });
-        await context.Response.WriteAsync(payload);
+        return ApiProblemDetailsFactory.WriteAsync(
+            context,
+            StatusCodes.Status403Forbidden,
+            "Forbidden",
+            message,
+            "MODULE_ACCESS_FORBIDDEN",
+            context.RequestAborted);
     }
 
     private static async Task<T?> GetFromDistributedCacheAsync<T>(IDistributedCache cache, string key)

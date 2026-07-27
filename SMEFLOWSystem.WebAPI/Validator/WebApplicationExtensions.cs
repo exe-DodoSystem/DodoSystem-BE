@@ -28,6 +28,7 @@ public static class WebApplicationExtensions
         {
             ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
         });
+        app.UseExceptionHandler();
 
         if (!app.Environment.IsDevelopment() && !app.Environment.IsProduction())
         {

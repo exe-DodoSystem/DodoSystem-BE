@@ -30,19 +30,8 @@ public class AttendanceSettingController : ControllerBase
     [Authorize(Policy = PolicyNames.HrAccess)]
     public async Task<IActionResult> GetConfig()
     {
-        try
-        {
-            var result = await _service.GetSettingsAsync();
-            return Ok(new { Data = result });
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            return Unauthorized(new { Error = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Error = ex.Message });
-        }
+        var result = await _service.GetSettingsAsync();
+        return Ok(new { Data = result });
     }
 
     /// <summary>[Admin, HR] Cập nhật cấu hình chấm công (tạo mới nếu chưa có)</summary>
@@ -50,18 +39,7 @@ public class AttendanceSettingController : ControllerBase
     [Authorize(Policy = PolicyNames.HrAccess)]
     public async Task<IActionResult> UpsertConfig([FromBody] UpdateAttendanceSettingRequestDto dto)
     {
-        try
-        {
-            var result = await _service.UpdateSettingsAsync(dto);
-            return Ok(new { Data = result, Message = "Cập nhật cấu hình chấm công thành công." });
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            return Unauthorized(new { Error = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Error = ex.Message });
-        }
+        var result = await _service.UpdateSettingsAsync(dto);
+        return Ok(new { Data = result, Message = "Cập nhật cấu hình chấm công thành công." });
     }
 }

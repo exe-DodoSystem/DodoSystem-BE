@@ -122,9 +122,13 @@ public class ShiftPatternRepository : IShiftPatternRepository
 
         query = query
             .AsNoTracking()
-            .Include(sp => sp.Days)
+            .Include(sp => sp.Days.Where(day =>
+                day.TenantId == tenantId &&
+                (!day.ScheduledShiftId.HasValue ||
+                 day.ScheduledShift!.TenantId == tenantId)))
                 .ThenInclude(d => d.ScheduledShift)
-                    .ThenInclude(s => s.Segments)
+                    .ThenInclude(s => s!.Segments.Where(
+                        segment => segment.TenantId == tenantId))
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(search))

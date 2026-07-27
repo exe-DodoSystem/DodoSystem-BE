@@ -1,7 +1,9 @@
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Core.Entities;
 using SMEFLOWSystem.Infrastructure.Data;
+using SMEFLOWSystem.Infrastructure.Data.Configurations;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace SMEFLOWSystem.Infrastructure.Repositories;
 
@@ -18,6 +20,81 @@ public class RawPunchLogRepository : IRawPunchLogRepository
     {
         await _context.RawPunchLogs.AddAsync(punchLog);
         await _context.SaveChangesAsync();
+    }
+
+    public async Task<(RawPunchLog PunchLog, bool IsNew)> AddIdempotentAsync(
+        RawPunchLog punchLog)
+    {
+        if (punchLog.ClientRequestId == null)
+        {
+            await AddAsync(punchLog);
+            return (punchLog, true);
+        }
+
+        try
+        {
+            await _context.RawPunchLogs.AddAsync(punchLog);
+            await _context.SaveChangesAsync();
+            return (punchLog, true);
+        }
+        catch (DbUpdateException exception)
+            when (IsIdempotencyConstraintViolation(exception))
+        {
+            _context.Entry(punchLog).State = EntityState.Detached;
+
+            var existing = await GetByClientRequestIdAsync(
+                punchLog.TenantId,
+                punchLog.EmployeeId,
+                punchLog.ClientRequestId);
+
+            if (existing == null)
+            {
+                throw;
+            }
+
+            return (existing, false);
+        }
+    }
+
+    public Task<RawPunchLog?> GetByClientRequestIdAsync(
+        Guid tenantId,
+        Guid employeeId,
+        string clientRequestId)
+    {
+        return _context.RawPunchLogs
+            .AsNoTracking()
+            .FirstOrDefaultAsync(log =>
+                log.TenantId == tenantId &&
+                log.EmployeeId == employeeId &&
+                log.ClientRequestId == clientRequestId);
+    }
+
+    public Task<RawPunchLog?> GetLatestByEmployeePunchTypeAsync(
+        Guid tenantId,
+        Guid employeeId,
+        string punchType,
+        DateTime sinceUtc)
+    {
+        return _context.RawPunchLogs
+            .AsNoTracking()
+            .Where(log =>
+                log.TenantId == tenantId &&
+                log.EmployeeId == employeeId &&
+                log.PunchType == punchType &&
+                log.Timestamp >= sinceUtc)
+            .OrderByDescending(log => log.Timestamp)
+            .FirstOrDefaultAsync();
+    }
+
+    private static bool IsIdempotencyConstraintViolation(
+        DbUpdateException exception)
+    {
+        return exception.InnerException is PostgresException
+        {
+            SqlState: PostgresErrorCodes.UniqueViolation,
+            ConstraintName:
+                RawPunchLogConfiguration.IdempotencyIndexName
+        };
     }
 
     public async Task<List<RawPunchLog>> GetByEmployeeAndDateRangeAsync(Guid employeeId, DateTime fromDate, DateTime toDate)

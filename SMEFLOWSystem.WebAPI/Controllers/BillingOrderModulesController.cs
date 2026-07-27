@@ -24,15 +24,8 @@ public class BillingOrderModulesController : ControllerBase
     [HttpGet("me/by-module-id/{moduleId:int}")]
     public async Task<ActionResult<List<BillingOrderModuleDto>>> GetMyByModuleId([FromRoute] int moduleId)
     {
-        try
-        {
-            var lines = await _service.GetMyByModuleIdAsync(moduleId);
-            return Ok(lines);
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return Unauthorized();
-        }
+        var lines = await _service.GetMyByModuleIdAsync(moduleId);
+        return Ok(lines);
     }
     /// <summary>[TenantAdmin] Lấy thông tin các module đã mua thuộc 1 module Code cụ thể</summary>
 
@@ -40,19 +33,8 @@ public class BillingOrderModulesController : ControllerBase
     [HttpGet("me/by-module-code/{code}")]
     public async Task<ActionResult<List<BillingOrderModuleDto>>> GetMyByModuleCode([FromRoute] string code)
     {
-        try
-        {
-            var lines = await _service.GetMyByModuleCodeAsync(code);
-            return Ok(lines);
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return Unauthorized();
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { error = ex.Message });
-        }
+        var lines = await _service.GetMyByModuleCodeAsync(code);
+        return Ok(lines);
     }
     /// <summary>[TenantAdmin] Lấy danh sách module thuộc 1 đơn hàng thanh toán (Billing Order) cụ thể</summary>
 

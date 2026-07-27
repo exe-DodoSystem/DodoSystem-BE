@@ -17,6 +17,12 @@ public partial class RawPunchLog : ITenantEntity
     
     /// <summary>Ai quẹt thẻ.</summary>
     public Guid EmployeeId { get; set; }
+
+    /// <summary>
+    /// Khóa idempotency do client sinh. Null đối với client cũ và các log
+    /// được tạo từ luồng nội bộ.
+    /// </summary>
+    public string? ClientRequestId { get; set; }
     
     // Thời điểm hệ thống ghi nhận người dùng thao tác
     public DateTime Timestamp { get; set; }

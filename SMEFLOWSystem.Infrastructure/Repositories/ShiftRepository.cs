@@ -39,7 +39,8 @@ public class ShiftRepository : IShiftRepository
 
         query = query
             .AsNoTracking()
-            .Include(s => s.Segments)
+            .Include(s => s.Segments.Where(
+                segment => segment.TenantId == tenantId))
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(search))

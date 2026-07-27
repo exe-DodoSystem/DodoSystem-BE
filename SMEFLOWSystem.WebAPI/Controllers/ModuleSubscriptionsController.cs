@@ -23,51 +23,26 @@ public class ModuleSubscriptionsController : ControllerBase
     [HttpGet("me/all")]
     public async Task<ActionResult<List<ModuleSubscriptionDto>>> GetMyAll()
     {
-        try
-        {
-            var subs = await _service.GetMyAllAsync();
-            return Ok(subs);
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return Unauthorized();
-        }
+        var subs = await _service.GetMyAllAsync();
+        return Ok(subs);
     }
 
     /// <summary>Lấy thông tin gói đăng ký của Tenant theo Module ID</summary>
     [HttpGet("me/by-module-id/{moduleId:int}")]
     public async Task<ActionResult<ModuleSubscriptionDto>> GetMyByModuleId([FromRoute] int moduleId)
     {
-        try
-        {
-            var sub = await _service.GetMyByModuleIdAsync(moduleId);
-            if (sub == null) return NotFound();
-            return Ok(sub);
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return Unauthorized();
-        }
+        var sub = await _service.GetMyByModuleIdAsync(moduleId);
+        if (sub == null) return NotFound();
+        return Ok(sub);
     }
 
     /// <summary>Lấy thông tin gói đăng ký của Tenant theo Module Code</summary>
     [HttpGet("me/by-module-code/{code}")]
     public async Task<ActionResult<ModuleSubscriptionDto>> GetMyByModuleCode([FromRoute] string code)
     {
-        try
-        {
-            var sub = await _service.GetMyByModuleCodeAsync(code);
-            if (sub == null) return NotFound();
-            return Ok(sub);
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return Unauthorized();
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { error = ex.Message });
-        }
+        var sub = await _service.GetMyByModuleCodeAsync(code);
+        if (sub == null) return NotFound();
+        return Ok(sub);
     }
 
     /// <summary>Hủy gói đăng ký Module của Tenant</summary>
@@ -75,18 +50,7 @@ public class ModuleSubscriptionsController : ControllerBase
     [Authorize(Policy = PolicyNames.TenantAdmin)]
     public async Task<IActionResult> CancelMyModuleSubscription([FromRoute] int moduleId)
     {
-        try
-        {
-            await _service.CancelMyModuleSubscriptionAsync(moduleId);
-            return Ok(new { message = "Hủy module thành công" });
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return Unauthorized();
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        await _service.CancelMyModuleSubscriptionAsync(moduleId);
+        return Ok(new { message = "Hủy module thành công" });
     }
 }

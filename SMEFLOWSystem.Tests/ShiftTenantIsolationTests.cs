@@ -98,6 +98,67 @@ public sealed class ShiftTenantIsolationTests
         Assert.StartsWith("Alpha", item.Name);
     }
 
+    [Fact]
+    public async Task ShiftIncludeDeleted_FiltersCrossTenantSegments()
+    {
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        var currentTenant =
+            new PhaseZeroTestContext.MutableCurrentTenantService(tenantA);
+        await using var context = PhaseZeroTestContext.Create(tenantA);
+        var shift = Shift(tenantA, "A-SHIFT", isDeleted: false);
+        context.Shifts.Add(shift);
+        context.ShiftSegments.AddRange(
+            Segment(tenantA, shift),
+            Segment(tenantB, shift));
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+
+        var result = await new ShiftRepository(context, currentTenant)
+            .GetPagedAsync(null, true, 1, 20);
+
+        var storedShift = Assert.Single(result.Items);
+        var segment = Assert.Single(storedShift.Segments);
+        Assert.Equal(tenantA, segment.TenantId);
+    }
+
+    [Fact]
+    public async Task ShiftPatternIncludeDeleted_FiltersCrossTenantNavigations()
+    {
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        var currentTenant =
+            new PhaseZeroTestContext.MutableCurrentTenantService(tenantA);
+        await using var context = PhaseZeroTestContext.Create(tenantA);
+        var pattern = Pattern(tenantA, "Tenant A pattern", isDeleted: false);
+        var shiftA = Shift(tenantA, "A-SHIFT", isDeleted: false);
+        var shiftB = Shift(tenantB, "B-SHIFT", isDeleted: false);
+        context.ShiftPatterns.Add(pattern);
+        context.Shifts.AddRange(shiftA, shiftB);
+        context.ShiftPatternDays.AddRange(
+            PatternDay(tenantA, pattern.Id, shiftA.Id, dayIndex: 0),
+            PatternDay(tenantB, pattern.Id, shiftA.Id, dayIndex: 1),
+            PatternDay(tenantA, pattern.Id, shiftB.Id, dayIndex: 2));
+        context.ShiftSegments.AddRange(
+            Segment(tenantA, shiftA),
+            Segment(tenantB, shiftA));
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+
+        var result = await new ShiftPatternRepository(
+                context,
+                currentTenant)
+            .GetPagedAsync(null, true, 1, 20);
+
+        var storedPattern = Assert.Single(result.Items);
+        var day = Assert.Single(storedPattern.Days);
+        Assert.Equal(tenantA, day.TenantId);
+        Assert.Equal(shiftA.Id, day.ScheduledShiftId);
+        Assert.Equal(tenantA, day.ScheduledShift!.TenantId);
+        var segment = Assert.Single(day.ScheduledShift.Segments);
+        Assert.Equal(tenantA, segment.TenantId);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -158,6 +219,35 @@ public sealed class ShiftTenantIsolationTests
             Name = name,
             CycleLengthDays = 7,
             IsDeleted = isDeleted
+        };
+    }
+
+    private static ShiftSegment Segment(Guid tenantId, Shift shift)
+    {
+        return new ShiftSegment
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            ShiftId = shift.Id,
+            Shift = shift,
+            StartTime = new TimeSpan(8, 0, 0),
+            EndTime = new TimeSpan(17, 0, 0)
+        };
+    }
+
+    private static ShiftPatternDay PatternDay(
+        Guid tenantId,
+        Guid patternId,
+        Guid shiftId,
+        int dayIndex)
+    {
+        return new ShiftPatternDay
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            ShiftPatternId = patternId,
+            ScheduledShiftId = shiftId,
+            DayIndex = dayIndex
         };
     }
 }

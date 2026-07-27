@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using ShareKernel.Common.Enum;
 using SMEFLOWSystem.Application.DTOs.AuthDtos;
 using SMEFLOWSystem.Application.DTOs.UserDtos;
+using SMEFLOWSystem.Application.Exceptions;
 using SMEFLOWSystem.Application.Helpers;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Application.Interfaces.IServices;
@@ -69,10 +70,14 @@ namespace SMEFLOWSystem.Application.Services
         {
             var existingUser = await _userRepo.GetUserByEmailAsync(request.AdminEmail);
             if (existingUser != null)
-                throw new Exception("Email này đã được sử dụng!");
+                throw new ConflictException(
+                    "Email này đã được sử dụng!",
+                    "AUTH_EMAIL_ALREADY_EXISTS");
 
             if (request.ModuleIds == null || request.ModuleIds.Length == 0)
-                throw new Exception("Vui lòng chọn ít nhất 1 module!");
+                throw new BusinessRuleException(
+                    "Vui lòng chọn ít nhất 1 module!",
+                    "AUTH_MODULE_REQUIRED");
 
             Guid createdOrderId = Guid.Empty;
             string adminEmail = request.AdminEmail;
@@ -115,7 +120,8 @@ namespace SMEFLOWSystem.Application.Services
                 var adminRole = await _roleRepo.GetRoleByNameAsync("TenantAdmin");
 
                 if (adminRole == null)
-                    throw new Exception("Lỗi hệ thống: Không tìm thấy Role 'TenantAdmin'. Hãy chạy Seed Data trước.");
+                    throw new InvalidOperationException(
+                        "Lỗi hệ thống: Không tìm thấy Role 'TenantAdmin'. Hãy chạy Seed Data trước.");
 
                 var userRole = new UserRole
                 {
@@ -142,7 +148,9 @@ namespace SMEFLOWSystem.Application.Services
 
                 var modules = await _moduleRepo.GetByIdsAsync(request.ModuleIds);
                 if (modules.Count != request.ModuleIds.Distinct().Count())
-                    throw new Exception("Có module không tồn tại hoặc đang bị tắt!");
+                    throw new BusinessRuleException(
+                        "Có module không tồn tại hoặc đang bị tắt!",
+                        "AUTH_INVALID_MODULE");
 
                 foreach (var module in modules)
                 {
@@ -182,16 +190,20 @@ namespace SMEFLOWSystem.Application.Services
             var user = await _userRepo.GetUserByEmailAsync(request.Email);
 
             if (user == null)
-                throw new Exception("Tài khoản hoặc mật khẩu không chính xác");
+                throw new UnauthorizedAccessException(
+                    "Tài khoản hoặc mật khẩu không chính xác");
 
             if (!AuthHelper.VerifyPassword(request.Password, user.PasswordHash))
-                throw new Exception("Tài khoản hoặc mật khẩu không chính xác");
+                throw new UnauthorizedAccessException(
+                    "Tài khoản hoặc mật khẩu không chính xác");
 
             if (!user.IsActive)
-                throw new Exception("Tài khoản của bạn đã bị khóa.");
+                throw new UnauthorizedAccessException(
+                    "Tài khoản của bạn đã bị khóa.");
 
             var tenant = user.Tenant;
-            if (tenant == null) throw new Exception("Không tìm thấy tenant");
+            if (tenant == null)
+                throw new InvalidOperationException("Không tìm thấy tenant");
 
             var isSystemAdmin = user.UserRoles?.Any(ur => ur.Role != null
                                                         && string.Equals(ur.Role.Name, "SystemAdmin", StringComparison.OrdinalIgnoreCase)) == true;
@@ -209,7 +221,9 @@ namespace SMEFLOWSystem.Application.Services
             if (!string.Equals(tenant.Status, StatusEnum.TenantActive, StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(tenant.Status, StatusEnum.TenantTrial, StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(tenant.Status, StatusEnum.TenantSuspended, StringComparison.OrdinalIgnoreCase))
-                throw new Exception("Tài khoản công ty chưa sẵn sàng để đăng nhập.");
+                throw new ConflictException(
+                    "Tài khoản công ty chưa sẵn sàng để đăng nhập.",
+                    "AUTH_TENANT_NOT_READY");
 
             var token = AuthHelper.GenerateJwtToken(user, _config, isModulesExpired);
             var userDto =  _mapper.Map<LoginUserDto>(user);

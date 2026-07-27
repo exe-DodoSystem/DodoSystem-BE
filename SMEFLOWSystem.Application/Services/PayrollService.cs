@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using SharedKernel.DTOs;
 using ShareKernel.Common.Enum;
 using SMEFLOWSystem.Application.DTOs.PayrollDtos;
+using SMEFLOWSystem.Application.Exceptions;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Application.Interfaces.IServices;
 using SMEFLOWSystem.Core.Entities;
@@ -283,7 +284,8 @@ namespace SMEFLOWSystem.Application.Services
         public async Task<PayrollDto> CalculatePayrollForEmployeeAsync(Guid tenantId, Guid employeeId, int month, int year, bool suppressGenerateNotify = false)
         {
             var emp = await _employeeRepository.GetByIdAsync(employeeId);
-            if (emp == null || emp.TenantId != tenantId) throw new Exception("Không tìm thấy nhân viên.");
+            if (emp == null || emp.TenantId != tenantId)
+                throw new KeyNotFoundException("Không tìm thấy nhân viên.");
 
             if (!_currentUser.IsAdmin() && !_currentUser.IsHrManager())
             {
@@ -294,7 +296,9 @@ namespace SMEFLOWSystem.Application.Services
             var existingPayroll = existingPayrolls.FirstOrDefault();
 
             if (existingPayroll != null && existingPayroll.Status != PayrollStatus.Draft)
-                throw new Exception("Phiếu lương đã chốt, không thể tính toán lại.");
+                throw new ConflictException(
+                    "Phiếu lương đã chốt, không thể tính toán lại.",
+                    "PAYROLL_NOT_DRAFT");
 
             var timesheets = await _timesheetRepository.GetByEmployeeMonthAsync(employeeId, month, year);
 
@@ -586,10 +590,13 @@ namespace SMEFLOWSystem.Application.Services
         public async Task<bool> MarkPaidAsync(Guid payrollId)
         {
             var payroll = await _payrollRepository.GetByIdAsync(payrollId);
-            if (payroll == null) return false;
+            if (payroll == null)
+                throw new KeyNotFoundException("Không tìm thấy phiếu lương.");
 
             if (payroll.Status != PayrollStatus.Published)
-                throw new Exception("Chỉ phiếu lương đã chốt (Published) mới được đánh dấu đã thanh toán.");
+                throw new ConflictException(
+                    "Chỉ phiếu lương đã chốt (Published) mới được đánh dấu đã thanh toán.",
+                    "PAYROLL_NOT_PUBLISHED");
 
             payroll.Status = PayrollStatus.Paid;
             await _payrollRepository.UpdateAsync(payroll);
@@ -629,7 +636,8 @@ namespace SMEFLOWSystem.Application.Services
         public async Task<PayrollDto> UpdateManualFieldsAsync(Guid payrollId, UpdatePayrollDto dto)
         {
             var payroll = await _payrollRepository.GetByIdAsync(payrollId);
-            if (payroll == null) throw new Exception("Không tìm thấy phiếu lương.");
+            if (payroll == null)
+                throw new KeyNotFoundException("Không tìm thấy phiếu lương.");
 
             if (!_currentUser.IsAdmin() && !_currentUser.IsHrManager())
             {
@@ -639,7 +647,9 @@ namespace SMEFLOWSystem.Application.Services
             }
 
             if (payroll.Status != PayrollStatus.Draft)
-                throw new Exception("Chỉ được cập nhật thông tin khi phiếu lương đang ở trạng thái Nháp (Draft).");
+                throw new ConflictException(
+                    "Chỉ được cập nhật thông tin khi phiếu lương đang ở trạng thái Nháp (Draft).",
+                    "PAYROLL_NOT_DRAFT");
 
             payroll.CustomBonus = dto.CustomBonus;
             payroll.CustomDeduction = dto.CustomDeduction ?? 0;
@@ -656,10 +666,13 @@ namespace SMEFLOWSystem.Application.Services
         public async Task<bool> PublishPayrollAsync(Guid payrollId)
         {
             var payroll = await _payrollRepository.GetByIdAsync(payrollId);
-            if (payroll == null) return false;
+            if (payroll == null)
+                throw new KeyNotFoundException("Không tìm thấy phiếu lương.");
 
             if (payroll.Status != PayrollStatus.Draft)
-                throw new Exception("Chỉ phiếu lương ở trạng thái Nháp (Draft) mới được chốt.");
+                throw new ConflictException(
+                    "Chỉ phiếu lương ở trạng thái Nháp (Draft) mới được chốt.",
+                    "PAYROLL_NOT_DRAFT");
 
             payroll.Status = PayrollStatus.Published;
             await _payrollRepository.UpdateAsync(payroll);
@@ -767,7 +780,9 @@ namespace SMEFLOWSystem.Application.Services
             var payroll = existingPayrolls.FirstOrDefault();
 
             if (payroll != null && payroll.Status != PayrollStatus.Draft)
-                throw new InvalidOperationException("Phiếu lương đã chốt, không thể thay đổi thưởng/phạt.");
+                throw new ConflictException(
+                    "Phiếu lương đã chốt, không thể thay đổi thưởng/phạt.",
+                    "PAYROLL_NOT_DRAFT");
 
             if (payroll == null)
             {
@@ -869,7 +884,9 @@ namespace SMEFLOWSystem.Application.Services
             var existingPayrolls = await _payrollRepository.GetByEmployeeMonthAsync(dto.EmployeeId, tenantId, dto.Month, dto.Year);
             var payroll = existingPayrolls.FirstOrDefault();
             if (payroll != null && payroll.Status != PayrollStatus.Draft)
-                throw new InvalidOperationException("Phiếu lương của tháng này đã chốt, không thể thêm entry mới.");
+                throw new ConflictException(
+                    "Phiếu lương của tháng này đã chốt, không thể thêm entry mới.",
+                    "PAYROLL_NOT_DRAFT");
 
             var entry = new EmployeeBonusDeductionEntry
             {
@@ -935,7 +952,9 @@ namespace SMEFLOWSystem.Application.Services
             var existingPayrolls = await _payrollRepository.GetByEmployeeMonthAsync(entry.EmployeeId, tenantId, entry.Month, entry.Year);
             var payroll = existingPayrolls.FirstOrDefault();
             if (payroll != null && payroll.Status != PayrollStatus.Draft)
-                throw new InvalidOperationException("Phiếu lương của tháng này đã chốt, không thể xóa entry.");
+                throw new ConflictException(
+                    "Phiếu lương của tháng này đã chốt, không thể xóa entry.",
+                    "PAYROLL_NOT_DRAFT");
 
             await _entriesRepo.DeleteAsync(entry);
 
@@ -1003,7 +1022,9 @@ namespace SMEFLOWSystem.Application.Services
                 var existingPayrolls = await _payrollRepository.GetByEmployeeMonthAsync(emp.Id, tenantId, dto.Month, dto.Year);
                 var payroll = existingPayrolls.FirstOrDefault();
                 if (payroll != null && payroll.Status != PayrollStatus.Draft)
-                    throw new InvalidOperationException($"Phiếu lương của nhân viên {emp.FullName} đã chốt, không thể thêm entry.");
+                    throw new ConflictException(
+                        $"Phiếu lương của nhân viên {emp.FullName} đã chốt, không thể thêm entry.",
+                        "PAYROLL_NOT_DRAFT");
             }
 
             var newEntries = new List<EmployeeBonusDeductionEntry>();
