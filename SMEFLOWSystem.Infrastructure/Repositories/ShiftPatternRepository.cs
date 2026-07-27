@@ -2,16 +2,21 @@ using Microsoft.EntityFrameworkCore;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Core.Entities;
 using SMEFLOWSystem.Infrastructure.Data;
+using SMEFLOWSystem.SharedKernel.Interfaces;
 
 namespace SMEFLOWSystem.Infrastructure.Repositories;
 
 public class ShiftPatternRepository : IShiftPatternRepository
 {
     private readonly SMEFLOWSystemContext _context;
+    private readonly ICurrentTenantService _currentTenantService;
 
-    public ShiftPatternRepository(SMEFLOWSystemContext context)
+    public ShiftPatternRepository(
+        SMEFLOWSystemContext context,
+        ICurrentTenantService currentTenantService)
     {
         _context = context;
+        _currentTenantService = currentTenantService;
     }
 
     public async Task<EmployeeShiftPattern?> GetActivePatternForEmployeeAsync(Guid employeeId, DateOnly targetDate)
@@ -106,15 +111,21 @@ public class ShiftPatternRepository : IShiftPatternRepository
         if (pageNumber < 1) pageNumber = 1;
         if (pageSize < 1) pageSize = 10;
 
-        var query = _context.ShiftPatterns
+        var tenantId = _currentTenantService.TenantId
+            ?? throw new UnauthorizedAccessException("Tenant ID is missing.");
+
+        IQueryable<ShiftPattern> query = includeDeleted
+            ? _context.ShiftPatterns
+                .IgnoreQueryFilters()
+                .Where(pattern => pattern.TenantId == tenantId)
+            : _context.ShiftPatterns;
+
+        query = query
             .AsNoTracking()
             .Include(sp => sp.Days)
                 .ThenInclude(d => d.ScheduledShift)
                     .ThenInclude(s => s.Segments)
             .AsQueryable();
-
-        if (includeDeleted)
-            query = query.IgnoreQueryFilters();
 
         if (!string.IsNullOrWhiteSpace(search))
         {

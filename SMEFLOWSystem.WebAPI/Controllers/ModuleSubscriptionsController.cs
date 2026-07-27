@@ -1,11 +1,14 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SMEFLOWSystem.Application.DTOs.ModuleDtos;
 using SMEFLOWSystem.Application.Interfaces.IServices;
+using SMEFLOWSystem.SharedKernel.Common;
 
 namespace SMEFLOWSystem.WebAPI.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
+[Authorize]
 public class ModuleSubscriptionsController : ControllerBase
 {
     private readonly IModuleSubscriptionService _service;
@@ -69,6 +72,7 @@ public class ModuleSubscriptionsController : ControllerBase
 
     /// <summary>Hủy gói đăng ký Module của Tenant</summary>
     [HttpDelete("me/cancel/{moduleId:int}")]
+    [Authorize(Policy = PolicyNames.TenantAdmin)]
     public async Task<IActionResult> CancelMyModuleSubscription([FromRoute] int moduleId)
     {
         try

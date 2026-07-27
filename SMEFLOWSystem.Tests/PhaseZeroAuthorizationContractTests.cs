@@ -11,7 +11,7 @@ namespace SMEFLOWSystem.Tests;
 
 public sealed class PhaseZeroAuthorizationContractTests
 {
-    [KnownBugFact("BE-AUTH-01")]
+    [Fact]
     [Trait("Phase", "0")]
     [Trait("Gap", "BE-AUTH-01")]
     public void ModuleSubscriptionsController_RequiresAuthenticatedUser()
@@ -22,7 +22,7 @@ public sealed class PhaseZeroAuthorizationContractTests
         Assert.NotEmpty(authorizeAttributes);
     }
 
-    [KnownBugFact("BE-AUTH-01")]
+    [Fact]
     [Trait("Phase", "0")]
     [Trait("Gap", "BE-AUTH-01")]
     public void CancelModuleSubscription_RequiresTenantAdminPolicy()

@@ -1,6 +1,7 @@
 using AutoMapper;
 using ShareKernel.Common.Enum;
 using SMEFLOWSystem.Application.DTOs.ModuleDtos;
+using SMEFLOWSystem.Application.Extensions;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Application.Interfaces.IServices;
 using SMEFLOWSystem.SharedKernel.Interfaces;
@@ -16,6 +17,7 @@ public class ModuleSubscriptionService : IModuleSubscriptionService
     private readonly IModuleSubscriptionRepository _moduleSubscriptionRepo;
     private readonly IBillingOrderRepository _billingOrderRepo;
     private readonly IBillingOrderModuleRepository _billingOrderModuleRepo;
+    private readonly ICurrentUserService _currentUser;
 
     public ModuleSubscriptionService(
         IMapper mapper,
@@ -23,7 +25,8 @@ public class ModuleSubscriptionService : IModuleSubscriptionService
         IModuleRepository moduleRepo,
         IModuleSubscriptionRepository moduleSubscriptionRepo,
         IBillingOrderRepository billingOrderRepo,
-        IBillingOrderModuleRepository billingOrderModuleRepo)
+        IBillingOrderModuleRepository billingOrderModuleRepo,
+        ICurrentUserService currentUser)
     {
         _mapper = mapper;
         _currentTenantService = currentTenantService;
@@ -31,6 +34,7 @@ public class ModuleSubscriptionService : IModuleSubscriptionService
         _moduleSubscriptionRepo = moduleSubscriptionRepo;
         _billingOrderRepo = billingOrderRepo;
         _billingOrderModuleRepo = billingOrderModuleRepo;
+        _currentUser = currentUser;
     }
 
     public async Task<List<ModuleSubscriptionDto>> GetMyAllAsync()
@@ -71,11 +75,13 @@ public class ModuleSubscriptionService : IModuleSubscriptionService
 
     public async Task<bool> CancelMyModuleSubscriptionAsync(int moduleId)
     {
+        _currentUser.EnsureAdmin();
+
         var tenantId = GetTenantIdOrThrow();
         var sub = await _moduleSubscriptionRepo.GetByTenantAndModuleIgnoreTenantAsync(tenantId, moduleId);
         
         if (sub == null || sub.IsDeleted) 
-            throw new Exception("Không tìm thấy module này trong danh sách đăng ký.");
+            throw new KeyNotFoundException("Không tìm thấy module này trong danh sách đăng ký.");
 
         sub.IsDeleted = true;
         sub.Status = StatusEnum.ModuleSuspended;

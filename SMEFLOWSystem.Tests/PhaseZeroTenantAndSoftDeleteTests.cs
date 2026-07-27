@@ -7,7 +7,7 @@ namespace SMEFLOWSystem.Tests;
 
 public sealed class PhaseZeroTenantAndSoftDeleteTests
 {
-    [KnownBugFact("BE-HR-01")]
+    [Fact]
     [Trait("Phase", "0")]
     [Trait("Gap", "BE-HR-01")]
     public async Task ShiftIncludeDeleted_NeverReturnsAnotherTenant()
@@ -23,7 +23,9 @@ public sealed class PhaseZeroTenantAndSoftDeleteTests
             Shift(tenantB, "B-DELETED", isDeleted: true));
         await context.SaveChangesAsync();
 
-        var repository = new ShiftRepository(context);
+        var repository = new ShiftRepository(
+            context,
+            new PhaseZeroTestContext.MutableCurrentTenantService(tenantA));
         var (items, total) = await repository.GetPagedAsync(
             search: null,
             includeDeleted: true,
@@ -36,7 +38,7 @@ public sealed class PhaseZeroTenantAndSoftDeleteTests
         Assert.Contains(items, item => item.Code == "A-DELETED");
     }
 
-    [KnownBugFact("BE-HR-01")]
+    [Fact]
     [Trait("Phase", "0")]
     [Trait("Gap", "BE-HR-01")]
     public async Task ShiftPatternIncludeDeleted_NeverReturnsAnotherTenant()
@@ -52,7 +54,9 @@ public sealed class PhaseZeroTenantAndSoftDeleteTests
             Pattern(tenantB, "B Deleted", isDeleted: true));
         await context.SaveChangesAsync();
 
-        var repository = new ShiftPatternRepository(context);
+        var repository = new ShiftPatternRepository(
+            context,
+            new PhaseZeroTestContext.MutableCurrentTenantService(tenantA));
         var (items, total) = await repository.GetPagedAsync(
             search: null,
             includeDeleted: true,

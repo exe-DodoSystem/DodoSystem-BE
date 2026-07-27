@@ -2,16 +2,21 @@ using Microsoft.EntityFrameworkCore;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.Core.Entities;
 using SMEFLOWSystem.Infrastructure.Data;
+using SMEFLOWSystem.SharedKernel.Interfaces;
 
 namespace SMEFLOWSystem.Infrastructure.Repositories;
 
 public class ShiftRepository : IShiftRepository
 {
     private readonly SMEFLOWSystemContext _context;
+    private readonly ICurrentTenantService _currentTenantService;
 
-    public ShiftRepository(SMEFLOWSystemContext context)
+    public ShiftRepository(
+        SMEFLOWSystemContext context,
+        ICurrentTenantService currentTenantService)
     {
         _context = context;
+        _currentTenantService = currentTenantService;
     }
 
     public async Task<(List<Shift> Items, int TotalCount)> GetPagedAsync(
@@ -23,13 +28,19 @@ public class ShiftRepository : IShiftRepository
         if (pageNumber < 1) pageNumber = 1;
         if (pageSize < 1) pageSize = 10;
 
-        var query = _context.Shifts
+        var tenantId = _currentTenantService.TenantId
+            ?? throw new UnauthorizedAccessException("Tenant ID is missing.");
+
+        IQueryable<Shift> query = includeDeleted
+            ? _context.Shifts
+                .IgnoreQueryFilters()
+                .Where(shift => shift.TenantId == tenantId)
+            : _context.Shifts;
+
+        query = query
             .AsNoTracking()
             .Include(s => s.Segments)
             .AsQueryable();
-
-        if (includeDeleted)
-            query = query.IgnoreQueryFilters();
 
         if (!string.IsNullOrWhiteSpace(search))
         {
