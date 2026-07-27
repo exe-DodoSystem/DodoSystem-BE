@@ -408,6 +408,7 @@ public sealed class SystemAnalyticsReadRepository : ISystemAnalyticsReadReposito
         Guid tenantId,
         DateTime periodFromUtc,
         DateTime periodToExclusiveUtc,
+        int? moduleId,
         CancellationToken ct)
     {
         ValidateRange(periodFromUtc, periodToExclusiveUtc);
@@ -432,6 +433,9 @@ public sealed class SystemAnalyticsReadRepository : ISystemAnalyticsReadReposito
             return null;
         }
 
+        var billingLines = _context.BillingOrderModules
+            .IgnoreQueryFilters()
+            .AsNoTracking();
         var payments =
             from payment in _context.PaymentTransactions.IgnoreQueryFilters().AsNoTracking()
             join order in _context.BillingOrders.IgnoreQueryFilters().AsNoTracking()
@@ -439,6 +443,10 @@ public sealed class SystemAnalyticsReadRepository : ISystemAnalyticsReadReposito
             where payment.TenantId == tenantId
                 && order.TenantId == tenantId
                 && order.IsDeleted != true
+                && (!moduleId.HasValue || billingLines.Any(line =>
+                    line.BillingOrderId == order.Id
+                    && line.TenantId == tenantId
+                    && line.ModuleId == moduleId.Value))
             select new
             {
                 payment.Amount,
@@ -486,7 +494,11 @@ public sealed class SystemAnalyticsReadRepository : ISystemAnalyticsReadReposito
                 order.TenantId == tenantId
                 && order.IsDeleted != true
                 && order.PaymentStatus.ToLower() == "pending"
-                && order.Status.ToLower() != "cancelled")
+                && order.Status.ToLower() != "cancelled"
+                && (!moduleId.HasValue || billingLines.Any(line =>
+                    line.BillingOrderId == order.Id
+                    && line.TenantId == tenantId
+                    && line.ModuleId == moduleId.Value)))
             .Select(order => (decimal?)(order.FinalAmount
                 ?? (order.TotalAmount - (order.DiscountAmount ?? 0m))))
             .SumAsync(ct) ?? 0m;
@@ -510,35 +522,59 @@ public sealed class SystemAnalyticsReadRepository : ISystemAnalyticsReadReposito
     public async Task<TenantSubscriptionCountRow> GetTenantSubscriptionCountsAsync(
         Guid tenantId,
         DateTime nowUtc,
+        int? moduleId,
         CancellationToken ct)
     {
         var expiringBeforeUtc = nowUtc.AddDays(30);
-        var query =
+        var subscriptions = await (
             from subscription in _context.ModuleSubscriptions.IgnoreQueryFilters().AsNoTracking()
             join tenant in _context.Tenants.IgnoreQueryFilters().AsNoTracking()
                 on subscription.TenantId equals tenant.Id
+            join module in _context.Modules.AsNoTracking()
+                on subscription.ModuleId equals module.Id
             where subscription.TenantId == tenantId
                 && subscription.StartDate <= nowUtc
                 && subscription.EndDate > nowUtc
                 && !subscription.IsDeleted
+                && (!moduleId.HasValue || subscription.ModuleId == moduleId.Value)
                 && !tenant.IsDeleted
                 && tenant.Name != SystemTenantConstants.Name
-            select subscription;
+            select new
+            {
+                subscription.Status,
+                subscription.EndDate,
+                module.MonthlyPrice
+            })
+            .ToListAsync(ct);
 
         return new TenantSubscriptionCountRow
         {
-            Active = await query.CountAsync(
-                subscription => subscription.Status.ToLower() == "active",
-                ct),
-            Trial = await query.CountAsync(
-                subscription => subscription.Status.ToLower() == "trial",
-                ct),
-            ExpiringIn30Days = await query.CountAsync(
-                subscription =>
-                    (subscription.Status.ToLower() == "active"
-                        || subscription.Status.ToLower() == "trial")
-                    && subscription.EndDate <= expiringBeforeUtc,
-                ct)
+            Active = subscriptions.Count(subscription =>
+                string.Equals(
+                    subscription.Status,
+                    "Active",
+                    StringComparison.OrdinalIgnoreCase)),
+            Trial = subscriptions.Count(subscription =>
+                string.Equals(
+                    subscription.Status,
+                    "Trial",
+                    StringComparison.OrdinalIgnoreCase)),
+            ExpiringIn30Days = subscriptions.Count(subscription =>
+                (string.Equals(
+                        subscription.Status,
+                        "Active",
+                        StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(
+                        subscription.Status,
+                        "Trial",
+                        StringComparison.OrdinalIgnoreCase))
+                && subscription.EndDate <= expiringBeforeUtc),
+            EstimatedMrr = subscriptions
+                .Where(subscription => string.Equals(
+                    subscription.Status,
+                    "Active",
+                    StringComparison.OrdinalIgnoreCase))
+                .Sum(subscription => subscription.MonthlyPrice)
         };
     }
 

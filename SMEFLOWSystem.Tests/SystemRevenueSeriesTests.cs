@@ -352,12 +352,14 @@ public sealed class SystemRevenueSeriesTests
             Guid tenantId,
             DateTime periodFromUtc,
             DateTime periodToExclusiveUtc,
+            int? moduleId,
             CancellationToken ct)
             => Task.FromResult<TenantFinancialAggregateRow?>(null);
 
         public Task<TenantSubscriptionCountRow> GetTenantSubscriptionCountsAsync(
             Guid tenantId,
             DateTime nowUtc,
+            int? moduleId,
             CancellationToken ct)
             => Task.FromResult(new TenantSubscriptionCountRow());
 

@@ -223,15 +223,13 @@ public sealed class SystemAnalyticsService : ISystemAnalyticsService
         if (unknownTypeCount > 0)
         {
             _logger.LogWarning(
-                "Excluded {UnknownActionCenterTypeCount} System Analytics action-center candidates with unrecognized types.",
+                "Excluded {UnknownActionCenterTypeCount} action-center candidates with unrecognized types.",
                 unknownTypeCount);
         }
 
         var uniqueItems = mappedItems
             .GroupBy(item => item.Id, StringComparer.Ordinal)
-            .Select(group => group
-                .OrderByDescending(item => item.OccurredAt)
-                .First())
+            .Select(group => group.OrderByDescending(item => item.OccurredAt).First())
             .ToList();
         var counts = new SystemActionCenterCountsDto
         {
@@ -714,43 +712,16 @@ public sealed class SystemAnalyticsService : ISystemAnalyticsService
 
     private static string? NormalizeActionCenterType(string? type)
     {
-        if (string.Equals(
-                type,
-                SystemActionCenterItemType.PaymentFailed,
-                StringComparison.OrdinalIgnoreCase))
+        var knownTypes = new[]
         {
-            return SystemActionCenterItemType.PaymentFailed;
-        }
-        if (string.Equals(
-                type,
-                SystemActionCenterItemType.OrderOverdue,
-                StringComparison.OrdinalIgnoreCase))
-        {
-            return SystemActionCenterItemType.OrderOverdue;
-        }
-        if (string.Equals(
-                type,
-                SystemActionCenterItemType.SubscriptionExpiring,
-                StringComparison.OrdinalIgnoreCase))
-        {
-            return SystemActionCenterItemType.SubscriptionExpiring;
-        }
-        if (string.Equals(
-                type,
-                SystemActionCenterItemType.TrialEnding,
-                StringComparison.OrdinalIgnoreCase))
-        {
-            return SystemActionCenterItemType.TrialEnding;
-        }
-        if (string.Equals(
-                type,
-                SystemActionCenterItemType.TenantSuspended,
-                StringComparison.OrdinalIgnoreCase))
-        {
-            return SystemActionCenterItemType.TenantSuspended;
-        }
-
-        return null;
+            SystemActionCenterItemType.PaymentFailed,
+            SystemActionCenterItemType.OrderOverdue,
+            SystemActionCenterItemType.SubscriptionExpiring,
+            SystemActionCenterItemType.TrialEnding,
+            SystemActionCenterItemType.TenantSuspended
+        };
+        return knownTypes.FirstOrDefault(known =>
+            string.Equals(known, type, StringComparison.OrdinalIgnoreCase));
     }
 
     private static string BuildActionCenterTargetPath(

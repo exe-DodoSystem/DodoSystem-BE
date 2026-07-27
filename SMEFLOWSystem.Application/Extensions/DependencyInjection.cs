@@ -63,6 +63,7 @@ public static class DependencyInjection
         services.AddScoped<ISystemTenantService, SystemTenantService>();
         services.AddScoped<ISystemDashboardService, SystemDashboardService>();
         services.AddScoped<ISystemAnalyticsService, SystemAnalyticsService>();
+        services.AddScoped<ISystemTenantAnalyticsService, SystemTenantAnalyticsService>();
         services.AddScoped<ISystemSubscriptionService, SystemSubscriptionService>();
         services.AddScoped<ISystemBillingService, SystemBillingService>();
 
