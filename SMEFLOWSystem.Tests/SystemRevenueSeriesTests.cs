@@ -162,10 +162,19 @@ public sealed class SystemRevenueSeriesTests
     {
         var repository = new FakeAnalyticsRepository();
         var service = CreateService(repository);
-        var query = Query(new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 1));
+        var from = new DateOnly(2026, 7, 1);
+        var to = new DateOnly(2026, 7, 1);
+        var query = Query(from, to);
+        var equivalentQueryWithDifferentCasing = Query(from, to);
+        equivalentQueryWithDifferentCasing.Timezone = "asia/ho_chi_minh";
+        equivalentQueryWithDifferentCasing.Currency = "vnd";
+        equivalentQueryWithDifferentCasing.Compare = "NONE";
+        equivalentQueryWithDifferentCasing.TenantSegment = "ALL";
+        equivalentQueryWithDifferentCasing.Granularity = "DAY";
 
         var first = await service.GetRevenueSeriesAsync(query);
-        var second = await service.GetRevenueSeriesAsync(query);
+        var second = await service.GetRevenueSeriesAsync(
+            equivalentQueryWithDifferentCasing);
 
         Assert.Same(first, second);
         Assert.Equal(1, repository.InvoicedQueryCount);

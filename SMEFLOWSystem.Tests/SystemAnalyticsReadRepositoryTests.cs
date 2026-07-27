@@ -1,5 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using SMEFLOWSystem.Application.DTOs.SystemAnalyticsDtos;
+using SMEFLOWSystem.Application.Options;
+using SMEFLOWSystem.Application.Services.System;
 using SMEFLOWSystem.Core.Entities;
 using SMEFLOWSystem.Infrastructure.Data;
 using SMEFLOWSystem.Infrastructure.Repositories;
@@ -241,6 +246,191 @@ public sealed class SystemAnalyticsReadRepositoryTests
 
         Assert.Equal(paidOrder.Id, Assert.Single(paidRows).OrderId);
         Assert.Equal(trialOrder.Id, Assert.Single(trialRows).OrderId);
+    }
+
+    [Fact]
+    public async Task RevenueSeriesAndEveryBreakdownDimension_ReconcileThroughReadRepository()
+    {
+        await using var context = CreateContext();
+        var tenantA = Tenant("Tenant A");
+        var tenantB = Tenant("Tenant B");
+        var systemTenant = Tenant("SYSTEM");
+        context.Tenants.AddRange(tenantA, tenantB, systemTenant);
+
+        var moduleA = Module("ATTENDANCE", 100m);
+        var moduleB = Module("PAYROLL", 200m);
+        context.Modules.AddRange(moduleA, moduleB);
+        await context.SaveChangesAsync();
+
+        var processedAt = new DateTime(2026, 7, 15, 5, 0, 0, DateTimeKind.Utc);
+        var orderA = Order(tenantA.Id, processedAt, 100m, 10m);
+        var orderB = Order(tenantB.Id, processedAt.AddDays(1), 50m, 0m);
+        var systemOrder = Order(systemTenant.Id, processedAt, 500m, 0m);
+        context.BillingOrders.AddRange(orderA, orderB, systemOrder);
+        context.BillingOrderModules.AddRange(
+            BillingLine(tenantA.Id, orderA.Id, moduleA.Id, 60m),
+            BillingLine(tenantA.Id, orderA.Id, moduleB.Id, 40m),
+            BillingLine(tenantB.Id, orderB.Id, moduleB.Id, 50m),
+            BillingLine(systemTenant.Id, systemOrder.Id, moduleA.Id, 500m));
+        context.PaymentTransactions.AddRange(
+            Payment(tenantA.Id, orderA.Id, "Success", processedAt, 90m),
+            Payment(tenantB.Id, orderB.Id, "Settled", processedAt.AddDays(1), 50m),
+            Payment(tenantA.Id, orderA.Id, "Failed", processedAt, 30m),
+            Payment(systemTenant.Id, systemOrder.Id, "Paid", processedAt, 500m));
+        await context.SaveChangesAsync();
+
+        var repository = new SystemAnalyticsReadRepository(context);
+        var service = new SystemAnalyticsService(
+            repository,
+            new MemoryCache(new MemoryCacheOptions()),
+            Options.Create(new SystemAnalyticsOptions()),
+            NullLogger<SystemAnalyticsService>.Instance);
+        var series = await service.GetRevenueSeriesAsync(new SystemRevenueSeriesQueryDto
+        {
+            From = new DateOnly(2026, 7, 1),
+            To = new DateOnly(2026, 7, 31),
+            Compare = SystemAnalyticsCompare.None,
+            Granularity = SystemAnalyticsGranularity.Day
+        });
+        var seriesCollected = series.Points.Sum(point => point.CollectedRevenue);
+
+        Assert.Equal(140m, seriesCollected);
+        foreach (var dimension in new[]
+                 {
+                     SystemAnalyticsDimension.Module,
+                     SystemAnalyticsDimension.Tenant,
+                     SystemAnalyticsDimension.Gateway
+                 })
+        {
+            var breakdown = await service.GetRevenueBreakdownAsync(
+                new SystemRevenueBreakdownQueryDto
+                {
+                    From = new DateOnly(2026, 7, 1),
+                    To = new DateOnly(2026, 7, 31),
+                    Compare = SystemAnalyticsCompare.None,
+                    Dimension = dimension,
+                    Limit = 10
+                });
+
+            Assert.Equal(seriesCollected, breakdown.TotalCollectedRevenue);
+            Assert.Equal(
+                seriesCollected,
+                breakdown.Items.Sum(item => item.CollectedRevenue)
+                    + (breakdown.Other?.CollectedRevenue ?? 0m));
+        }
+    }
+
+    [Fact]
+    public async Task ActionCenterCandidates_ApplyTimeBoundariesAndExcludeSystemTenant()
+    {
+        await using var context = CreateContext();
+        var tenant = Tenant("Tenant A");
+        var suspendedTenant = Tenant("Suspended tenant");
+        suspendedTenant.Status = "Suspended";
+        var systemTenant = Tenant("SYSTEM");
+        context.Tenants.AddRange(tenant, suspendedTenant, systemTenant);
+        var module = Module("ATTENDANCE", 100m);
+        context.Modules.Add(module);
+        await context.SaveChangesAsync();
+
+        var now = new DateTime(2026, 7, 24, 12, 0, 0, DateTimeKind.Utc);
+        var failedBoundaryOrder = Order(tenant.Id, now, 100m, 0m);
+        var failedOutsideOrder = Order(tenant.Id, now, 100m, 0m);
+        var overdueBoundaryOrder = Order(tenant.Id, now.AddHours(-24), 100m, 0m);
+        var notOverdueOrder = Order(
+            tenant.Id,
+            now.AddHours(-24).AddSeconds(1),
+            100m,
+            0m);
+        var systemOrder = Order(systemTenant.Id, now, 100m, 0m);
+        context.BillingOrders.AddRange(
+            failedBoundaryOrder,
+            failedOutsideOrder,
+            overdueBoundaryOrder,
+            notOverdueOrder,
+            systemOrder);
+        var failedBoundary = Payment(
+            tenant.Id,
+            failedBoundaryOrder.Id,
+            "Failed",
+            now.AddHours(-24),
+            100m);
+        var failedOutside = Payment(
+            tenant.Id,
+            failedOutsideOrder.Id,
+            "Failed",
+            now.AddHours(-24).AddTicks(-1),
+            100m);
+        var systemFailure = Payment(
+            systemTenant.Id,
+            systemOrder.Id,
+            "Failed",
+            now,
+            100m);
+        context.PaymentTransactions.AddRange(
+            failedBoundary,
+            failedOutside,
+            systemFailure);
+        var activeBoundary = Subscription(
+            tenant.Id,
+            module.Id,
+            "Active",
+            now.AddMonths(-1),
+            now.AddDays(7));
+        var trialBoundary = Subscription(
+            tenant.Id,
+            module.Id,
+            "Trial",
+            now.AddDays(-1),
+            now.AddDays(7));
+        var outsideWindow = Subscription(
+            tenant.Id,
+            module.Id,
+            "Active",
+            now.AddMonths(-1),
+            now.AddDays(7).AddTicks(1));
+        var systemSubscription = Subscription(
+            systemTenant.Id,
+            module.Id,
+            "Active",
+            now.AddMonths(-1),
+            now.AddDays(1));
+        context.ModuleSubscriptions.AddRange(
+            activeBoundary,
+            trialBoundary,
+            outsideWindow,
+            systemSubscription);
+        await context.SaveChangesAsync();
+
+        var repository = new SystemAnalyticsReadRepository(context);
+        var candidates = await repository.GetActionCenterCandidatesAsync(
+            now,
+            overdueGraceHours: 24,
+            CancellationToken.None);
+
+        Assert.Contains(candidates, candidate =>
+            candidate.Type == SystemActionCenterItemType.PaymentFailed
+            && candidate.EntityId == failedBoundary.Id);
+        Assert.DoesNotContain(candidates, candidate =>
+            candidate.EntityId == failedOutside.Id);
+        Assert.Contains(candidates, candidate =>
+            candidate.Type == SystemActionCenterItemType.OrderOverdue
+            && candidate.EntityId == overdueBoundaryOrder.Id);
+        Assert.DoesNotContain(candidates, candidate =>
+            candidate.EntityId == notOverdueOrder.Id);
+        Assert.Contains(candidates, candidate =>
+            candidate.Type == SystemActionCenterItemType.SubscriptionExpiring
+            && candidate.EntityId == activeBoundary.Id);
+        Assert.Contains(candidates, candidate =>
+            candidate.Type == SystemActionCenterItemType.TrialEnding
+            && candidate.EntityId == trialBoundary.Id);
+        Assert.DoesNotContain(candidates, candidate =>
+            candidate.EntityId == outsideWindow.Id);
+        Assert.Contains(candidates, candidate =>
+            candidate.Type == SystemActionCenterItemType.TenantSuspended
+            && candidate.EntityId == suspendedTenant.Id);
+        Assert.DoesNotContain(candidates, candidate =>
+            candidate.TenantId == systemTenant.Id);
     }
 
     private static SMEFLOWSystemContext CreateContext()

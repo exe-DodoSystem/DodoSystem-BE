@@ -312,7 +312,7 @@ public sealed class SystemAnalyticsReadRepository : ISystemAnalyticsReadReposito
             where payment.TenantId == order.TenantId
                 && payment.Status.ToLower() == "failed"
                 && (payment.ProcessedAt ?? payment.CreatedAt) >= failedSinceUtc
-                && (payment.ProcessedAt ?? payment.CreatedAt) < nowUtc
+                && (payment.ProcessedAt ?? payment.CreatedAt) <= nowUtc
                 && order.IsDeleted != true
                 && !tenant.IsDeleted
                 && tenant.Name != SystemTenantConstants.Name
@@ -324,7 +324,7 @@ public sealed class SystemAnalyticsReadRepository : ISystemAnalyticsReadReposito
                 TenantId = tenant.Id,
                 TenantName = tenant.Name,
                 OccurredAt = payment.ProcessedAt ?? payment.CreatedAt,
-                AdditionalInfo = payment.Gateway
+                AdditionalInfo = null
             })
             .ToListAsync(ct);
 
