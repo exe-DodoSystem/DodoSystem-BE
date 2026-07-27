@@ -10,34 +10,28 @@ namespace SMEFLOWSystem.Tests;
 
 public sealed class PhaseZeroAttendanceContractTests
 {
-    [Fact]
+    [Theory]
+    [InlineData(false, "FakeGPS: Phát hiện sử dụng phần mềm giả mạo vị trí.")]
+    [InlineData(true, "FakeGPS: Phát hiện sử dụng phần mềm giả mạo vị trí.")]
+    [InlineData(false, "BatBuocGPS: Vui lòng bật định vị GPS để chấm công.")]
+    [InlineData(true, "BatBuocGPS: Vui lòng bật định vị GPS để chấm công.")]
+    [InlineData(false, "NgoaiVung: Bạn đang ở ngoài vùng chấm công cho phép.")]
+    [InlineData(true, "NgoaiVung: Bạn đang ở ngoài vùng chấm công cho phép.")]
     [Trait("Phase", "0")]
     [Trait("Gap", "BE-ATT-02")]
-    public async Task BusinessValidation_ReturnsBadRequest_ForJsonTransport()
+    public async Task BusinessValidation_ReturnsBadRequestWithMessage_ForBothTransports(
+        bool multipart,
+        string message)
     {
-        var controller = CreateController(
-            new InvalidOperationException(
-                "FakeGPS: Phát hiện sử dụng phần mềm giả mạo vị trí."));
+        var controller =
+            CreateController(new InvalidOperationException(message));
 
-        var result = await controller.SubmitPunch(new SubmitPunchRequestDto());
+        var result = multipart
+            ? await controller.SubmitPunchForm(new SubmitPunchRequestDto(), null)
+            : await controller.SubmitPunch(new SubmitPunchRequestDto());
 
-        Assert.IsType<BadRequestObjectResult>(result);
-    }
-
-    [KnownBugFact("BE-ATT-02")]
-    [Trait("Phase", "0")]
-    [Trait("Gap", "BE-ATT-02")]
-    public async Task BusinessValidation_ReturnsBadRequest_ForMultipartTransport()
-    {
-        var controller = CreateController(
-            new InvalidOperationException(
-                "FakeGPS: Phát hiện sử dụng phần mềm giả mạo vị trí."));
-
-        var result = await controller.SubmitPunchForm(
-            new SubmitPunchRequestDto(),
-            null);
-
-        Assert.IsType<BadRequestObjectResult>(result);
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal(message, ReadStringProperty(badRequest.Value, "Error"));
     }
 
     [Theory]
@@ -56,10 +50,33 @@ public sealed class PhaseZeroAttendanceContractTests
             ? await controller.SubmitPunchForm(new SubmitPunchRequestDto(), null)
             : await controller.SubmitPunch(new SubmitPunchRequestDto());
 
-        Assert.IsType<NotFoundObjectResult>(result);
+        var notFound = Assert.IsType<NotFoundObjectResult>(result);
+        Assert.Equal(
+            "Employee not found for current user.",
+            ReadStringProperty(notFound.Value, "Error"));
     }
 
-    private static AttendanceController CreateController(Exception exception)
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Phase", "0")]
+    [Trait("Gap", "BE-ATT-02")]
+    public async Task ValidRequest_ReturnsOk_ForBothTransports(bool multipart)
+    {
+        var controller = CreateController();
+
+        var result = multipart
+            ? await controller.SubmitPunchForm(new SubmitPunchRequestDto(), null)
+            : await controller.SubmitPunch(new SubmitPunchRequestDto());
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(
+            "Punch submitted successfully",
+            ReadStringProperty(ok.Value, "Message"));
+    }
+
+    private static AttendanceController CreateController(
+        Exception? exception = null)
     {
         var userId = Guid.NewGuid();
         var identity = new ClaimsIdentity(
@@ -69,7 +86,7 @@ public sealed class PhaseZeroAttendanceContractTests
             },
             authenticationType: "PhaseZeroTest");
 
-        return new AttendanceController(new ThrowingAttendanceService(exception))
+        return new AttendanceController(new StubAttendanceService(exception))
         {
             ControllerContext = new ControllerContext
             {
@@ -81,11 +98,19 @@ public sealed class PhaseZeroAttendanceContractTests
         };
     }
 
-    private sealed class ThrowingAttendanceService : IAttendanceService
+    private static string? ReadStringProperty(object? value, string propertyName)
     {
-        private readonly Exception _exception;
+        return value?
+            .GetType()
+            .GetProperty(propertyName)?
+            .GetValue(value) as string;
+    }
 
-        public ThrowingAttendanceService(Exception exception)
+    private sealed class StubAttendanceService : IAttendanceService
+    {
+        private readonly Exception? _exception;
+
+        public StubAttendanceService(Exception? exception)
         {
             _exception = exception;
         }
@@ -94,7 +119,9 @@ public sealed class PhaseZeroAttendanceContractTests
             Guid userId,
             SubmitPunchRequestDto request)
         {
-            return Task.FromException<RawPunchLogDto>(_exception);
+            return _exception == null
+                ? Task.FromResult(new RawPunchLogDto())
+                : Task.FromException<RawPunchLogDto>(_exception);
         }
 
         public Task<TodayAttendanceDto> GetMyTodayStatusAsync(Guid userId)

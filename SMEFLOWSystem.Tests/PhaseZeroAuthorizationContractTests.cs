@@ -39,7 +39,7 @@ public sealed class PhaseZeroAuthorizationContractTests
                 StringComparison.Ordinal));
     }
 
-    [KnownBugFact("BE-LEAVE-01")]
+    [Fact]
     [Trait("Phase", "0")]
     [Trait("Gap", "BE-LEAVE-01")]
     public void LeaveRequestService_DependsOnCentralHrAuthorization()
@@ -47,7 +47,7 @@ public sealed class PhaseZeroAuthorizationContractTests
         AssertConstructorDependsOn<IHrAuthorizationService>(typeof(LeaveRequestService));
     }
 
-    [KnownBugFact("BE-LEAVE-01")]
+    [Fact]
     [Trait("Phase", "0")]
     [Trait("Gap", "BE-LEAVE-01")]
     public void LeaveRequestListQueries_AcceptDepartmentScope()
@@ -60,7 +60,7 @@ public sealed class PhaseZeroAuthorizationContractTests
             nameof(ILeaveRequestRepository.GetAllAsync));
     }
 
-    [KnownBugFact("BE-MGR-05")]
+    [Fact]
     [Trait("Phase", "0")]
     [Trait("Gap", "BE-MGR-05")]
     public void ManualTimesheetService_DependsOnCentralHrAuthorization()
@@ -68,7 +68,7 @@ public sealed class PhaseZeroAuthorizationContractTests
         AssertConstructorDependsOn<IHrAuthorizationService>(typeof(ManualTimesheetService));
     }
 
-    [KnownBugFact("BE-MGR-05")]
+    [Fact]
     [Trait("Phase", "0")]
     [Trait("Gap", "BE-MGR-05")]
     public void ManualTimesheetMonthQuery_AcceptsDepartmentScope()

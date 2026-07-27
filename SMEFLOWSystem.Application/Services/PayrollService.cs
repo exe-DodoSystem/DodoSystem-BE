@@ -81,7 +81,11 @@ namespace SMEFLOWSystem.Application.Services
                 .GroupBy(t => t.EmployeeId)
                 .ToDictionary(g => g.Key, g => g.ToList());
 
-            var allManualTimesheets = await _manualTimesheetRepository.GetByTenantMonthYearAsync(tenantId, month, year);
+            var allManualTimesheets = await _manualTimesheetRepository.GetByTenantMonthYearAsync(
+                tenantId,
+                month,
+                year,
+                departmentIds: null);
             var manualTimesheetByEmployee = allManualTimesheets.ToDictionary(t => t.EmployeeId);
 
             var allEntries = await _entriesRepo.GetByTenantMonthYearAsync(tenantId, month, year);
@@ -523,7 +527,11 @@ namespace SMEFLOWSystem.Application.Services
                 var allTimesheets = await _timesheetRepository.GetByTenantMonthAsync(tenantId, month, year);
                 var timesheetEmployeeIds = allTimesheets.Select(t => t.EmployeeId).ToHashSet();
 
-                var allManualTimesheets = await _manualTimesheetRepository.GetByTenantMonthYearAsync(tenantId, month, year);
+                var allManualTimesheets = await _manualTimesheetRepository.GetByTenantMonthYearAsync(
+                    tenantId,
+                    month,
+                    year,
+                    departmentIds: null);
                 var manualEmployeeIds = allManualTimesheets.Select(t => t.EmployeeId).ToHashSet();
 
                 foreach (var dto in dtos)

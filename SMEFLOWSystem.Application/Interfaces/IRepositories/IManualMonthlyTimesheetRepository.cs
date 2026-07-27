@@ -12,5 +12,9 @@ public interface IManualMonthlyTimesheetRepository
     Task DeleteAsync(ManualMonthlyTimesheet timesheet);
     Task<ManualMonthlyTimesheet?> GetByIdAsync(Guid id);
     Task<ManualMonthlyTimesheet?> GetByEmployeeMonthYearAsync(Guid tenantId, Guid employeeId, int month, int year);
-    Task<List<ManualMonthlyTimesheet>> GetByTenantMonthYearAsync(Guid tenantId, int month, int year);
+    Task<List<ManualMonthlyTimesheet>> GetByTenantMonthYearAsync(
+        Guid tenantId,
+        int month,
+        int year,
+        IReadOnlyCollection<Guid>? departmentIds);
 }

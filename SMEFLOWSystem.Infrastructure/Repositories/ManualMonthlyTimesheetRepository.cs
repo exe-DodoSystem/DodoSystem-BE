@@ -50,11 +50,31 @@ public class ManualMonthlyTimesheetRepository : IManualMonthlyTimesheetRepositor
             .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.EmployeeId == employeeId && x.Month == month && x.Year == year);
     }
 
-    public async Task<List<ManualMonthlyTimesheet>> GetByTenantMonthYearAsync(Guid tenantId, int month, int year)
+    public async Task<List<ManualMonthlyTimesheet>> GetByTenantMonthYearAsync(
+        Guid tenantId,
+        int month,
+        int year,
+        IReadOnlyCollection<Guid>? departmentIds)
     {
-        return await _context.ManualMonthlyTimesheets
+        if (departmentIds is { Count: 0 })
+        {
+            return new List<ManualMonthlyTimesheet>();
+        }
+
+        var query = _context.ManualMonthlyTimesheets
             .Include(x => x.Employee)
-            .Where(x => x.TenantId == tenantId && x.Month == month && x.Year == year)
-            .ToListAsync();
+            .Where(x =>
+                x.TenantId == tenantId &&
+                x.Month == month &&
+                x.Year == year);
+
+        if (departmentIds != null)
+        {
+            query = query.Where(x =>
+                x.Employee.DepartmentId.HasValue &&
+                departmentIds.Contains(x.Employee.DepartmentId.Value));
+        }
+
+        return await query.ToListAsync();
     }
 }

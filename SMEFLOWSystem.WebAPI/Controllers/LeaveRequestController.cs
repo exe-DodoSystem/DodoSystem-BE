@@ -129,6 +129,10 @@ public class LeaveRequestController : ControllerBase
         {
             return NotFound(new { Error = ex.Message });
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(403, new { Error = ex.Message });
+        }
         catch (InvalidOperationException ex)
         {
             return BadRequest(new { Error = ex.Message });
@@ -149,6 +153,10 @@ public class LeaveRequestController : ControllerBase
         catch (KeyNotFoundException ex)
         {
             return NotFound(new { Error = ex.Message });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(403, new { Error = ex.Message });
         }
         catch (InvalidOperationException ex)
         {

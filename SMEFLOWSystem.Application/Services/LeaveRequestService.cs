@@ -21,6 +21,7 @@ public class LeaveRequestService : ILeaveRequestService
     private readonly ITransaction _transaction;
     private readonly IRawPunchLogRepository _rawPunchLogRepository;
     private readonly IAttendanceSettingRepository _attendanceSettingRepository;
+    private readonly IHrAuthorizationService _hrAuthorization;
 
     private static readonly TimeZoneInfo VietnamTimeZone = GetVietnamTimeZone();
 
@@ -32,7 +33,8 @@ public class LeaveRequestService : ILeaveRequestService
         ICurrentTenantService currentTenantService,
         ITransaction transaction,
         IRawPunchLogRepository rawPunchLogRepository,
-        IAttendanceSettingRepository attendanceSettingRepository)
+        IAttendanceSettingRepository attendanceSettingRepository,
+        IHrAuthorizationService hrAuthorization)
     {
         _leaveRequestRepository = leaveRequestRepository;
         _leaveTypeRepository = leaveTypeRepository;
@@ -42,6 +44,7 @@ public class LeaveRequestService : ILeaveRequestService
         _transaction = transaction;
         _rawPunchLogRepository = rawPunchLogRepository;
         _attendanceSettingRepository = attendanceSettingRepository;
+        _hrAuthorization = hrAuthorization;
     }
 
     private static TimeZoneInfo GetVietnamTimeZone()
@@ -272,7 +275,11 @@ public class LeaveRequestService : ILeaveRequestService
     {
         var tenantId = _currentTenantService.TenantId ?? throw new UnauthorizedAccessException("Tenant ID is missing.");
         var request = await _leaveRequestRepository.GetByIdAsync(requestId) ?? throw new KeyNotFoundException("Không tìm thấy đơn xin nghỉ phép.");
-        
+
+        var employee = request.Employee
+            ?? throw new KeyNotFoundException("Không tìm thấy nhân viên của đơn xin nghỉ phép.");
+        await _hrAuthorization.EnsureEmployeeAccessAsync(employee);
+
         request.Approve(hrUserId, dto.ApproverNote);
 
         await _transaction.ExecuteAsync(async () =>
@@ -318,7 +325,11 @@ public class LeaveRequestService : ILeaveRequestService
     {
         var tenantId = _currentTenantService.TenantId ?? throw new UnauthorizedAccessException("Tenant ID is missing.");
         var request = await _leaveRequestRepository.GetByIdAsync(requestId) ?? throw new KeyNotFoundException("Không tìm thấy đơn xin nghỉ phép.");
-        
+
+        var employee = request.Employee
+            ?? throw new KeyNotFoundException("Không tìm thấy nhân viên của đơn xin nghỉ phép.");
+        await _hrAuthorization.EnsureEmployeeAccessAsync(employee);
+
         var oldStatus = request.Status;
         request.Reject(hrUserId, dto.RejectReason);
 
@@ -351,13 +362,17 @@ public class LeaveRequestService : ILeaveRequestService
 
     public async Task<List<LeaveRequestDto>> GetPendingRequestsAsync()
     {
-        var list = await _leaveRequestRepository.GetPendingAsync();
+        var departmentIds =
+            await _hrAuthorization.GetAccessibleDepartmentIdsAsync();
+        var list = await _leaveRequestRepository.GetPendingAsync(departmentIds);
         return list.Select(MapToDto).ToList();
     }
 
     public async Task<List<LeaveRequestDto>> GetAllRequestsAsync()
     {
-        var list = await _leaveRequestRepository.GetAllAsync();
+        var departmentIds =
+            await _hrAuthorization.GetAccessibleDepartmentIdsAsync();
+        var list = await _leaveRequestRepository.GetAllAsync(departmentIds);
         return list.Select(MapToDto).ToList();
     }
 

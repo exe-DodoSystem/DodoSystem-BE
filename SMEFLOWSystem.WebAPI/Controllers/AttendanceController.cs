@@ -42,13 +42,9 @@ public class AttendanceController : ControllerBase
             var result = await _service.SubmitPunchAsync(userId, request);
             return Ok(new { Data = result, Message = "Punch submitted successfully" });
         }
-        catch (InvalidOperationException ex) when (ex.Message.StartsWith("Employee not found"))
-        {
-            return NotFound(new { Error = ex.Message });
-        }
         catch (InvalidOperationException ex)
         {
-            return BadRequest(new { Error = ex.Message });
+            return MapSubmitPunchError(ex);
         }
     }
 
@@ -63,17 +59,29 @@ public class AttendanceController : ControllerBase
             return Unauthorized(new { Error = "User is not authenticated correctly." });
         }
 
-        request.SelfieBase64 ??= await FormFileHelper.ToBase64DataUriAsync(selfie);
-
         try
         {
+            request.SelfieBase64 ??=
+                await FormFileHelper.ToBase64DataUriAsync(selfie);
             var result = await _service.SubmitPunchAsync(userId, request);
             return Ok(new { Data = result, Message = "Punch submitted successfully" });
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException ex)
         {
-            return NotFound(new { Error = "Employee not found for current user." });
+            return MapSubmitPunchError(ex);
         }
+    }
+
+    private IActionResult MapSubmitPunchError(InvalidOperationException exception)
+    {
+        if (exception.Message.StartsWith(
+            "Employee not found",
+            StringComparison.Ordinal))
+        {
+            return NotFound(new { Error = exception.Message });
+        }
+
+        return BadRequest(new { Error = exception.Message });
     }
 
     /// <summary>Lấy thông tin chấm công hôm nay của user đăng nhập</summary>

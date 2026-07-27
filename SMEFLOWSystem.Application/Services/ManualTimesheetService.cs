@@ -16,17 +16,20 @@ public class ManualTimesheetService : IManualTimesheetService
     private readonly IManualMonthlyTimesheetRepository _manualTimesheetRepo;
     private readonly IEmployeeRepository _employeeRepo;
     private readonly ICurrentUserService _currentUser;
+    private readonly IHrAuthorizationService _hrAuthorization;
     private readonly IMapper _mapper;
 
     public ManualTimesheetService(
         IManualMonthlyTimesheetRepository manualTimesheetRepo,
         IEmployeeRepository employeeRepo,
         ICurrentUserService currentUser,
+        IHrAuthorizationService hrAuthorization,
         IMapper mapper)
     {
         _manualTimesheetRepo = manualTimesheetRepo;
         _employeeRepo = employeeRepo;
         _currentUser = currentUser;
+        _hrAuthorization = hrAuthorization;
         _mapper = mapper;
     }
 
@@ -67,7 +70,13 @@ public class ManualTimesheetService : IManualTimesheetService
     {
         _currentUser.EnsureHrAccess();
 
-        var list = await _manualTimesheetRepo.GetByTenantMonthYearAsync(tenantId, month, year);
+        var departmentIds =
+            await _hrAuthorization.GetAccessibleDepartmentIdsAsync();
+        var list = await _manualTimesheetRepo.GetByTenantMonthYearAsync(
+            tenantId,
+            month,
+            year,
+            departmentIds);
         return _mapper.Map<List<ManualMonthlyTimesheetDto>>(list);
     }
 

@@ -59,25 +59,51 @@ public class LeaveRequestRepository : ILeaveRequestRepository
             .ToListAsync();
     }
 
-    public async Task<List<LeaveRequest>> GetPendingAsync()
+    public async Task<List<LeaveRequest>> GetPendingAsync(
+        IReadOnlyCollection<Guid>? departmentIds)
     {
-        return await _context.LeaveRequests
+        if (departmentIds is { Count: 0 })
+            return new List<LeaveRequest>();
+
+        IQueryable<LeaveRequest> query = _context.LeaveRequests
             .Include(r => r.Segments)
                 .ThenInclude(s => s.TargetShiftSegment)
             .Include(r => r.Employee)
             .Include(r => r.LeaveTypeNavigation)
-            .Where(r => r.Status == "Pending")
-            .ToListAsync();
+            .Where(r => r.Status == "Pending");
+
+        if (departmentIds != null)
+        {
+            query = query.Where(request =>
+                request.Employee != null &&
+                request.Employee.DepartmentId.HasValue &&
+                departmentIds.Contains(request.Employee.DepartmentId.Value));
+        }
+
+        return await query.ToListAsync();
     }
 
-    public async Task<List<LeaveRequest>> GetAllAsync()
+    public async Task<List<LeaveRequest>> GetAllAsync(
+        IReadOnlyCollection<Guid>? departmentIds)
     {
-        return await _context.LeaveRequests
+        if (departmentIds is { Count: 0 })
+            return new List<LeaveRequest>();
+
+        IQueryable<LeaveRequest> query = _context.LeaveRequests
             .Include(r => r.Segments)
                 .ThenInclude(s => s.TargetShiftSegment)
             .Include(r => r.Employee)
-            .Include(r => r.LeaveTypeNavigation)
-            .ToListAsync();
+            .Include(r => r.LeaveTypeNavigation);
+
+        if (departmentIds != null)
+        {
+            query = query.Where(request =>
+                request.Employee != null &&
+                request.Employee.DepartmentId.HasValue &&
+                departmentIds.Contains(request.Employee.DepartmentId.Value));
+        }
+
+        return await query.ToListAsync();
     }
 
     public async Task AddAsync(LeaveRequest leaveRequest)

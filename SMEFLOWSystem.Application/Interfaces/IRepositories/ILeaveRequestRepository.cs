@@ -14,8 +14,10 @@ public interface ILeaveRequestRepository
 
     Task<LeaveRequest?> GetByIdAsync(Guid id);
     Task<List<LeaveRequest>> GetByEmployeeAsync(Guid employeeId);
-    Task<List<LeaveRequest>> GetPendingAsync();
-    Task<List<LeaveRequest>> GetAllAsync();
+    Task<List<LeaveRequest>> GetPendingAsync(
+        IReadOnlyCollection<Guid>? departmentIds);
+    Task<List<LeaveRequest>> GetAllAsync(
+        IReadOnlyCollection<Guid>? departmentIds);
     Task AddAsync(LeaveRequest leaveRequest);
     Task UpdateAsync(LeaveRequest leaveRequest);
     Task DeleteAsync(LeaveRequest leaveRequest);
