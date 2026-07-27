@@ -179,8 +179,6 @@ public sealed class SystemActionCenterTests
             CancellationToken ct)
             => Task.FromResult(0m);
 
-        public Task<bool> ModuleExistsAsync(int moduleId, CancellationToken ct)
-            => Task.FromResult(true);
 
         public Task<List<BillingOrderModuleAllocationRow>>
             GetBillingOrderModuleAllocationsAsync(
