@@ -278,6 +278,7 @@ public sealed class SystemAnalyticsControllerContractTests
             ExcludesTestTenants = false,
             MrrStatus = mrrStatus
         };
+    }
     private sealed class MissingTenantAnalyticsService :
         ISystemTenantAnalyticsService
     {
