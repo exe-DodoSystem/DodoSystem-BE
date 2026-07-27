@@ -4,6 +4,7 @@ using SMEFLOWSystem.Application.DTOs.SystemAnalyticsDtos;
 using SMEFLOWSystem.Application.Exceptions;
 using SMEFLOWSystem.Application.Interfaces.IServices.System;
 using SMEFLOWSystem.SharedKernel.Common;
+using SMEFLOWSystem.WebAPI.Exceptions;
 using SMEFLOWSystem.WebAPI.ProblemDetails;
 
 namespace SMEFLOWSystem.WebAPI.Controllers.System;
@@ -27,9 +28,8 @@ public sealed class SystemAnalyticsController : ControllerBase
     /// <summary>[SystemAdmin] Lấy chuỗi doanh thu invoiced, collected, outstanding và estimated MRR.</summary>
     [HttpGet("revenue-series")]
     [ProducesResponseType<SystemRevenueSeriesResponseDto>(StatusCodes.Status200OK)]
-    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType<Microsoft.AspNetCore.Mvc.ProblemDetails>(
-        StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType<ApiProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiProblemDetails>(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetRevenueSeries(
         [FromQuery] SystemRevenueSeriesQueryDto query,
         CancellationToken cancellationToken)
@@ -43,7 +43,7 @@ public sealed class SystemAnalyticsController : ControllerBase
             var problem = SystemAnalyticsProblemDetailsFactory.Validation(
                 HttpContext,
                 exception.Errors);
-            return StatusCode(problem.Status!.Value, problem);
+            return ApiProblemDetailsFactory.CreateResult(problem);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -55,16 +55,15 @@ public sealed class SystemAnalyticsController : ControllerBase
                 exception,
                 "Unexpected error while generating the System Analytics revenue series.");
             var problem = SystemAnalyticsProblemDetailsFactory.UnexpectedError(HttpContext);
-            return StatusCode(problem.Status!.Value, problem);
+            return ApiProblemDetailsFactory.CreateResult(problem);
         }
     }
 
     /// <summary>[SystemAdmin] Lấy phân bổ doanh thu collected theo module, tenant hoặc cổng thanh toán.</summary>
     [HttpGet("revenue-breakdown")]
     [ProducesResponseType<SystemRevenueBreakdownResponseDto>(StatusCodes.Status200OK)]
-    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType<Microsoft.AspNetCore.Mvc.ProblemDetails>(
-        StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType<ApiProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiProblemDetails>(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetRevenueBreakdown(
         [FromQuery] SystemRevenueBreakdownQueryDto query,
         CancellationToken cancellationToken)
@@ -78,7 +77,7 @@ public sealed class SystemAnalyticsController : ControllerBase
             var problem = SystemAnalyticsProblemDetailsFactory.Validation(
                 HttpContext,
                 exception.Errors);
-            return StatusCode(problem.Status!.Value, problem);
+            return ApiProblemDetailsFactory.CreateResult(problem);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -90,15 +89,14 @@ public sealed class SystemAnalyticsController : ControllerBase
                 exception,
                 "Unexpected error while generating the System Analytics revenue breakdown.");
             var problem = SystemAnalyticsProblemDetailsFactory.UnexpectedError(HttpContext);
-            return StatusCode(problem.Status!.Value, problem);
+            return ApiProblemDetailsFactory.CreateResult(problem);
         }
     }
 
     /// <summary>[SystemAdmin] Lấy các hành động cần xử lý từ dữ liệu vận hành hiện có.</summary>
     [HttpGet("action-center")]
     [ProducesResponseType<SystemActionCenterResponseDto>(StatusCodes.Status200OK)]
-    [ProducesResponseType<Microsoft.AspNetCore.Mvc.ProblemDetails>(
-        StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType<ApiProblemDetails>(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetActionCenter(
         CancellationToken cancellationToken)
     {
@@ -116,7 +114,58 @@ public sealed class SystemAnalyticsController : ControllerBase
                 exception,
                 "Unexpected error while generating the System Analytics action center.");
             var problem = SystemAnalyticsProblemDetailsFactory.UnexpectedError(HttpContext);
-            return StatusCode(problem.Status!.Value, problem);
+            return ApiProblemDetailsFactory.CreateResult(problem);
+        }
+    }
+
+    /// <summary>[SystemAdmin] Dự báo collected revenue theo tháng bằng linear trend.</summary>
+    [HttpGet("revenue-forecast")]
+    [ProducesResponseType<SystemRevenueForecastResponseDto>(
+        StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiProblemDetails>(
+        StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiProblemDetails>(
+        StatusCodes.Status422UnprocessableEntity)]
+    [ProducesResponseType<ApiProblemDetails>(
+        StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetRevenueForecast(
+        [FromQuery] SystemRevenueForecastQueryDto query,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await _service.GetRevenueForecastAsync(
+                query,
+                cancellationToken));
+        }
+        catch (SystemAnalyticsQueryValidationException exception)
+        {
+            var problem = SystemAnalyticsProblemDetailsFactory.Validation(
+                HttpContext,
+                exception.Errors);
+            return ApiProblemDetailsFactory.CreateResult(problem);
+        }
+        catch (InsufficientForecastHistoryException exception)
+        {
+            var problem =
+                SystemAnalyticsProblemDetailsFactory.InsufficientForecastHistory(
+                    HttpContext,
+                    exception.Message);
+            return ApiProblemDetailsFactory.CreateResult(problem);
+        }
+        catch (OperationCanceledException) when (
+            cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Unexpected error while generating the System Analytics revenue forecast.");
+            var problem = SystemAnalyticsProblemDetailsFactory.UnexpectedError(
+                HttpContext);
+            return ApiProblemDetailsFactory.CreateResult(problem);
         }
     }
 }

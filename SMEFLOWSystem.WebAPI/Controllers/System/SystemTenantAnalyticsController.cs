@@ -4,6 +4,7 @@ using SMEFLOWSystem.Application.DTOs.SystemAnalyticsDtos;
 using SMEFLOWSystem.Application.Exceptions;
 using SMEFLOWSystem.Application.Interfaces.IServices.System;
 using SMEFLOWSystem.SharedKernel.Common;
+using SMEFLOWSystem.WebAPI.Exceptions;
 using SMEFLOWSystem.WebAPI.ProblemDetails;
 
 namespace SMEFLOWSystem.WebAPI.Controllers.System;
@@ -28,11 +29,11 @@ public sealed class SystemTenantAnalyticsController : ControllerBase
     [HttpGet("{tenantId:guid}/financial-summary")]
     [ProducesResponseType<SystemTenantFinancialSummaryResponseDto>(
         StatusCodes.Status200OK)]
-    [ProducesResponseType<ValidationProblemDetails>(
+    [ProducesResponseType<ApiProblemDetails>(
         StatusCodes.Status400BadRequest)]
-    [ProducesResponseType<Microsoft.AspNetCore.Mvc.ProblemDetails>(
+    [ProducesResponseType<ApiProblemDetails>(
         StatusCodes.Status404NotFound)]
-    [ProducesResponseType<Microsoft.AspNetCore.Mvc.ProblemDetails>(
+    [ProducesResponseType<ApiProblemDetails>(
         StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetFinancialSummary(
         [FromRoute] Guid tenantId,
@@ -51,14 +52,14 @@ public sealed class SystemTenantAnalyticsController : ControllerBase
             var problem = SystemAnalyticsProblemDetailsFactory.Validation(
                 HttpContext,
                 exception.Errors);
-            return StatusCode(problem.Status!.Value, problem);
+            return ApiProblemDetailsFactory.CreateResult(problem);
         }
         catch (KeyNotFoundException)
         {
             var problem = SystemAnalyticsProblemDetailsFactory.NotFound(
                 HttpContext,
                 "The specified tenant does not exist.");
-            return StatusCode(problem.Status!.Value, problem);
+            return ApiProblemDetailsFactory.CreateResult(problem);
         }
         catch (OperationCanceledException) when (
             cancellationToken.IsCancellationRequested)
@@ -72,7 +73,7 @@ public sealed class SystemTenantAnalyticsController : ControllerBase
                 "Unexpected error while generating a System Analytics tenant financial summary.");
             var problem = SystemAnalyticsProblemDetailsFactory.UnexpectedError(
                 HttpContext);
-            return StatusCode(problem.Status!.Value, problem);
+            return ApiProblemDetailsFactory.CreateResult(problem);
         }
     }
 }

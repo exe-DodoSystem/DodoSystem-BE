@@ -366,6 +366,8 @@ public sealed class SystemRevenueSeriesTests
         public Task<List<MonthlyCollectedRevenueRow>> GetMonthlyCollectedRevenueAsync(
             DateTime fromUtc,
             DateTime toExclusiveUtc,
+            int? moduleId,
+            string tenantSegment,
             CancellationToken ct)
             => Task.FromResult(new List<MonthlyCollectedRevenueRow>());
     }

@@ -581,9 +581,17 @@ public sealed class SystemAnalyticsReadRepository : ISystemAnalyticsReadReposito
     public Task<List<MonthlyCollectedRevenueRow>> GetMonthlyCollectedRevenueAsync(
         DateTime fromUtc,
         DateTime toExclusiveUtc,
+        int? moduleId,
+        string tenantSegment,
         CancellationToken ct)
     {
         ValidateRange(fromUtc, toExclusiveUtc);
+        var segment = NormalizeTenantSegment(tenantSegment);
+        var includeAllTenants = segment == SystemAnalyticsSegment.All;
+        var includeTrialTenants = segment == SystemAnalyticsSegment.Trial;
+        var lines = _context.BillingOrderModules
+            .IgnoreQueryFilters()
+            .AsNoTracking();
 
         var query =
             from payment in _context.PaymentTransactions.IgnoreQueryFilters().AsNoTracking()
@@ -599,10 +607,17 @@ public sealed class SystemAnalyticsReadRepository : ISystemAnalyticsReadReposito
                 && order.IsDeleted != true
                 && !tenant.IsDeleted
                 && tenant.Name != SystemTenantConstants.Name
+                && (includeAllTenants
+                    || (includeTrialTenants && tenant.Status.ToLower() == "trial")
+                    || (!includeTrialTenants && tenant.Status.ToLower() != "trial"))
+                && (!moduleId.HasValue || lines.Any(line =>
+                    line.BillingOrderId == order.Id
+                    && line.TenantId == order.TenantId
+                    && line.ModuleId == moduleId.Value))
             group payment by new
             {
-                payment.ProcessedAt!.Value.Year,
-                payment.ProcessedAt.Value.Month
+                Year = payment.ProcessedAt!.Value.AddHours(7).Year,
+                Month = payment.ProcessedAt.Value.AddHours(7).Month
             }
             into month
             orderby month.Key.Year, month.Key.Month

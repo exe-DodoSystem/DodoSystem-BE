@@ -5,10 +5,11 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using SMEFLOWSystem.Application.DTOs.SystemAnalyticsDtos;
 using Microsoft.Extensions.Logging.Abstractions;
-using SMEFLOWSystem.Application.DTOs.SystemAnalyticsDtos;
 using SMEFLOWSystem.Application.Interfaces.IServices.System;
+using SMEFLOWSystem.Application.Exceptions;
 using SMEFLOWSystem.SharedKernel.Common;
 using SMEFLOWSystem.WebAPI.Controllers.System;
+using SMEFLOWSystem.WebAPI.Exceptions;
 using SMEFLOWSystem.WebAPI.ProblemDetails;
 
 namespace SMEFLOWSystem.Tests;
@@ -84,6 +85,80 @@ public sealed class SystemAnalyticsControllerContractTests
     }
 
     [Fact]
+    public void RevenueForecastRoute_UsesSystemAdminPolicyAnd422Contract()
+    {
+        var controllerType = typeof(SystemAnalyticsController);
+        var authorize = controllerType.GetCustomAttribute<AuthorizeAttribute>();
+        var action = controllerType.GetMethod(
+            nameof(SystemAnalyticsController.GetRevenueForecast));
+        var httpGet = action?.GetCustomAttribute<HttpGetAttribute>();
+        var responses = action?.GetCustomAttributes<ProducesResponseTypeAttribute>()
+            .ToList();
+
+        Assert.Equal(PolicyNames.SystemAdmin, authorize?.Policy);
+        Assert.Equal("revenue-forecast", httpGet?.Template);
+        Assert.Contains(responses!, response =>
+            response.StatusCode == StatusCodes.Status200OK
+            && response.Type == typeof(SystemRevenueForecastResponseDto));
+        Assert.Contains(responses!, response =>
+            response.StatusCode == StatusCodes.Status422UnprocessableEntity);
+    }
+
+    [Fact]
+    public async Task RevenueForecast_InsufficientHistoryReturnsProblemDetails422()
+    {
+        var controller = new SystemAnalyticsController(
+            new InsufficientHistoryAnalyticsService(),
+            NullLogger<SystemAnalyticsController>.Instance)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    TraceIdentifier = "phase-8-trace"
+                }
+            }
+        };
+
+        var result = await controller.GetRevenueForecast(
+            new SystemRevenueForecastQueryDto(),
+            CancellationToken.None);
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        var problem = Assert.IsType<ApiProblemDetails>(objectResult.Value);
+
+        Assert.Equal(
+            StatusCodes.Status422UnprocessableEntity,
+            objectResult.StatusCode);
+        Assert.Contains("application/problem+json", objectResult.ContentTypes);
+        Assert.Equal("phase-8-trace", problem.TraceId);
+        Assert.Equal("INSUFFICIENT_FORECAST_HISTORY", problem.ErrorCode);
+        Assert.Contains(
+            "6 complete contiguous months",
+            problem.Detail!,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void OperationsHealthSummaryRoute_UsesSystemAdminPolicyAndContract()
+    {
+        var controllerType = typeof(SystemOperationsController);
+        var route = controllerType.GetCustomAttribute<RouteAttribute>();
+        var authorize = controllerType.GetCustomAttribute<AuthorizeAttribute>();
+        var action = controllerType.GetMethod(
+            nameof(SystemOperationsController.GetHealthSummary));
+        var httpGet = action?.GetCustomAttribute<HttpGetAttribute>();
+        var responses = action?.GetCustomAttributes<ProducesResponseTypeAttribute>()
+            .ToList();
+
+        Assert.Equal("api/system/operations", route?.Template);
+        Assert.Equal(PolicyNames.SystemAdmin, authorize?.Policy);
+        Assert.Equal("health-summary", httpGet?.Template);
+        Assert.Contains(responses!, response =>
+            response.StatusCode == StatusCodes.Status200OK
+            && response.Type == typeof(SystemOperationsHealthResponseDto));
+    }
+
+    [Fact]
     public async Task TenantFinancialSummary_InvalidTenantReturnsSanitized404()
     {
         var controller = new SystemTenantAnalyticsController(
@@ -104,10 +179,12 @@ public sealed class SystemAnalyticsControllerContractTests
             new SystemAnalyticsPeriodQueryDto(),
             CancellationToken.None);
         var objectResult = Assert.IsType<ObjectResult>(result);
-        var problem = Assert.IsType<ProblemDetails>(objectResult.Value);
+        var problem = Assert.IsType<ApiProblemDetails>(objectResult.Value);
 
         Assert.Equal(StatusCodes.Status404NotFound, objectResult.StatusCode);
-        Assert.Equal("phase-6-trace", problem.Extensions["traceId"]);
+        Assert.Contains("application/problem+json", objectResult.ContentTypes);
+        Assert.Equal("phase-6-trace", problem.TraceId);
+        Assert.Equal("SYSTEM_ANALYTICS_RESOURCE_NOT_FOUND", problem.ErrorCode);
         Assert.DoesNotContain("SYSTEM", problem.Detail!, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -129,8 +206,13 @@ public sealed class SystemAnalyticsControllerContractTests
 
         Assert.Equal(StatusCodes.Status400BadRequest, validation.Status);
         Assert.Equal(StatusCodes.Status500InternalServerError, unexpected.Status);
-        Assert.Equal("phase-3-trace", validation.Extensions["traceId"]);
-        Assert.Equal("phase-3-trace", unexpected.Extensions["traceId"]);
+        Assert.Equal("phase-3-trace", validation.TraceId);
+        Assert.Equal("phase-3-trace", unexpected.TraceId);
+        Assert.Equal(
+            "SYSTEM_ANALYTICS_VALIDATION_ERROR",
+            validation.ErrorCode);
+        Assert.Equal("INTERNAL_SERVER_ERROR", unexpected.ErrorCode);
+        Assert.NotNull(validation.Errors);
         Assert.DoesNotContain("SQL", unexpected.Detail!, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("gateway", unexpected.Detail!, StringComparison.OrdinalIgnoreCase);
     }
@@ -290,5 +372,30 @@ public sealed class SystemAnalyticsControllerContractTests
         {
             throw new KeyNotFoundException("Tenant not found.");
         }
+    }
+
+    private sealed class InsufficientHistoryAnalyticsService :
+        ISystemAnalyticsService
+    {
+        public Task<SystemRevenueForecastResponseDto> GetRevenueForecastAsync(
+            SystemRevenueForecastQueryDto query,
+            CancellationToken ct = default)
+        {
+            throw new InsufficientForecastHistoryException(6, 5);
+        }
+
+        public Task<SystemRevenueSeriesResponseDto> GetRevenueSeriesAsync(
+            SystemRevenueSeriesQueryDto query,
+            CancellationToken ct = default)
+            => throw new NotSupportedException();
+
+        public Task<SystemRevenueBreakdownResponseDto> GetRevenueBreakdownAsync(
+            SystemRevenueBreakdownQueryDto query,
+            CancellationToken ct = default)
+            => throw new NotSupportedException();
+
+        public Task<SystemActionCenterResponseDto> GetActionCenterAsync(
+            CancellationToken ct = default)
+            => throw new NotSupportedException();
     }
 }

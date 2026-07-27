@@ -173,5 +173,7 @@ public interface ISystemAnalyticsReadRepository
     Task<List<MonthlyCollectedRevenueRow>> GetMonthlyCollectedRevenueAsync(
         DateTime fromUtc,
         DateTime toExclusiveUtc,
+        int? moduleId,
+        string tenantSegment,
         CancellationToken ct);
 }

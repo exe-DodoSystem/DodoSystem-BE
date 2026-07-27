@@ -304,6 +304,8 @@ public sealed class SystemRevenueBreakdownTests
         public Task<List<MonthlyCollectedRevenueRow>> GetMonthlyCollectedRevenueAsync(
             DateTime fromUtc,
             DateTime toExclusiveUtc,
+            int? moduleId,
+            string tenantSegment,
             CancellationToken ct)
             => Task.FromResult(new List<MonthlyCollectedRevenueRow>());
     }

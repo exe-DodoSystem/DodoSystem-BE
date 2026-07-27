@@ -107,6 +107,7 @@ public static class DependencyInjection
                 }
             });
             c.OperationFilter<ProblemDetailsResponseOperationFilter>();
+            c.OperationFilter<SystemAnalyticsExamplesOperationFilter>();
 
             // Thêm cấu hình đọc file XML comments
             var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
@@ -118,6 +119,9 @@ public static class DependencyInjection
         });
 
         services.AddHttpContextAccessor();
+        services.AddScoped<
+            ISystemOperationsHealthService,
+            SystemOperationsHealthService>();
         services.AddScoped<IAuthorizationHandler, ActiveSystemAdminHandler>();
         services.AddAuthorization(options =>
         {

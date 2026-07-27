@@ -1,8 +1,16 @@
-# Kế hoạch nâng cấp Frontend cho SystemAdmin — bám theo Backend Phase 0, 1 và 2
+# Kế hoạch nâng cấp Frontend cho SystemAdmin — bám theo Backend Phase 0–9
 
 > Tài liệu này mô tả chi tiết FE cần thêm màn hình nào, route nào, API client nào, bảng/filter nào, nút nào và xử lý từng trạng thái ra sao.
 >
-> Phạm vi contract được đối chiếu trực tiếp với Backend hiện tại. FE không được tự giả định endpoint mutation ngoài những endpoint được ghi là **đã có**.
+> Phạm vi contract được đối chiếu trực tiếp với Backend hiện tại, bao gồm 6 endpoint
+> Analytics/Operations read-only của Backend Phase 3–8. FE không được tự giả định
+> endpoint mutation ngoài những endpoint được ghi là **đã có**.
+>
+> Contract bàn giao cho FE dùng camelCase theo JSON Web defaults. Swagger của đúng
+> application version được deploy vẫn là nguồn kiểm tra cuối cùng khi tích hợp.
+>
+> Trạng thái bàn giao: contract và test Backend đã có trong branch hiện tại; FE chỉ gọi
+> được các endpoint mới sau khi application version chứa Backend Phase 3–9 đã deploy.
 
 ---
 
@@ -20,6 +28,12 @@ Sau khi hoàn thành, SystemAdmin có thể:
 8. Theo dõi xu hướng sử dụng, hủy và hết hạn module.
 9. Không nhìn thấy tenant nội bộ `SYSTEM`.
 10. Không hiển thị secret, password hash, refresh token hoặc dữ liệu nhạy cảm.
+11. Xem chuỗi doanh thu invoiced/collected/outstanding và estimated MRR.
+12. Xem breakdown collected revenue theo module, tenant hoặc gateway.
+13. Xem action center dẫn tới đúng màn hình xử lý.
+14. Xem financial summary của từng tenant.
+15. Xem health summary an toàn của PostgreSQL, Redis và RabbitMQ.
+16. Xem revenue forecast có confidence interval và xử lý đúng trường hợp thiếu lịch sử.
 
 ---
 
@@ -78,6 +92,8 @@ Nếu FE đang dùng tên route khác, có thể đổi path nhưng phải giữ
 |---|---|---|
 | `/system-admin` | Redirect đến dashboard | SystemAdmin |
 | `/system-admin/dashboard` | Dashboard hệ thống | SystemAdmin |
+| `/system-admin/analytics` | Doanh thu, breakdown và dự báo | SystemAdmin |
+| `/system-admin/operations` | Sức khỏe dependency hệ thống | SystemAdmin |
 | `/system-admin/tenants` | Danh sách tenant | SystemAdmin |
 | `/system-admin/tenants/:tenantId` | Chi tiết tenant | SystemAdmin |
 | `/system-admin/subscriptions` | Subscription toàn hệ thống | SystemAdmin |
@@ -94,13 +110,15 @@ Nếu FE đang dùng tên route khác, có thể đổi path nhưng phải giữ
 Thứ tự menu:
 
 1. Tổng quan
-2. Tenant
-3. Subscription
-4. Billing order
-5. Payment transaction
-6. Module
-7. Role
-8. Cài đặt
+2. Phân tích doanh thu
+3. Vận hành hệ thống
+4. Tenant
+5. Subscription
+6. Billing order
+7. Payment transaction
+8. Module
+9. Role
+10. Cài đặt
 
 Mỗi item cần:
 
@@ -258,6 +276,32 @@ Chỉ hiển thị trong FE ở Development/Staging khi `SystemBootstrap:AllowRe
 Backend có maintenance gate production riêng cho tình huống khẩn cấp, nhưng FE production
 không được render chức năng này.
 
+### 4.8. Analytics và operations API
+
+```text
+GET /api/system/analytics/revenue-series
+GET /api/system/analytics/revenue-breakdown
+GET /api/system/analytics/action-center
+GET /api/system/analytics/tenants/{tenantId}/financial-summary
+GET /api/system/operations/health-summary
+GET /api/system/analytics/revenue-forecast
+```
+
+Method gợi ý:
+
+```ts
+getSystemRevenueSeries(query, signal?)
+getSystemRevenueBreakdown(query, signal?)
+getSystemActionCenter(signal?)
+getSystemTenantFinancialSummary(tenantId, query, signal?)
+getSystemOperationsHealth(signal?)
+getSystemRevenueForecast(query, signal?)
+```
+
+Đây đều là endpoint read-only và dùng policy `SystemAdmin`. FE không được gọi endpoint
+`/health` cũ để thay cho `health-summary`, vì `/health` không có cùng authorization/response
+contract dành cho SystemAdmin.
+
 ---
 
 ## 5. Type dùng chung phía FE
@@ -291,6 +335,9 @@ type ProblemDetails = {
   status?: number;
   detail?: string;
   instance?: string;
+  traceId?: string;
+  errorCode?: string;
+  error?: string;
   errors?: Record<string, string[]>;
 };
 ```
@@ -310,6 +357,8 @@ normalizeApiError(error): {
   status?: number;
   message: string;
   fieldErrors?: Record<string, string[]>;
+  errorCode?: string;
+  traceId?: string;
 }
 ```
 
@@ -320,9 +369,16 @@ Thứ tự lấy message:
 3. `title`
 4. Message mặc định theo status
 
+Với 6 endpoint Analytics/Operations mới, response lỗi dùng content type
+`application/problem+json`. FE nên hiển thị `traceId` ở khu vực chi tiết hỗ trợ/copy lỗi,
+không dùng `traceId` làm message chính. `errorCode` là mã máy đọc được; không parse
+`detail` để quyết định luồng.
+
 ### 5.3. Date/time
 
 - DateTime Backend trả UTC: hiển thị theo `Asia/Ho_Chi_Minh`.
+- `from`, `to`, `bucketStart`, `trainingFrom`, `trainingTo` của Analytics là chuỗi
+  `YYYY-MM-DD`; xử lý như calendar date, không parse qua UTC `Date`.
 - Khi extend subscription, gửi ISO UTC có hậu tố `Z`.
 - `subscriptionEndDate` của tenant là `DateOnly`; hiển thị trực tiếp theo ngày, không convert timezone gây lệch ngày.
 - Không lấy `new Date("YYYY-MM-DD")` rồi format lại nếu thư viện có thể đổi timezone.
@@ -1379,7 +1435,415 @@ Không log request body vào console, monitoring hoặc analytics.
 
 ---
 
-## 16. Error handling theo HTTP status
+## 16. Phase FE-10 — Analytics, action center và operations
+
+### 16.1. Common query contract
+
+Các endpoint revenue và tenant financial dùng query chung:
+
+```ts
+type SystemAnalyticsPeriodQuery = {
+  from?: string; // YYYY-MM-DD
+  to?: string; // YYYY-MM-DD
+  timezone?: "Asia/Ho_Chi_Minh";
+  currency?: "VND";
+  compare?: "previous_period" | "previous_year" | "none";
+  moduleId?: number; // > 0
+  tenantSegment?: "all" | "paid" | "trial";
+};
+```
+
+Quy tắc:
+
+- Nếu không gửi `from/to`, Backend dùng 30 ngày gần nhất tính cả hai đầu.
+- Khoảng tối đa 24 tháng; `from <= to`.
+- Hiện chỉ hỗ trợ timezone `Asia/Ho_Chi_Minh` và currency `VND`.
+- `compare` mặc định của Backend là `previous_period`. FE phải gửi explicit giá trị người
+  dùng đang chọn để query key và UI không mơ hồ.
+- Chỉ `revenue-series` hiện trả dữ liệu so sánh qua `previousPoints`. Với breakdown,
+  tenant financial và forecast, FE phải gửi `compare=none` và không render comparison UI.
+- `moduleId` không tồn tại trả `400`, không phải `404`.
+- `tenantSegment=paid` nghĩa là tenant không có status `Trial`; không tự diễn giải thành
+  trạng thái payment.
+- Không gửi query key có giá trị `undefined`, chuỗi rỗng hoặc `NaN`.
+
+Type metadata dùng chung:
+
+```ts
+type SystemAnalyticsMeta = {
+  from: string;
+  to: string;
+  previousFrom: string | null;
+  previousTo: string | null;
+  timezone: "Asia/Ho_Chi_Minh";
+  currency: "VND";
+  generatedAt: string; // UTC DateTime
+  dataThrough: string | null; // UTC DateTime
+  freshness: string; // hiện tại là "Live", cho phép forward-compatible
+  excludesInternalTenant: boolean;
+  excludesTestTenants: boolean;
+  mrrStatus: "Estimated" | "Unavailable";
+  warnings: string[];
+};
+```
+
+Không ẩn toàn bộ chart chỉ vì có warning. Render warning banner/tooltip theo mã đã biết
+và fallback `Dữ liệu có cảnh báo: {code}` cho mã mới.
+
+| Warning code | Cách FE xử lý |
+|---|---|
+| `REFUND_DATA_UNAVAILABLE` | Không hiển thị refund bằng `0`; ghi `Chưa có dữ liệu refund` |
+| `TEST_TENANT_FLAG_UNAVAILABLE` | Ghi rõ dữ liệu có thể bao gồm test tenant; `SYSTEM` vẫn bị loại |
+| `MRR_USES_CURRENT_CATALOG_PRICE` | Gắn badge `MRR ước tính` |
+| `PAYMENT_WITHOUT_PROCESSED_AT_EXCLUDED` | Tooltip giải thích payment thiếu thời điểm xử lý bị loại |
+| `PAYMENT_STATUS_UNRECOGNIZED` | Cảnh báo có payment status chưa nhận diện |
+| `ORDER_MODULE_ALLOCATION_UNAVAILABLE` | Phần không phân bổ được nằm trong `other` |
+| `ORDER_OVERDUE_USES_CONFIGURED_GRACE_PERIOD` | Action overdue dùng grace period Backend |
+| `FORECAST_EXCLUDES_REFUNDS` | Forecast không trừ refund |
+| `FORECAST_BASED_ON_AVAILABLE_PAYMENT_HISTORY` | Forecast chỉ dựa trên payment history hiện có |
+| `PAYMENT_DELAY_DAYS_NEGATIVE_EXCLUDED` | Average delay đã loại dữ liệu âm |
+
+### 16.2. Action center trên dashboard
+
+API:
+
+```text
+GET /api/system/analytics/action-center
+```
+
+Types:
+
+```ts
+type SystemActionCenterItemType =
+  | "PaymentFailed"
+  | "OrderOverdue"
+  | "SubscriptionExpiring"
+  | "TrialEnding"
+  | "TenantSuspended";
+
+type SystemActionCenterSeverity = "critical" | "warning" | "info";
+
+type SystemActionCenterResponse = {
+  counts: {
+    critical: number;
+    warning: number;
+    info: number;
+  };
+  items: Array<{
+    id: string;
+    type: SystemActionCenterItemType;
+    severity: SystemActionCenterSeverity;
+    title: string;
+    description: string;
+    occurredAt: string; // UTC DateTime
+    entityId: string | null;
+    targetPath: string | null;
+  }>;
+  meta: SystemAnalyticsMeta;
+};
+```
+
+UI:
+
+- Đặt panel `Cần xử lý` gần đầu dashboard.
+- Sort đã do Backend quyết định; không tự sort lại làm thay đổi ưu tiên.
+- Badge `critical/warning/info` dùng cả icon, text và màu.
+- `counts` tính trên toàn bộ tập unique trước giới hạn item. Vì vậy tổng counts có thể lớn
+  hơn `items.length`; không coi đây là lỗi.
+- Chỉ điều hướng khi `targetPath` bắt đầu bằng `/system-admin/`. Nếu null/không hợp lệ,
+  disable link và vẫn hiển thị nội dung.
+- Dùng `id` làm React/Vue key; không tự ghép key từ index.
+
+Mapping target hiện tại:
+
+| Type | Màn hình đích |
+|---|---|
+| `PaymentFailed` | Payment transactions |
+| `OrderOverdue` | Billing order detail |
+| `SubscriptionExpiring` / `TrialEnding` | Subscription list theo tenant |
+| `TenantSuspended` | Tenant detail |
+
+### 16.3. Revenue series
+
+Route FE:
+
+```text
+/system-admin/analytics
+```
+
+API:
+
+```text
+GET /api/system/analytics/revenue-series
+```
+
+Query:
+
+```ts
+type SystemRevenueSeriesQuery = SystemAnalyticsPeriodQuery & {
+  granularity?: "day" | "week" | "month";
+};
+```
+
+Nếu bỏ `granularity`, Backend chọn:
+
+- Tối đa 31 ngày: `day`.
+- 32–180 ngày: `week`.
+- Trên 180 ngày: `month`.
+
+Response:
+
+```ts
+type SystemRevenueSeriesPoint = {
+  bucketStart: string; // YYYY-MM-DD
+  invoicedRevenue: number;
+  collectedRevenue: number;
+  refundedAmount: number | null;
+  outstandingCreated: number;
+  mrrSnapshot: number | null;
+};
+
+type SystemRevenueSeriesResponse = {
+  points: SystemRevenueSeriesPoint[];
+  previousPoints: SystemRevenueSeriesPoint[] | null;
+  meta: SystemAnalyticsMeta;
+};
+```
+
+UI:
+
+- Line/bar chart cho invoiced, collected và outstanding.
+- MRR dùng trục/series riêng và badge theo `meta.mrrStatus`.
+- `refundedAmount=null` phải hiển thị `N/A`/ẩn series refund, tuyệt đối không đổi thành `0`.
+- Khi `compare=none`, `previousPoints=null`; không render legend previous.
+- Bucket rỗng hợp lệ có giá trị `0`; empty state chỉ khi `points.length === 0`.
+- Hiển thị `generatedAt`, `dataThrough` và warning tooltip.
+
+### 16.4. Revenue breakdown
+
+API:
+
+```text
+GET /api/system/analytics/revenue-breakdown
+```
+
+Query:
+
+```ts
+type SystemRevenueBreakdownQuery = SystemAnalyticsPeriodQuery & {
+  dimension: "module" | "tenant" | "gateway";
+  limit?: number; // 5..50, Backend mặc định 10
+};
+```
+
+Luôn gửi `compare=none`; response breakdown không có previous items.
+
+Response:
+
+```ts
+type SystemRevenueBreakdownItem = {
+  id: string;
+  name: string;
+  collectedRevenue: number;
+  percentageOfTotal: number;
+};
+
+type SystemRevenueBreakdownResponse = {
+  totalCollectedRevenue: number;
+  items: SystemRevenueBreakdownItem[];
+  other: SystemRevenueBreakdownItem | null;
+  meta: SystemAnalyticsMeta;
+};
+```
+
+UI:
+
+- Dimension selector `Module | Tenant | Gateway`.
+- Donut/bar chart và bảng accessibility.
+- Render `other` khi khác null; không tự cộng lại hoặc tự tạo `Other`.
+- Dùng `percentageOfTotal` Backend trả về; chỉ format display, không tính lại bằng float.
+- `items + other` phải được test khớp `totalCollectedRevenue`.
+
+### 16.5. Revenue forecast
+
+API:
+
+```text
+GET /api/system/analytics/revenue-forecast
+```
+
+Query:
+
+```ts
+type SystemRevenueForecastQuery = SystemAnalyticsPeriodQuery & {
+  forecastPeriods?: number; // 1..6, Backend mặc định 3
+  granularity?: "month";
+};
+```
+
+FE nên dùng month-range picker và luôn gửi:
+
+```text
+from=<ngày đầu tháng đầu>
+to=<ngày cuối tháng cuối>
+compare=none
+granularity=month
+```
+
+Training cần ít nhất 6 tháng lịch đầy đủ và có collected payment history liên tục. Nếu
+không đủ, Backend trả `422` với `errorCode=INSUFFICIENT_FORECAST_HISTORY`. Đây là empty
+state nghiệp vụ, không phải lỗi hệ thống và không được retry tự động.
+
+Response:
+
+```ts
+type SystemRevenueForecastResponse = {
+  method: "LinearTrend";
+  trainingFrom: string;
+  trainingTo: string;
+  currency: "VND";
+  granularity: "month";
+  actualPoints: Array<{
+    bucketStart: string;
+    value: number;
+  }>;
+  forecastPoints: Array<{
+    bucketStart: string;
+    value: number;
+    lowerBound: number;
+    upperBound: number;
+  }>;
+  meta: SystemAnalyticsMeta;
+};
+```
+
+UI:
+
+- Vẽ actual nét liền, forecast nét đứt, confidence interval dạng band.
+- Không nối/ghi forecast vào `actualPoints`.
+- `lowerBound` luôn không âm nhưng FE vẫn phải render theo response, không tự clamp/tính lại.
+- Hiển thị method và training window.
+- Luôn hiển thị hai warning forecast trong `meta.warnings`.
+
+### 16.6. Tenant financial summary
+
+Tích hợp vào tenant detail bằng tab/card `Tài chính`.
+
+API:
+
+```text
+GET /api/system/analytics/tenants/{tenantId}/financial-summary
+```
+
+FE gửi `from`, `to`, `timezone`, `currency`, `moduleId?` và `compare=none`. Không cần
+expose `tenantSegment` vì endpoint đã cố định một tenant.
+
+Response:
+
+```ts
+type SystemTenantFinancialSummaryResponse = {
+  tenantId: string;
+  tenantName: string;
+  status: string;
+  currentMrr: number;
+  lifetimeCollectedRevenue: number;
+  collectedRevenueInPeriod: number;
+  outstandingAmount: number;
+  lastSuccessfulPaymentAt: string | null;
+  lastFailedPaymentAt: string | null;
+  averagePaymentDelayDays: number | null;
+  subscriptions: {
+    active: number;
+    trial: number;
+    expiringIn30Days: number;
+  };
+  meta: SystemAnalyticsMeta;
+};
+```
+
+Quy tắc UI:
+
+- `currentMrr` là estimated theo catalog price hiện tại, không ghi là doanh thu thực thu.
+- `lifetimeCollectedRevenue` không đổi theo date range; `collectedRevenueInPeriod` có đổi.
+- Timestamp/payment delay null hiển thị `Chưa có`.
+- Tenant không tồn tại, đã bị xóa hoặc tenant `SYSTEM` đều trả `404`; quay về tenant list.
+
+### 16.7. Operations health
+
+Route:
+
+```text
+/system-admin/operations
+```
+
+API:
+
+```text
+GET /api/system/operations/health-summary
+```
+
+Response:
+
+```ts
+type SystemOperationsHealthStatus = "Healthy" | "Degraded" | "Unhealthy";
+
+type SystemOperationsHealthResponse = {
+  status: SystemOperationsHealthStatus;
+  checkedAt: string; // UTC DateTime
+  durationMs: number;
+  components: Array<{
+    name: string;
+    status: SystemOperationsHealthStatus;
+    durationMs: number;
+    description: string | null;
+  }>;
+};
+```
+
+Quan trọng:
+
+- Dependency unhealthy vẫn có thể trả HTTP `200`; badge phải dựa vào `response.status`,
+  không dựa riêng vào HTTP status.
+- `500` chỉ là lỗi không tạo được health summary.
+- Không đoán host/URL từ component; Backend cố ý chỉ trả mô tả an toàn.
+- Component hiện có thường là `postgres`, `redis`, `rabbitmq`, nhưng FE phải render được
+  component name mới.
+- Backend cache 15 giây. Chỉ polling khi page operations đang visible, chu kỳ tối thiểu
+  30 giây; dừng polling khi tab browser hidden.
+
+### 16.8. Query key, refresh và hiệu năng
+
+```ts
+["system", "analytics", "revenue-series", query]
+["system", "analytics", "revenue-breakdown", query]
+["system", "analytics", "action-center"]
+["system", "analytics", "tenant-financial", tenantId, query]
+["system", "analytics", "revenue-forecast", query]
+["system", "operations", "health-summary"]
+```
+
+- Truyền AbortSignal khi đổi filter/rời trang.
+- Không gọi đồng thời series, breakdown và forecast cho range 24 tháng ngay khi dashboard
+  mount. Chỉ gọi dữ liệu của tab/panel đang visible.
+- Series có Backend cache mặc định 120 giây; FE stale time đề xuất 60–120 giây.
+- Breakdown/forecast không polling tự động.
+- Action center refresh khi focus hoặc bằng nút `Làm mới`; tránh polling nhanh.
+- Health polling theo quy tắc ở mục 16.7.
+
+### 16.9. Loading, empty và error
+
+- Skeleton riêng cho chart/cards, giữ dữ liệu cũ khi refetch.
+- `400`: map `errors` vào filter tương ứng.
+- `401/403`: theo auth flow chung.
+- `404`: dùng cho tenant financial summary không tồn tại.
+- `422` forecast: empty state `Chưa đủ dữ liệu lịch sử để dự báo`, hiển thị `traceId`
+  trong chi tiết hỗ trợ nếu có; không toast đỏ dạng lỗi hệ thống.
+- `500`: error state có retry thủ công.
+- Không log toàn bộ analytics response lên console/third-party analytics.
+
+---
+
+## 17. Error handling theo HTTP status
 
 | Status | Xử lý FE |
 |---|---|
@@ -1388,6 +1852,7 @@ Không log request body vào console, monitoring hoặc analytics.
 | `403` | Hiển thị không đủ quyền hoặc SystemAdmin không còn active |
 | `404` | Hiển thị resource không tồn tại; cho quay lại list |
 | `409` | Hiển thị conflict; giữ dialog/form và refetch dữ liệu hiện tại |
+| `422` | Trạng thái nghiệp vụ không xử lý được; hiện dùng cho forecast thiếu lịch sử, không retry tự động |
 | `429` | Hiển thị thao tác quá nhanh; disable retry ngắn hạn |
 | `500+` | Thông báo lỗi hệ thống, có nút thử lại |
 
@@ -1405,7 +1870,7 @@ List:
 
 ---
 
-## 17. Cache/query key và invalidation
+## 18. Cache/query key và invalidation
 
 Query key gợi ý:
 
@@ -1424,9 +1889,15 @@ Query key gợi ý:
 ["system", "payments", query]
 ["system", "modules"]
 ["system", "roles", query]
+["system", "analytics", "revenue-series", query]
+["system", "analytics", "revenue-breakdown", query]
+["system", "analytics", "action-center"]
+["system", "analytics", "tenant-financial", tenantId, query]
+["system", "analytics", "revenue-forecast", query]
+["system", "operations", "health-summary"]
 ```
 
-### 17.1. Tenant status mutation
+### 18.1. Tenant status mutation
 
 Invalidate:
 
@@ -1434,8 +1905,9 @@ Invalidate:
 - Tenant detail.
 - Dashboard overview.
 - Các query có liên quan đến tenant hiện tại.
+- Action center, tenant financial và các analytics query vì tenant segment/status có thể đổi.
 
-### 17.2. Subscription mutation
+### 18.2. Subscription mutation
 
 Invalidate:
 
@@ -1443,8 +1915,9 @@ Invalidate:
 - Tenant detail.
 - Tenant list.
 - Dashboard và module statistics.
+- Action center, tenant financial và revenue series vì estimated MRR có thể đổi.
 
-### 17.3. Module mutation
+### 18.3. Module mutation
 
 Invalidate:
 
@@ -1452,8 +1925,9 @@ Invalidate:
 - Module options trong tenant/subscription filter.
 - Dashboard module charts.
 - Subscription list nếu module active state có thể ảnh hưởng action.
+- Analytics query có `moduleId` và tenant financial summary.
 
-### 17.4. Role mutation
+### 18.4. Role mutation
 
 Invalidate:
 
@@ -1463,7 +1937,7 @@ Invalidate:
 
 ---
 
-## 18. UX chi tiết cho bảng
+## 19. UX chi tiết cho bảng
 
 Mọi bảng cần:
 
@@ -1491,7 +1965,7 @@ Accessibility:
 
 ---
 
-## 19. Các thành phần FE không được làm sai
+## 20. Các thành phần FE không được làm sai
 
 1. Không dùng tenant endpoint cũ để dựng SystemAdmin list.
 2. Không hiển thị tenant `SYSTEM`.
@@ -1505,10 +1979,15 @@ Accessibility:
 10. Không lưu reason/current password vào persistent storage.
 11. Không log response chứa dữ liệu user lên console production.
 12. Không thêm nút delete/cancel/refund khi Backend chưa có endpoint.
+13. Không đổi `refundedAmount=null` thành `0`.
+14. Không tự tính MRR, breakdown percentage hoặc forecast ở FE.
+15. Không coi HTTP `200` của health summary đồng nghĩa payload `Healthy`.
+16. Không retry tự động response forecast `422`.
+17. Không điều hướng `targetPath` action center ra ngoài prefix `/system-admin/`.
 
 ---
 
-## 20. File/folder FE đề xuất
+## 21. File/folder FE đề xuất
 
 Tên thực tế có thể đổi theo framework hiện tại:
 
@@ -1523,6 +2002,8 @@ src/
         systemBillingApi.ts
         systemModulesApi.ts
         systemRolesApi.ts
+        systemAnalyticsApi.ts
+        systemOperationsApi.ts
       components/
         SystemAdminLayout.tsx
         SystemStatusBadge.tsx
@@ -1531,6 +2012,12 @@ src/
         TenantStatusDialog.tsx
         SubscriptionExtendDialog.tsx
         SubscriptionStatusDialog.tsx
+        AnalyticsWarningBanner.tsx
+        RevenueSeriesChart.tsx
+        RevenueBreakdownChart.tsx
+        RevenueForecastChart.tsx
+        ActionCenterPanel.tsx
+        OperationsHealthPanel.tsx
       pages/
         SystemDashboardPage.tsx
         SystemTenantsPage.tsx
@@ -1542,11 +2029,15 @@ src/
         SystemModulesPage.tsx
         SystemRolesPage.tsx
         SystemAdminSettingsPage.tsx
+        SystemAnalyticsPage.tsx
+        SystemOperationsPage.tsx
       hooks/
         useSystemDashboard.ts
         useSystemTenants.ts
         useSystemSubscriptions.ts
         useSystemBilling.ts
+        useSystemAnalytics.ts
+        useSystemOperations.ts
       types/
         dashboard.ts
         tenant.ts
@@ -1554,6 +2045,8 @@ src/
         billing.ts
         module.ts
         role.ts
+        analytics.ts
+        operations.ts
         common.ts
       utils/
         status.ts
@@ -1567,9 +2060,9 @@ Nếu FE dùng Vue/Angular, giữ cùng separation: API, types, pages, component
 
 ---
 
-## 21. Test plan FE
+## 22. Test plan FE
 
-### 21.1. Unit test
+### 22.1. Unit test
 
 Test:
 
@@ -1581,8 +2074,12 @@ Test:
 - Action eligibility tenant.
 - Action eligibility subscription.
 - Query serialization bỏ field rỗng.
+- Warning code mapping có fallback cho code mới.
+- Analytics calendar date không lệch timezone.
+- Action center chỉ chấp nhận internal `targetPath`.
+- Forecast `422` normalize thành insufficient-history state.
 
-### 21.2. Component test
+### 22.2. Component test
 
 Dashboard:
 
@@ -1614,7 +2111,18 @@ Role:
 - System role name readonly.
 - Không có nút delete.
 
-### 21.3. Integration/API mock test
+Analytics/operations:
+
+- `refundedAmount=null` không render thành `0`.
+- `previousPoints=null` không render previous legend.
+- Breakdown `other=null` không render Other.
+- Action counts không bắt buộc bằng `items.length`.
+- Forecast tách actual/forecast và render confidence band.
+- Forecast `422` render empty state, không auto retry.
+- Health HTTP `200` với payload `Unhealthy` render badge đỏ.
+- Component health description null vẫn render an toàn.
+
+### 22.3. Integration/API mock test
 
 Mock:
 
@@ -1625,9 +2133,11 @@ Mock:
 - 403 SystemAdmin inactive.
 - 404 detail.
 - 409 mutation conflict.
+- 422 forecast thiếu lịch sử.
 - 500 retry.
+- Verify camelCase và nullability cho đủ 6 analytics/operations response.
 
-### 21.4. E2E staging
+### 22.4. E2E staging
 
 Kịch bản:
 
@@ -1647,12 +2157,18 @@ Kịch bản:
 14. Suspend/reactivate tenant test.
 15. Extend/suspend/reactivate subscription test.
 16. Xác nhận access module thay đổi ngay.
+17. Mở revenue series, đổi range/granularity/compare.
+18. Đổi breakdown dimension và xác nhận total.
+19. Mở action center và kiểm tra internal deep-link.
+20. Mở tenant financial summary.
+21. Kiểm tra health status/components.
+22. Kiểm tra forecast thành công hoặc `422` đúng contract.
 
 Không chạy mutation E2E trên tenant production thật.
 
 ---
 
-## 22. Thứ tự triển khai FE an toàn
+## 23. Thứ tự triển khai FE an toàn
 
 ### Sprint FE-0 — Foundation
 
@@ -1690,7 +2206,16 @@ Không chạy mutation E2E trên tenant production thật.
 - Invalidation.
 - Structured error handling.
 
-### Sprint FE-5 — Production rollout
+### Sprint FE-5 — Analytics/operations read-only
+
+- Action center trên dashboard.
+- Revenue series và breakdown.
+- Tenant financial summary.
+- Operations health.
+- Revenue forecast và trạng thái `422`.
+- Analytics warnings/metadata.
+
+### Sprint FE-6 — Production rollout
 
 1. Deploy toàn bộ read-only UI.
 2. Giữ `systemAdminMutationsEnabled=false`.
@@ -1701,7 +2226,7 @@ Không chạy mutation E2E trên tenant production thật.
 
 ---
 
-## 23. API Backend chưa có — không được gọi trong bản FE hiện tại
+## 24. API Backend chưa có — không được gọi trong bản FE hiện tại
 
 Các chức năng sau cần Backend bổ sung ở phase tương lai:
 
@@ -1712,9 +2237,8 @@ Các chức năng sau cần Backend bổ sung ở phase tương lai:
 5. Suspend/activate user từ màn hình SystemAdmin.
 6. Delete role.
 7. Permission matrix cho custom role.
-8. Revenue analytics chính xác.
-9. Persist và đọc lại reason của mutation.
-10. Capability endpoint trả feature flags từ server.
+8. Persist và đọc lại reason của mutation.
+9. Capability endpoint trả feature flags từ server.
 
 Endpoint gợi ý cho backlog, **chưa tồn tại**:
 
@@ -1731,7 +2255,7 @@ Không implement API client cho danh sách này cho đến khi Backend có contr
 
 ---
 
-## 24. Definition of Done
+## 25. Definition of Done
 
 FE chỉ được coi là hoàn thành khi:
 
@@ -1748,17 +2272,22 @@ FE chỉ được coi là hoàn thành khi:
 - Subscription mutation tuân thủ transition.
 - Mọi mutation có confirmation.
 - Không có optimistic update sai.
-- 400/401/403/404/409/500 được xử lý rõ ràng.
+- 400/401/403/404/409/422/500 được xử lý rõ ràng.
 - Date UTC và DateOnly không lệch ngày.
 - Tiền hiển thị đúng VND.
 - Không lộ secret trên UI, log hoặc analytics.
+- Action center hiển thị đúng severity/count và chỉ dùng internal target path.
+- Revenue series/breakdown khớp contract, xử lý đúng null/warnings.
+- Tenant financial phân biệt lifetime, period revenue và estimated MRR.
+- Health page dựa vào payload status, không dựa riêng HTTP status.
+- Forecast xử lý được cả success và `422` thiếu lịch sử.
 - Unit/component tests pass.
 - E2E staging pass.
 - Production triển khai read-only trước, mutation sau.
 
 ---
 
-## 25. Checklist bàn giao cho FE developer
+## 26. Checklist bàn giao cho FE developer
 
 - [ ] Tạo SystemAdmin route guard.
 - [ ] Tạo layout và sidebar.
@@ -1767,6 +2296,7 @@ FE chỉ được coi là hoàn thành khi:
 - [ ] Thêm API client Subscription.
 - [ ] Thêm API client Billing/Payment.
 - [ ] Thêm API client Module/Role.
+- [ ] Thêm API client Analytics/Operations.
 - [ ] Tạo types từ DTO Backend.
 - [ ] Tạo error normalizer.
 - [ ] Tạo status badge mapping.
@@ -1778,6 +2308,12 @@ FE chỉ được coi là hoàn thành khi:
 - [ ] Tạo Payment list.
 - [ ] Tạo Module management.
 - [ ] Tạo Role management.
+- [ ] Tạo Action center panel.
+- [ ] Tạo Revenue analytics page.
+- [ ] Tạo Tenant financial summary.
+- [ ] Tạo Operations health page.
+- [ ] Tạo Revenue forecast và xử lý `422`.
+- [ ] Tạo Analytics warning/meta components.
 - [ ] Tạo tenant mutation dialogs.
 - [ ] Tạo subscription mutation dialogs.
 - [ ] Thêm feature flag.

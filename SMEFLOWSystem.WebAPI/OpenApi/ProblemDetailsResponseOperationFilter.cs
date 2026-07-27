@@ -1,4 +1,6 @@
+using System.Reflection;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.OpenApi.Models;
 using SMEFLOWSystem.WebAPI.Exceptions;
 using Swashbuckle.AspNetCore.SwaggerGen;
@@ -46,6 +48,19 @@ public sealed class ProblemDetailsResponseOperationFilter : IOperationFilter
                 operation,
                 "403",
                 "Authenticated caller does not have access",
+                problemSchema);
+        }
+
+        if (context.MethodInfo
+            .GetCustomAttributes<ProducesResponseTypeAttribute>(inherit: true)
+            .Any(attribute =>
+                attribute.StatusCode
+                    == StatusCodes.Status422UnprocessableEntity))
+        {
+            AddProblemResponse(
+                operation,
+                "422",
+                "Request is valid but cannot be processed",
                 problemSchema);
         }
     }

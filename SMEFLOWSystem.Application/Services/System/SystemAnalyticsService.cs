@@ -280,11 +280,137 @@ public sealed class SystemAnalyticsService : ISystemAnalyticsService
         };
     }
 
-    public Task<SystemRevenueForecastResponseDto> GetRevenueForecastAsync(
+    public async Task<SystemRevenueForecastResponseDto> GetRevenueForecastAsync(
         SystemRevenueForecastQueryDto query,
         CancellationToken ct = default)
     {
-        throw new NotSupportedException("Revenue forecast is scheduled for Phase 8.");
+        ArgumentNullException.ThrowIfNull(query);
+        if (_options.ForecastMinimumMonths < 2)
+        {
+            throw new InvalidOperationException(
+                "SystemAnalytics:ForecastMinimumMonths must be at least two.");
+        }
+        if (_options.ForecastMaximumPeriods is < 1 or > 6)
+        {
+            throw new InvalidOperationException(
+                "SystemAnalytics:ForecastMaximumPeriods must be between one and six.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.Granularity)
+            && !string.Equals(
+                query.Granularity,
+                SystemAnalyticsGranularity.Month,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new SystemAnalyticsQueryValidationException(
+                nameof(query.Granularity),
+                "Granularity must be 'month'.");
+        }
+
+        var forecastPeriods = query.ForecastPeriods ?? 3;
+        if (forecastPeriods < 1
+            || forecastPeriods > _options.ForecastMaximumPeriods)
+        {
+            throw new SystemAnalyticsQueryValidationException(
+                nameof(query.ForecastPeriods),
+                $"ForecastPeriods must be between 1 and {_options.ForecastMaximumPeriods}.");
+        }
+
+        var nowUtc = DateTime.UtcNow;
+        var period = AnalyticsPeriodResolver.Resolve(query, _options, nowUtc);
+        var trainingMonths = GetCompleteMonths(period.From, period.To);
+        if (trainingMonths.Count < _options.ForecastMinimumMonths)
+        {
+            throw new InsufficientForecastHistoryException(
+                _options.ForecastMinimumMonths,
+                trainingMonths.Count);
+        }
+
+        if (query.ModuleId.HasValue
+            && !await _repository.ModuleExistsAsync(query.ModuleId.Value, ct))
+        {
+            throw new SystemAnalyticsQueryValidationException(
+                nameof(query.ModuleId),
+                $"Module with ID '{query.ModuleId.Value}' does not exist.");
+        }
+
+        var tenantSegment = query.TenantSegment.Trim().ToLowerInvariant();
+        var timeZone = AnalyticsPeriodResolver.GetTimeZone(query.Timezone);
+        var trainingStartUtc = ToUtcBoundary(trainingMonths[0], timeZone);
+        var trainingEndExclusiveUtc = ToUtcBoundary(
+            trainingMonths[^1].AddMonths(1),
+            timeZone);
+        var rows = await _repository.GetMonthlyCollectedRevenueAsync(
+            trainingStartUtc,
+            trainingEndExclusiveUtc,
+            query.ModuleId,
+            tenantSegment,
+            ct);
+        var valuesByMonth = rows
+            .GroupBy(row => new DateOnly(row.Year, row.Month, 1))
+            .ToDictionary(
+                group => group.Key,
+                group => group.Sum(row => row.CollectedRevenue));
+        var availableMonths = trainingMonths.Count(valuesByMonth.ContainsKey);
+        if (availableMonths != trainingMonths.Count)
+        {
+            throw new InsufficientForecastHistoryException(
+                trainingMonths.Count,
+                availableMonths);
+        }
+
+        var trainingPoints = trainingMonths
+            .Select(month => new RevenueForecastInputPoint(
+                month,
+                valuesByMonth[month]))
+            .ToList();
+        var calculation = RevenueForecastCalculator.Calculate(
+            trainingPoints,
+            forecastPeriods);
+        var trainingTo = trainingMonths[^1].AddMonths(1).AddDays(-1);
+        var forecastTo = calculation.Points[^1]
+            .BucketStart
+            .AddMonths(1)
+            .AddDays(-1);
+        var meta = AnalyticsPeriodResolver.BuildMeta(period, query);
+        meta.From = trainingMonths[0].ToString("yyyy-MM-dd");
+        meta.To = forecastTo.ToString("yyyy-MM-dd");
+        meta.PreviousFrom = null;
+        meta.PreviousTo = null;
+        meta.GeneratedAt = nowUtc;
+        meta.DataThrough = trainingEndExclusiveUtc.AddTicks(-1);
+        meta.Warnings =
+        [
+            SystemAnalyticsWarningCodes.ForecastExcludesRefunds,
+            SystemAnalyticsWarningCodes.ForecastBasedOnAvailablePaymentHistory,
+            SystemAnalyticsWarningCodes.TestTenantFlagUnavailable
+        ];
+
+        return new SystemRevenueForecastResponseDto
+        {
+            Method = "LinearTrend",
+            TrainingFrom = trainingMonths[0].ToString("yyyy-MM-dd"),
+            TrainingTo = trainingTo.ToString("yyyy-MM-dd"),
+            Currency = SystemAnalyticsOptions.SupportedCurrency,
+            Granularity = SystemAnalyticsGranularity.Month,
+            ActualPoints = trainingPoints
+                .Select(point => new SystemRevenueForecastActualPointDto
+                {
+                    BucketStart = point.BucketStart.ToString("yyyy-MM-dd"),
+                    Value = point.Value
+                })
+                .ToList(),
+            ForecastPoints = calculation.Points
+                .Select(point => new SystemRevenueForecastPointDto
+                {
+                    BucketStart = point.BucketStart.ToString("yyyy-MM-dd"),
+                    Value = point.Value,
+                    LowerBound = point.LowerBound,
+                    UpperBound = point.UpperBound
+                })
+                .ToList(),
+            Meta = meta
+        };
     }
 
     private async Task<SystemRevenueSeriesResponseDto> BuildRevenueSeriesAsync(
@@ -519,6 +645,37 @@ public sealed class SystemAnalyticsService : ISystemAnalyticsService
     private static bool IsInPeriod(DateOnly date, DateOnly from, DateOnly to)
     {
         return date >= from && date <= to;
+    }
+
+    private static IReadOnlyList<DateOnly> GetCompleteMonths(
+        DateOnly from,
+        DateOnly to)
+    {
+        var firstMonth = new DateOnly(from.Year, from.Month, 1);
+        if (from.Day != 1)
+        {
+            firstMonth = firstMonth.AddMonths(1);
+        }
+
+        var lastMonth = new DateOnly(to.Year, to.Month, 1);
+        if (to.Day != DateTime.DaysInMonth(to.Year, to.Month))
+        {
+            lastMonth = lastMonth.AddMonths(-1);
+        }
+
+        if (firstMonth > lastMonth)
+        {
+            return [];
+        }
+
+        var months = new List<DateOnly>();
+        for (var month = firstMonth;
+             month <= lastMonth;
+             month = month.AddMonths(1))
+        {
+            months.Add(month);
+        }
+        return months;
     }
 
     private static DateTime? MaxTimestamp(DateTime? first, DateTime? second)

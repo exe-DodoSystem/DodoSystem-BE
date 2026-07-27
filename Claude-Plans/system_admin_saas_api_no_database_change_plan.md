@@ -1173,9 +1173,12 @@ Giữ nguyên `GET /health`.
 
 **Exit criteria:**
 
-- [ ] Endpoint mới có policy SystemAdmin.
-- [ ] `/health` cũ không đổi.
-- [ ] Không lộ thông tin kết nối.
+- [x] Endpoint mới có policy SystemAdmin.
+- [x] `/health` cũ không đổi.
+- [x] Không lộ thông tin kết nối.
+
+> Health summary dùng cache 15 giây và thay toàn bộ description/exception/data thô
+> bằng thông điệp an toàn theo component và trạng thái.
 
 ---
 
@@ -1224,9 +1227,13 @@ Response tách actual và forecast, có method/training window/warnings.
 
 **Exit criteria:**
 
-- [ ] Phase 3 đã reconciliation pass.
-- [ ] Dữ liệu staging đủ lịch sử hoặc endpoint trả 422 đúng contract.
-- [ ] Không lưu model/result.
+- [x] Phase 3 đã reconciliation pass cho nguồn monthly collected revenue bằng repository/service test local.
+- [x] Endpoint trả `422 ProblemDetails` đúng contract khi không đủ 6 tháng liên tục; độ đầy đủ dữ liệu staging sẽ được xác nhận ở Phase 9.
+- [x] Không lưu model/result; forecast được tính deterministic tại request.
+
+> Đã triển khai Phase 8: monthly collected revenue dùng tháng theo `Asia/Ho_Chi_Minh`,
+> áp dụng `moduleId`/`tenantSegment`, không tự điền tháng thiếu bằng `0`, giới hạn forecast
+> 1–6 tháng, tách actual/forecast và trả confidence interval có lower bound không âm.
 
 ---
 
@@ -1295,10 +1302,22 @@ Không có:
 
 **Exit criteria cuối:**
 
-- [ ] 6 endpoint pass contract/security/reconciliation.
+- [ ] 6 endpoint pass contract/security/reconciliation trên staging; bộ local đã pass cho đủ 6 endpoint.
 - [ ] FE staging sign-off.
-- [ ] Không có database change.
-- [ ] Có application rollback plan.
+- [x] Không có database change trong diff; không có entity/context/configuration/migration change.
+- [x] Có application rollback plan tại `system_admin_saas_api_phase9_release_runbook.md`.
+
+> Kết quả hardening local Phase 9:
+>
+> - Chuẩn hóa lỗi của 6 endpoint về `application/problem+json` với
+>   `traceId`, `errorCode`, `error` và `errors`.
+> - Swagger có success example cho đủ 6 endpoint, canonical
+>   `400/401/403/500` ProblemDetails và `422` riêng cho forecast.
+> - Có test policy `SystemAdmin`, active System Admin requirement, field/nullability,
+>   warnings, secret-field guard và cancellation cho health pipeline.
+> - Contract/security/reconciliation local pass; Release build pass.
+> - Chưa thể kết luận p50/p95, PostgreSQL query plan, dữ liệu staging hoặc FE sign-off
+>   khi workspace không có staging URL/token và không có PostgreSQL test environment.
 
 ---
 

@@ -631,6 +631,142 @@ public sealed class SystemAnalyticsReadRepositoryTests
             candidate.TenantId == systemTenant.Id);
     }
 
+    [Fact]
+    public async Task MonthlyCollectedRevenue_UsesVietnamMonthAndAppliesFilters()
+    {
+        await using var context = CreateContext();
+        var paidTenant = Tenant("Paid tenant");
+        var trialTenant = Tenant("Trial tenant");
+        trialTenant.Status = "Trial";
+        var systemTenant = Tenant("SYSTEM");
+        context.Tenants.AddRange(paidTenant, trialTenant, systemTenant);
+        var moduleA = Module("MODULE_A", 100m);
+        var moduleB = Module("MODULE_B", 200m);
+        context.Modules.AddRange(moduleA, moduleB);
+        await context.SaveChangesAsync();
+
+        var paidModuleAOrder = Order(
+            paidTenant.Id,
+            new DateTime(2026, 6, 30, 18, 0, 0, DateTimeKind.Utc),
+            100m,
+            0m);
+        var paidModuleBOrder = Order(
+            paidTenant.Id,
+            new DateTime(2026, 7, 15, 0, 0, 0, DateTimeKind.Utc),
+            200m,
+            0m);
+        var trialModuleAOrder = Order(
+            trialTenant.Id,
+            new DateTime(2026, 7, 15, 0, 0, 0, DateTimeKind.Utc),
+            300m,
+            0m);
+        var systemOrder = Order(
+            systemTenant.Id,
+            new DateTime(2026, 7, 15, 0, 0, 0, DateTimeKind.Utc),
+            400m,
+            0m);
+        var outsideOrder = Order(
+            paidTenant.Id,
+            new DateTime(2026, 7, 31, 18, 0, 0, DateTimeKind.Utc),
+            500m,
+            0m);
+        context.BillingOrders.AddRange(
+            paidModuleAOrder,
+            paidModuleBOrder,
+            trialModuleAOrder,
+            systemOrder,
+            outsideOrder);
+        context.BillingOrderModules.AddRange(
+            BillingLine(paidTenant.Id, paidModuleAOrder.Id, moduleA.Id, 100m),
+            BillingLine(paidTenant.Id, paidModuleBOrder.Id, moduleB.Id, 200m),
+            BillingLine(trialTenant.Id, trialModuleAOrder.Id, moduleA.Id, 300m),
+            BillingLine(systemTenant.Id, systemOrder.Id, moduleA.Id, 400m),
+            BillingLine(paidTenant.Id, outsideOrder.Id, moduleA.Id, 500m));
+        context.PaymentTransactions.AddRange(
+            Payment(
+                paidTenant.Id,
+                paidModuleAOrder.Id,
+                "Success",
+                new DateTime(2026, 6, 30, 18, 0, 0, DateTimeKind.Utc),
+                100m),
+            Payment(
+                paidTenant.Id,
+                paidModuleBOrder.Id,
+                "Success",
+                new DateTime(2026, 7, 15, 0, 0, 0, DateTimeKind.Utc),
+                200m),
+            Payment(
+                trialTenant.Id,
+                trialModuleAOrder.Id,
+                "Success",
+                new DateTime(2026, 7, 15, 0, 0, 0, DateTimeKind.Utc),
+                300m),
+            Payment(
+                systemTenant.Id,
+                systemOrder.Id,
+                "Success",
+                new DateTime(2026, 7, 15, 0, 0, 0, DateTimeKind.Utc),
+                400m),
+            Payment(
+                paidTenant.Id,
+                outsideOrder.Id,
+                "Success",
+                new DateTime(2026, 7, 31, 18, 0, 0, DateTimeKind.Utc),
+                500m));
+        await context.SaveChangesAsync();
+
+        var repository = new SystemAnalyticsReadRepository(context);
+        var fromUtc = new DateTime(
+            2026,
+            6,
+            30,
+            17,
+            0,
+            0,
+            DateTimeKind.Utc);
+        var toExclusiveUtc = new DateTime(
+            2026,
+            7,
+            31,
+            17,
+            0,
+            0,
+            DateTimeKind.Utc);
+
+        var all = await repository.GetMonthlyCollectedRevenueAsync(
+            fromUtc,
+            toExclusiveUtc,
+            null,
+            SystemAnalyticsSegment.All,
+            CancellationToken.None);
+        var moduleAOnly = await repository.GetMonthlyCollectedRevenueAsync(
+            fromUtc,
+            toExclusiveUtc,
+            moduleA.Id,
+            SystemAnalyticsSegment.All,
+            CancellationToken.None);
+        var paidOnly = await repository.GetMonthlyCollectedRevenueAsync(
+            fromUtc,
+            toExclusiveUtc,
+            null,
+            SystemAnalyticsSegment.Paid,
+            CancellationToken.None);
+        var trialOnly = await repository.GetMonthlyCollectedRevenueAsync(
+            fromUtc,
+            toExclusiveUtc,
+            null,
+            SystemAnalyticsSegment.Trial,
+            CancellationToken.None);
+
+        var allMonth = Assert.Single(all);
+        Assert.Equal(2026, allMonth.Year);
+        Assert.Equal(7, allMonth.Month);
+        Assert.Equal(600m, allMonth.CollectedRevenue);
+        Assert.Equal(400m, Assert.Single(moduleAOnly).CollectedRevenue);
+        Assert.Equal(300m, Assert.Single(paidOnly).CollectedRevenue);
+        Assert.Equal(300m, Assert.Single(trialOnly).CollectedRevenue);
+    }
+
     private static SMEFLOWSystemContext CreateContext()
     {
         var options = new DbContextOptionsBuilder<SMEFLOWSystemContext>()
