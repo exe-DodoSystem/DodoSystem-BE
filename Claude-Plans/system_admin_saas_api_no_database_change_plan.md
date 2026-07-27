@@ -927,11 +927,14 @@ Controller dùng policy `SystemAdmin`, không chứa công thức.
 
 **Exit criteria:**
 
-- [ ] Contract `revenue-series` pass.
-- [ ] Tổng collected khớp source read-only.
-- [ ] `refundedAmount=null`.
-- [ ] `mrrStatus=Estimated`.
+- [x] Contract `revenue-series` pass (xác nhận bằng controller contract test).
+- [x] Tổng collected khớp source read-only (xác nhận bằng repository và service test local).
+- [x] `refundedAmount=null`.
+- [x] `mrrStatus=Estimated`.
 - [ ] p95 mục tiêu đạt hoặc có query plan giải thích được.
+
+> Còn mở: đo p95 và kiểm tra query plan trên PostgreSQL staging với dữ liệu có
+> kích thước đại diện. In-memory/unit test không được dùng để kết luận tiêu chí này.
 
 ---
 
@@ -994,9 +997,13 @@ breakdown.totalCollectedRevenue
 
 **Exit criteria:**
 
-- [ ] Không double count.
-- [ ] `items + other = total`.
-- [ ] Reconciliation Phase 3 pass.
+- [x] Không double count.
+- [x] `items + other = total`.
+- [x] Reconciliation Phase 3 pass (xác nhận bằng service test local cho cả
+  `module`, `tenant`, `gateway`).
+
+> Reconciliation với dữ liệu staging/drill-down thật vẫn thuộc bước hardening và
+> staging ở Phase 9.
 
 ---
 
@@ -1057,9 +1064,13 @@ GET /api/system/analytics/action-center
 
 **Exit criteria:**
 
-- [ ] Năm loại action trả đúng.
-- [ ] Warning overdue grace có trong meta.
+- [x] Năm loại action trả đúng.
+- [x] Warning overdue grace có trong meta.
 - [ ] Target path đã được FE xác nhận.
+
+> Backend đã giới hạn `targetPath` trong allow-list route `/system-admin/...` theo
+> tài liệu FE hiện có và đã có test không trả external URL. Cần FE sign-off để đóng
+> tiêu chí cuối cùng.
 
 ---
 
@@ -1114,9 +1125,12 @@ GET /api/system/subscriptions?tenantId=...
 
 **Exit criteria:**
 
-- [ ] 404 đúng cho tenant không hợp lệ.
-- [ ] Amount khớp drill-down.
-- [ ] MRR luôn được đánh dấu estimated.
+- [x] 404 đúng cho tenant không hợp lệ.
+- [x] Amount khớp read repository/drill-down contract trong automated test local.
+- [x] MRR luôn được đánh dấu estimated.
+
+> Còn mở ở Phase 9: reconciliation với dữ liệu staging thật cho billing order,
+> payment transaction và subscription drill-down của cùng tenant.
 
 ---
 

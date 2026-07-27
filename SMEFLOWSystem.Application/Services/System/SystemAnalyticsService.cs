@@ -183,10 +183,101 @@ public sealed class SystemAnalyticsService : ISystemAnalyticsService
         };
     }
 
-    public Task<SystemActionCenterResponseDto> GetActionCenterAsync(
+    public async Task<SystemActionCenterResponseDto> GetActionCenterAsync(
         CancellationToken ct = default)
     {
-        throw new NotSupportedException("Action center is scheduled for Phase 5.");
+        if (_options.OrderOverdueGraceHours < 0)
+        {
+            throw new InvalidOperationException(
+                "SystemAnalytics:OrderOverdueGraceHours cannot be negative.");
+        }
+        if (_options.ActionCenterMaxItems <= 0)
+        {
+            throw new InvalidOperationException(
+                "SystemAnalytics:ActionCenterMaxItems must be greater than zero.");
+        }
+
+        var nowUtc = DateTime.UtcNow;
+        var candidates = await _repository.GetActionCenterCandidatesAsync(
+            nowUtc,
+            _options.OrderOverdueGraceHours,
+            ct);
+        var mappedItems = new List<SystemActionCenterItemDto>(candidates.Count);
+        var unknownTypeCount = 0;
+
+        foreach (var candidate in candidates)
+        {
+            if (TryCreateActionCenterItem(
+                    candidate,
+                    _options.OrderOverdueGraceHours,
+                    out var item))
+            {
+                mappedItems.Add(item);
+            }
+            else
+            {
+                unknownTypeCount++;
+            }
+        }
+
+        if (unknownTypeCount > 0)
+        {
+            _logger.LogWarning(
+                "Excluded {UnknownActionCenterTypeCount} action-center candidates with unrecognized types.",
+                unknownTypeCount);
+        }
+
+        var uniqueItems = mappedItems
+            .GroupBy(item => item.Id, StringComparer.Ordinal)
+            .Select(group => group.OrderByDescending(item => item.OccurredAt).First())
+            .ToList();
+        var counts = new SystemActionCenterCountsDto
+        {
+            Critical = uniqueItems.Count(item =>
+                item.Severity == SystemActionCenterSeverity.Critical),
+            Warning = uniqueItems.Count(item =>
+                item.Severity == SystemActionCenterSeverity.Warning),
+            Info = uniqueItems.Count(item =>
+                item.Severity == SystemActionCenterSeverity.Info)
+        };
+        var items = uniqueItems
+            .OrderBy(item => GetSeverityRank(item.Severity))
+            .ThenByDescending(item => item.OccurredAt)
+            .ThenBy(item => item.Id, StringComparer.Ordinal)
+            .Take(_options.ActionCenterMaxItems)
+            .ToList();
+
+        var timeZone = AnalyticsPeriodResolver.GetTimeZone(
+            _options.BusinessTimezone);
+        var localToday = DateOnly.FromDateTime(
+            TimeZoneInfo.ConvertTimeFromUtc(nowUtc, timeZone));
+        var metaQuery = new SystemAnalyticsPeriodQueryDto
+        {
+            From = localToday,
+            To = localToday,
+            Timezone = SystemAnalyticsOptions.SupportedTimezone,
+            Currency = SystemAnalyticsOptions.SupportedCurrency,
+            Compare = SystemAnalyticsCompare.None
+        };
+        var metaPeriod = AnalyticsPeriodResolver.Resolve(
+            metaQuery,
+            _options,
+            nowUtc);
+        var meta = AnalyticsPeriodResolver.BuildMeta(metaPeriod, metaQuery);
+        meta.GeneratedAt = nowUtc;
+        meta.DataThrough = nowUtc;
+        meta.Warnings =
+        [
+            SystemAnalyticsWarningCodes.OrderOverdueUsesConfiguredGracePeriod,
+            SystemAnalyticsWarningCodes.TestTenantFlagUnavailable
+        ];
+
+        return new SystemActionCenterResponseDto
+        {
+            Counts = counts,
+            Items = items,
+            Meta = meta
+        };
     }
 
     public Task<SystemRevenueForecastResponseDto> GetRevenueForecastAsync(
@@ -555,6 +646,140 @@ public sealed class SystemAnalyticsService : ISystemAnalyticsService
             PercentageOfTotal = AnalyticsMetricCalculator.CalculatePercentage(
                 item.Amount,
                 totalCollectedRevenue)
+        };
+    }
+
+    private static bool TryCreateActionCenterItem(
+        ActionCenterCandidateRow candidate,
+        int overdueGraceHours,
+        out SystemActionCenterItemDto item)
+    {
+        var type = NormalizeActionCenterType(candidate.Type);
+        if (type == null)
+        {
+            item = null!;
+            return false;
+        }
+
+        var entityName = SanitizeActionCenterLabel(
+            candidate.EntityName,
+            candidate.EntityId.ToString("D"));
+        var tenantName = SanitizeActionCenterLabel(
+            candidate.TenantName,
+            candidate.TenantId.ToString("D"));
+        var (severity, title, description) = type switch
+        {
+            SystemActionCenterItemType.PaymentFailed => (
+                SystemActionCenterSeverity.Critical,
+                "Thanh toán thất bại",
+                $"Thanh toán cho hóa đơn {entityName} của {tenantName} đã thất bại."),
+            SystemActionCenterItemType.OrderOverdue => (
+                SystemActionCenterSeverity.Critical,
+                "Hóa đơn quá hạn thanh toán",
+                $"Hóa đơn {entityName} của {tenantName} đã quá hạn thanh toán {overdueGraceHours} giờ."),
+            SystemActionCenterItemType.SubscriptionExpiring => (
+                SystemActionCenterSeverity.Warning,
+                "Gói đăng ký sắp hết hạn",
+                $"Gói {entityName} của {tenantName} sẽ hết hạn trong vòng 7 ngày."),
+            SystemActionCenterItemType.TrialEnding => (
+                SystemActionCenterSeverity.Warning,
+                "Gói dùng thử sắp kết thúc",
+                $"Gói dùng thử {entityName} của {tenantName} sẽ kết thúc trong vòng 7 ngày."),
+            SystemActionCenterItemType.TenantSuspended => (
+                SystemActionCenterSeverity.Info,
+                "Tenant đang bị tạm ngưng",
+                $"Tenant {tenantName} đang ở trạng thái tạm ngưng."),
+            _ => throw new InvalidOperationException(
+                $"Unsupported action-center type '{type}'.")
+        };
+
+        item = new SystemActionCenterItemDto
+        {
+            Id = $"{type}_{candidate.EntityId:D}",
+            Type = type,
+            Severity = severity,
+            Title = title,
+            Description = description,
+            OccurredAt = EnsureUtc(candidate.OccurredAt),
+            EntityId = candidate.EntityId,
+            TargetPath = BuildActionCenterTargetPath(
+                type,
+                candidate.EntityId,
+                candidate.TenantId)
+        };
+        return true;
+    }
+
+    private static string? NormalizeActionCenterType(string? type)
+    {
+        var knownTypes = new[]
+        {
+            SystemActionCenterItemType.PaymentFailed,
+            SystemActionCenterItemType.OrderOverdue,
+            SystemActionCenterItemType.SubscriptionExpiring,
+            SystemActionCenterItemType.TrialEnding,
+            SystemActionCenterItemType.TenantSuspended
+        };
+        return knownTypes.FirstOrDefault(known =>
+            string.Equals(known, type, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string BuildActionCenterTargetPath(
+        string type,
+        Guid entityId,
+        Guid tenantId)
+    {
+        return type switch
+        {
+            SystemActionCenterItemType.PaymentFailed =>
+                "/system-admin/payment-transactions",
+            SystemActionCenterItemType.OrderOverdue =>
+                $"/system-admin/billing-orders/{entityId:D}",
+            SystemActionCenterItemType.SubscriptionExpiring or
+                SystemActionCenterItemType.TrialEnding =>
+                $"/system-admin/subscriptions?tenantId={tenantId:D}",
+            SystemActionCenterItemType.TenantSuspended =>
+                $"/system-admin/tenants/{tenantId:D}",
+            _ => throw new InvalidOperationException(
+                $"Unsupported action-center type '{type}'.")
+        };
+    }
+
+    private static string SanitizeActionCenterLabel(
+        string? value,
+        string fallback)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return fallback;
+        }
+
+        var sanitized = new string(value
+            .Where(character => !char.IsControl(character))
+            .Take(200)
+            .ToArray())
+            .Trim();
+        return sanitized.Length == 0 ? fallback : sanitized;
+    }
+
+    private static DateTime EnsureUtc(DateTime value)
+    {
+        return value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+        };
+    }
+
+    private static int GetSeverityRank(string severity)
+    {
+        return severity switch
+        {
+            SystemActionCenterSeverity.Critical => 0,
+            SystemActionCenterSeverity.Warning => 1,
+            SystemActionCenterSeverity.Info => 2,
+            _ => int.MaxValue
         };
     }
 

@@ -93,4 +93,30 @@ public sealed class SystemAnalyticsController : ControllerBase
             return StatusCode(problem.Status!.Value, problem);
         }
     }
+
+    /// <summary>[SystemAdmin] Lấy các hành động cần xử lý từ dữ liệu vận hành hiện có.</summary>
+    [HttpGet("action-center")]
+    [ProducesResponseType<SystemActionCenterResponseDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<Microsoft.AspNetCore.Mvc.ProblemDetails>(
+        StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetActionCenter(
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await _service.GetActionCenterAsync(cancellationToken));
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Unexpected error while generating the System Analytics action center.");
+            var problem = SystemAnalyticsProblemDetailsFactory.UnexpectedError(HttpContext);
+            return StatusCode(problem.Status!.Value, problem);
+        }
+    }
 }

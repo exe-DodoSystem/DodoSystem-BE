@@ -92,6 +92,7 @@ public sealed class TenantSubscriptionCountRow
     public int Active { get; set; }
     public int Trial { get; set; }
     public int ExpiringIn30Days { get; set; }
+    public decimal EstimatedMrr { get; set; }
 }
 
 public sealed class MonthlyCollectedRevenueRow
@@ -159,11 +160,13 @@ public interface ISystemAnalyticsReadRepository
         Guid tenantId,
         DateTime periodFromUtc,
         DateTime periodToExclusiveUtc,
+        int? moduleId,
         CancellationToken ct);
 
     Task<TenantSubscriptionCountRow> GetTenantSubscriptionCountsAsync(
         Guid tenantId,
         DateTime nowUtc,
+        int? moduleId,
         CancellationToken ct);
 
     // Forecast — monthly collected revenue

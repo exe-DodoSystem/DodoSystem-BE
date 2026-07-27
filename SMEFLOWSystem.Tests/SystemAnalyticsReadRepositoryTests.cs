@@ -200,6 +200,7 @@ public sealed class SystemAnalyticsReadRepositoryTests
             tenant.Id,
             new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc),
             new DateTime(2026, 8, 1, 0, 0, 0, DateTimeKind.Utc),
+            null,
             CancellationToken.None);
 
         Assert.NotNull(result);
@@ -209,6 +210,203 @@ public sealed class SystemAnalyticsReadRepositoryTests
         Assert.Null(result.LastSuccessfulPaymentAt);
         Assert.Null(result.LastFailedPaymentAt);
         Assert.Empty(result.PaymentDelayDaysList);
+    }
+
+    [Fact]
+    public async Task TenantFinancialAggregate_ReconcilesPaymentsOutstandingAndModuleFilter()
+    {
+        await using var context = CreateContext();
+        var tenant = Tenant("Tenant A");
+        context.Tenants.Add(tenant);
+        var moduleA = Module("A", 100m);
+        var moduleB = Module("B", 200m);
+        context.Modules.AddRange(moduleA, moduleB);
+        await context.SaveChangesAsync();
+
+        var paidInPeriodOrder = Order(
+            tenant.Id,
+            new DateTime(2026, 7, 10, 0, 0, 0, DateTimeKind.Utc),
+            100m,
+            10m);
+        paidInPeriodOrder.PaymentStatus = "Paid";
+        var paidOutsidePeriodOrder = Order(
+            tenant.Id,
+            new DateTime(2026, 6, 10, 0, 0, 0, DateTimeKind.Utc),
+            50m,
+            0m);
+        paidOutsidePeriodOrder.PaymentStatus = "Paid";
+        var negativeDelayOrder = Order(
+            tenant.Id,
+            new DateTime(2026, 7, 20, 0, 0, 0, DateTimeKind.Utc),
+            30m,
+            0m);
+        negativeDelayOrder.PaymentStatus = "Paid";
+        var failedOrder = Order(
+            tenant.Id,
+            new DateTime(2026, 7, 12, 0, 0, 0, DateTimeKind.Utc),
+            40m,
+            0m);
+        failedOrder.PaymentStatus = "Failed";
+        var pendingOrder = Order(
+            tenant.Id,
+            new DateTime(2026, 7, 15, 0, 0, 0, DateTimeKind.Utc),
+            120m,
+            20m);
+        context.BillingOrders.AddRange(
+            paidInPeriodOrder,
+            paidOutsidePeriodOrder,
+            negativeDelayOrder,
+            failedOrder,
+            pendingOrder);
+        context.BillingOrderModules.AddRange(
+            BillingLine(tenant.Id, paidInPeriodOrder.Id, moduleA.Id, 100m),
+            BillingLine(tenant.Id, paidOutsidePeriodOrder.Id, moduleB.Id, 50m),
+            BillingLine(tenant.Id, negativeDelayOrder.Id, moduleA.Id, 30m),
+            BillingLine(tenant.Id, failedOrder.Id, moduleA.Id, 40m),
+            BillingLine(tenant.Id, pendingOrder.Id, moduleA.Id, 120m));
+        context.PaymentTransactions.AddRange(
+            Payment(
+                tenant.Id,
+                paidInPeriodOrder.Id,
+                "Success",
+                new DateTime(2026, 7, 12, 0, 0, 0, DateTimeKind.Utc),
+                90m),
+            Payment(
+                tenant.Id,
+                paidOutsidePeriodOrder.Id,
+                "Settled",
+                new DateTime(2026, 6, 11, 0, 0, 0, DateTimeKind.Utc),
+                50m),
+            Payment(
+                tenant.Id,
+                negativeDelayOrder.Id,
+                "Paid",
+                new DateTime(2026, 7, 19, 0, 0, 0, DateTimeKind.Utc),
+                30m),
+            Payment(
+                tenant.Id,
+                failedOrder.Id,
+                "Failed",
+                new DateTime(2026, 7, 13, 0, 0, 0, DateTimeKind.Utc),
+                40m));
+        await context.SaveChangesAsync();
+
+        var repository = new SystemAnalyticsReadRepository(context);
+        var from = new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc);
+        var toExclusive = new DateTime(2026, 8, 1, 0, 0, 0, DateTimeKind.Utc);
+        var allModules = await repository.GetTenantFinancialAggregateAsync(
+            tenant.Id,
+            from,
+            toExclusive,
+            null,
+            CancellationToken.None);
+        var moduleAOnly = await repository.GetTenantFinancialAggregateAsync(
+            tenant.Id,
+            from,
+            toExclusive,
+            moduleA.Id,
+            CancellationToken.None);
+
+        Assert.NotNull(allModules);
+        Assert.Equal(170m, allModules.LifetimeCollectedRevenue);
+        Assert.Equal(120m, allModules.CollectedRevenueInPeriod);
+        Assert.Equal(100m, allModules.OutstandingAmount);
+        Assert.Equal(
+            new DateTime(2026, 7, 19, 0, 0, 0, DateTimeKind.Utc),
+            allModules.LastSuccessfulPaymentAt);
+        Assert.Equal(
+            new DateTime(2026, 7, 13, 0, 0, 0, DateTimeKind.Utc),
+            allModules.LastFailedPaymentAt);
+        Assert.Contains(-1m, allModules.PaymentDelayDaysList);
+
+        Assert.NotNull(moduleAOnly);
+        Assert.Equal(120m, moduleAOnly.LifetimeCollectedRevenue);
+        Assert.Equal(120m, moduleAOnly.CollectedRevenueInPeriod);
+        Assert.Equal(100m, moduleAOnly.OutstandingAmount);
+    }
+
+    [Fact]
+    public async Task TenantSubscriptionSummary_CountsCurrentRowsAndEstimatedMrrInOneProjection()
+    {
+        await using var context = CreateContext();
+        var tenant = Tenant("Tenant A");
+        context.Tenants.Add(tenant);
+        var moduleA = Module("A", 100m);
+        var moduleB = Module("B", 200m);
+        context.Modules.AddRange(moduleA, moduleB);
+        await context.SaveChangesAsync();
+
+        var now = new DateTime(2026, 7, 15, 0, 0, 0, DateTimeKind.Utc);
+        context.ModuleSubscriptions.AddRange(
+            Subscription(tenant.Id, moduleA.Id, "Active", now.AddDays(-1), now.AddDays(10)),
+            Subscription(tenant.Id, moduleB.Id, "Trial", now.AddDays(-1), now.AddDays(20)),
+            Subscription(tenant.Id, moduleB.Id, "Active", now.AddDays(-1), now.AddDays(60)),
+            Subscription(tenant.Id, moduleA.Id, "Active", now.AddDays(-10), now.AddDays(-1)),
+            new ModuleSubscription
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenant.Id,
+                ModuleId = moduleA.Id,
+                Status = "Active",
+                StartDate = now.AddDays(-1),
+                EndDate = now.AddDays(5),
+                IsDeleted = true
+            });
+        await context.SaveChangesAsync();
+
+        var repository = new SystemAnalyticsReadRepository(context);
+        var allModules = await repository.GetTenantSubscriptionCountsAsync(
+            tenant.Id,
+            now,
+            null,
+            CancellationToken.None);
+        var moduleAOnly = await repository.GetTenantSubscriptionCountsAsync(
+            tenant.Id,
+            now,
+            moduleA.Id,
+            CancellationToken.None);
+
+        Assert.Equal(2, allModules.Active);
+        Assert.Equal(1, allModules.Trial);
+        Assert.Equal(2, allModules.ExpiringIn30Days);
+        Assert.Equal(300m, allModules.EstimatedMrr);
+        Assert.Equal(1, moduleAOnly.Active);
+        Assert.Equal(0, moduleAOnly.Trial);
+        Assert.Equal(1, moduleAOnly.ExpiringIn30Days);
+        Assert.Equal(100m, moduleAOnly.EstimatedMrr);
+    }
+
+    [Fact]
+    public async Task TenantFinancialAggregate_ReturnsNullForMissingDeletedAndSystemTenant()
+    {
+        await using var context = CreateContext();
+        var deletedTenant = Tenant("Deleted tenant", isDeleted: true);
+        var systemTenant = Tenant("SYSTEM");
+        context.Tenants.AddRange(deletedTenant, systemTenant);
+        await context.SaveChangesAsync();
+
+        var repository = new SystemAnalyticsReadRepository(context);
+        var from = new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc);
+        var toExclusive = new DateTime(2026, 8, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        Assert.Null(await repository.GetTenantFinancialAggregateAsync(
+            Guid.NewGuid(),
+            from,
+            toExclusive,
+            null,
+            CancellationToken.None));
+        Assert.Null(await repository.GetTenantFinancialAggregateAsync(
+            deletedTenant.Id,
+            from,
+            toExclusive,
+            null,
+            CancellationToken.None));
+        Assert.Null(await repository.GetTenantFinancialAggregateAsync(
+            systemTenant.Id,
+            from,
+            toExclusive,
+            null,
+            CancellationToken.None));
     }
 
     [Fact]
