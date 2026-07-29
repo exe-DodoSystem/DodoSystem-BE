@@ -47,6 +47,8 @@ public class HrEmployeeService : IHrEmployeeService
     public async Task<PagedResultDto<EmployeeDto>> GetPagedAsync(EmployeeQueryDto query)
     {
         _currentUser.EnsureHrAccess();
+        var tenantId = _currentTenantService.TenantId
+            ?? throw new UnauthorizedAccessException("Tenant ID is missing.");
 
         // Xác định phạm vi DepartmentId được phép xem
         // - null  = Admin/HRManager → không giới hạn (dùng query.DepartmentId như cũ)
@@ -92,11 +94,13 @@ public class HrEmployeeService : IHrEmployeeService
                     foreach (var deptId in accessibleIds)
                     {
                         var (deptItems, deptTotal) = await _employeeRepo.GetPagedAsync(
+                            tenantId: tenantId,
                             departmentId: deptId,
                             positionId: query.PositionId,
                             roleId: query.RoleId,
                             status: query.Status,
                             includeResigned: query.IncludeResigned,
+                            includeDeleted: query.IncludeDeleted,
                             search: query.Search,
                             pageNumber: 1,
                             pageSize: int.MaxValue,
@@ -120,11 +124,13 @@ public class HrEmployeeService : IHrEmployeeService
         }
 
         var (items, total) = await _employeeRepo.GetPagedAsync(
+            tenantId: tenantId,
             departmentId: departmentId,
             positionId: query.PositionId,
             roleId: query.RoleId,
             status: query.Status,
             includeResigned: query.IncludeResigned,
+            includeDeleted: query.IncludeDeleted,
             search: query.Search,
             pageNumber: query.PageNumber,
             pageSize: query.PageSize,

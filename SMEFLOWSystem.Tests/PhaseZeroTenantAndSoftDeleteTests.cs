@@ -87,11 +87,13 @@ public sealed class PhaseZeroTenantAndSoftDeleteTests
         var repository = new EmployeeRepository(context);
         var byId = await repository.GetByIdAsync(deleted.Id);
         var (paged, total) = await repository.GetPagedAsync(
+            tenantId: tenantId,
             departmentId: null,
             positionId: null,
             roleId: null,
             status: null,
             includeResigned: false,
+            includeDeleted: false,
             search: null,
             pageNumber: 1,
             pageSize: 20,
@@ -103,6 +105,43 @@ public sealed class PhaseZeroTenantAndSoftDeleteTests
         Assert.Equal(1, total);
         Assert.Equal(active.Id, Assert.Single(paged).Id);
         Assert.Equal(active.Id, Assert.Single(byDepartment).Id);
+    }
+
+    [Fact]
+    [Trait("Phase", "0")]
+    [Trait("Gap", "BE-MGR-02")]
+    public async Task EmployeeIncludeDeletedQuery_RemainsTenantScoped()
+    {
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        var activeA = Employee(tenantA, null, "Active A", isDeleted: false);
+        var deletedA = Employee(tenantA, null, "Deleted A", isDeleted: true);
+        var deletedB = Employee(tenantB, null, "Deleted B", isDeleted: true);
+        await using var context = PhaseZeroTestContext.Create(tenantA);
+
+        context.Employees.AddRange(activeA, deletedA, deletedB);
+        await context.SaveChangesAsync();
+
+        var repository = new EmployeeRepository(context);
+        var (items, total) = await repository.GetPagedAsync(
+            tenantId: tenantA,
+            departmentId: null,
+            positionId: null,
+            roleId: null,
+            status: null,
+            includeResigned: false,
+            includeDeleted: true,
+            search: null,
+            pageNumber: 1,
+            pageSize: 20,
+            sortBy: null,
+            sortDir: null);
+
+        Assert.Equal(2, total);
+        Assert.All(items, item => Assert.Equal(tenantA, item.TenantId));
+        Assert.Contains(items, item => item.Id == activeA.Id && item.IsDeleted == false);
+        Assert.Contains(items, item => item.Id == deletedA.Id && item.IsDeleted == true);
+        Assert.DoesNotContain(items, item => item.Id == deletedB.Id);
     }
 
     [Fact]

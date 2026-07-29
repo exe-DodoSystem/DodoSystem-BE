@@ -15,11 +15,13 @@ public interface IEmployeeRepository
     Task<List<Employee>> GetByDepartmentIdAsync(Guid departmentId);
 
     Task<(List<Employee> Items, int TotalCount)> GetPagedAsync(
+        Guid tenantId,
         Guid? departmentId,
         Guid? positionId,
         int? roleId,
         string? status,
         bool includeResigned,
+        bool includeDeleted,
         string? search,
         int pageNumber,
         int pageSize,

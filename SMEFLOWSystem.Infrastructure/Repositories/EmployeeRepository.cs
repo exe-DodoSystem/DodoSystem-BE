@@ -70,11 +70,13 @@ public class EmployeeRepository : IEmployeeRepository
     }
 
     public async Task<(List<Employee> Items, int TotalCount)> GetPagedAsync(
+        Guid tenantId,
         Guid? departmentId,
         Guid? positionId,
         int? roleId,
         string? status,
         bool includeResigned,
+        bool includeDeleted,
         string? search,
         int pageNumber,
         int pageSize,
@@ -84,14 +86,18 @@ public class EmployeeRepository : IEmployeeRepository
         if (pageNumber < 1) pageNumber = 1;
         if (pageSize < 1) pageSize = 10;
 
-        var query = _context.Employees
+        var employeeQuery = includeDeleted
+            ? _context.Employees.IgnoreQueryFilters()
+            : _context.Employees;
+
+        var query = employeeQuery
             .AsNoTracking()
             .Include(e => e.Department)
             .Include(e => e.Position)
             .Include(e => e.User)
                 .ThenInclude(u => u.UserRoles)
                     .ThenInclude(ur => ur.Role)
-            .AsQueryable();
+            .Where(e => e.TenantId == tenantId);
 
         if (departmentId.HasValue)
             query = query.Where(e => e.DepartmentId == departmentId.Value);

@@ -477,11 +477,13 @@ public sealed class AttendanceIdempotencyTests
             => throw new NotSupportedException();
 
         public Task<(List<Employee> Items, int TotalCount)> GetPagedAsync(
+            Guid tenantId,
             Guid? departmentId,
             Guid? positionId,
             int? roleId,
             string? status,
             bool includeResigned,
+            bool includeDeleted,
             string? search,
             int pageNumber,
             int pageSize,

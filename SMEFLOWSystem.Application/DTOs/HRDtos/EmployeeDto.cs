@@ -22,4 +22,5 @@ public class EmployeeDto
     public DateOnly? ResignationDate { get; set; }
     public decimal BaseSalary { get; set; }
     public string Status { get; set; } = string.Empty;
+    public bool IsDeleted { get; set; }
 }

@@ -15,4 +15,5 @@ public class EmployeeQueryDto : PagingRequestDto
     public string? Search { get; init; }
 
     public bool IncludeResigned { get; init; } = false;
+    public bool IncludeDeleted { get; init; } = false;
 }
