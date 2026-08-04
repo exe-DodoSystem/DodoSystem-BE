@@ -10,6 +10,8 @@ namespace SMEFLOWSystem.Application.Helpers
 {
     public static class AuthHelper
     {
+        private const int DefaultAccessTokenExpiryMinutes = 60;
+
         public static string GenerateJwtToken(User user, IConfiguration config, bool isExpired = false)
         {
             // 1. Tạo danh sách Claims cơ bản
@@ -45,15 +47,24 @@ namespace SMEFLOWSystem.Application.Helpers
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             // 4. Tạo Token
+            var expiryMinutes = GetAccessTokenExpiryMinutes(config);
             var token = new JwtSecurityToken(
                 issuer: config["Jwt:Issuer"],
                 audience: config["Jwt:Audience"],
                 claims: claims,
-                expires: DateTime.UtcNow.AddHours(24),
+                expires: DateTime.UtcNow.AddMinutes(expiryMinutes),
                 signingCredentials: creds
             );
 
             return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        private static int GetAccessTokenExpiryMinutes(IConfiguration config)
+        {
+            var raw = config["Jwt:AccessTokenExpiryMinutes"];
+            return int.TryParse(raw, out var minutes) && minutes > 0
+                ? minutes
+                : DefaultAccessTokenExpiryMinutes;
         }
 
         public static string HashPassword(string password)

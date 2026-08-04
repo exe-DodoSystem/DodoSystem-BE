@@ -205,19 +205,6 @@ namespace SMEFLOWSystem.Application.Services
             if (tenant == null)
                 throw new InvalidOperationException("Không tìm thấy tenant");
 
-            var isSystemAdmin = user.UserRoles?.Any(ur => ur.Role != null
-                                                        && string.Equals(ur.Role.Name, "SystemAdmin", StringComparison.OrdinalIgnoreCase)) == true;
-            var isModulesExpired = false;
-            if (!isSystemAdmin)
-            {
-                // Rule: block tenant login only when ALL modules are expired
-                var subs = await _moduleSubscriptionRepo.GetByTenantIgnoreTenantAsync(tenant.Id);
-                var now = DateTime.UtcNow;
-                
-                var hasValidModule = subs.Any(s => ModuleSubscriptionRules.IsUsable(s, now));
-                isModulesExpired = !hasValidModule; 
-            }
-
             if (!string.Equals(tenant.Status, StatusEnum.TenantActive, StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(tenant.Status, StatusEnum.TenantTrial, StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(tenant.Status, StatusEnum.TenantSuspended, StringComparison.OrdinalIgnoreCase))
@@ -225,14 +212,11 @@ namespace SMEFLOWSystem.Application.Services
                     "Tài khoản công ty chưa sẵn sàng để đăng nhập.",
                     "AUTH_TENANT_NOT_READY");
 
-            var token = AuthHelper.GenerateJwtToken(user, _config, isModulesExpired);
-            var userDto =  _mapper.Map<LoginUserDto>(user);
-            userDto.Token = token;
-            userDto.IsExpired = isModulesExpired;
-
-            // Issue refresh token for clients that support token refresh.
             var issued = await _refreshTokenService.IssueAsync(user.Id);
+            var userDto =  _mapper.Map<LoginUserDto>(user);
+            userDto.Token = issued.AccessToken;
             userDto.RefreshToken = issued.RefreshToken;
+            userDto.IsExpired = issued.IsExpired;
 
             return userDto;
         }

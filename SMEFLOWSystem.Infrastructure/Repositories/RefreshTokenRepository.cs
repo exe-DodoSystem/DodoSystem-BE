@@ -24,10 +24,49 @@ public class RefreshTokenRepository : IRefreshTokenRepository
         await _context.SaveChangesAsync();
     }
 
-    public async Task UpdateAsync(RefreshToken token)
+    public async Task<bool> RotateAsync(
+        Guid currentTokenId,
+        RefreshToken replacementToken,
+        DateTime revokedAt,
+        string reason)
     {
-        _context.RefreshTokens.Update(token);
-        await _context.SaveChangesAsync();
+        var strategy = _context.Database.CreateExecutionStrategy();
+
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                await _context.RefreshTokens.AddAsync(replacementToken);
+                await _context.SaveChangesAsync();
+
+                var affectedRows = await _context.RefreshTokens
+                    .IgnoreQueryFilters()
+                    .Where(token => token.Id == currentTokenId
+                        && token.RevokedAt == null
+                        && token.ExpiresAt > revokedAt)
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(token => token.RevokedAt, revokedAt)
+                        .SetProperty(token => token.ReplacedByTokenId, replacementToken.Id)
+                        .SetProperty(token => token.RevokeReason, reason));
+
+                if (affectedRows != 1)
+                {
+                    await transaction.RollbackAsync();
+                    _context.Entry(replacementToken).State = EntityState.Detached;
+                    return false;
+                }
+
+                await transaction.CommitAsync();
+                return true;
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                _context.Entry(replacementToken).State = EntityState.Detached;
+                throw;
+            }
+        });
     }
 
     public Task<RefreshToken?> GetByTokenHashIgnoreTenantAsync(string tokenHash)
@@ -51,18 +90,13 @@ public class RefreshTokenRepository : IRefreshTokenRepository
     {
         var now = DateTime.UtcNow;
 
-        var tokens = await _context.RefreshTokens
-            .Where(t => t.UserId == userId && t.TenantId == tenantId && t.RevokedAt == null)
-            .ToListAsync();
-
-        if (tokens.Count == 0) return;
-
-        foreach (var token in tokens)
-        {
-            token.RevokedAt = now;
-            token.RevokeReason = reason;
-        }
-
-        await _context.SaveChangesAsync();
+        await _context.RefreshTokens
+            .IgnoreQueryFilters()
+            .Where(token => token.UserId == userId
+                && token.TenantId == tenantId
+                && token.RevokedAt == null)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(token => token.RevokedAt, now)
+                .SetProperty(token => token.RevokeReason, reason));
     }
 }
