@@ -7,14 +7,6 @@ namespace SMEFLOWSystem.Tests;
 public sealed class SystemRevenueCalculatorTests
 {
     [Fact]
-    public void CalculateFinalAmount_UsesStoredFinalOrDiscountFallback()
-    {
-        Assert.Equal(75m, AnalyticsMetricCalculator.CalculateFinalAmount(100m, 25m, null));
-        Assert.Equal(80m, AnalyticsMetricCalculator.CalculateFinalAmount(100m, 25m, 80m));
-        Assert.Equal(100m, AnalyticsMetricCalculator.CalculateFinalAmount(100m, null, null));
-    }
-
-    [Fact]
     public void SumCollected_UsesOnlySuccessfulPaymentsWithProcessedAt()
     {
         var processedAt = new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc);

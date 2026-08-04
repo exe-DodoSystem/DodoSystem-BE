@@ -233,7 +233,7 @@ public sealed class SystemRevenueSeriesTests
             OrderId = Guid.NewGuid(),
             TenantId = Guid.NewGuid(),
             BillingDate = billingDate,
-            FinalAmount = amount,
+            TotalAmount = amount,
             PaymentStatus = "Paid"
         };
     }

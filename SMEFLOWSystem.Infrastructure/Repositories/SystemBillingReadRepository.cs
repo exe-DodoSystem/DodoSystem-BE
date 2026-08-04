@@ -35,8 +35,6 @@ public sealed class SystemBillingReadRepository : ISystemBillingReadRepository
                 TenantName = tenant.Name,
                 BillingDate = order.BillingDate,
                 TotalAmount = order.TotalAmount,
-                DiscountAmount = order.DiscountAmount,
-                FinalAmount = order.FinalAmount,
                 PaymentStatus = order.PaymentStatus,
                 Status = order.Status,
                 CreatedAt = order.CreatedAt,
@@ -80,9 +78,6 @@ public sealed class SystemBillingReadRepository : ISystemBillingReadRepository
                 TenantName = x.TenantName,
                 BillingDate = x.BillingDate,
                 TotalAmount = x.TotalAmount,
-                DiscountAmount = x.DiscountAmount ?? 0,
-                FinalAmount = x.FinalAmount
-                    ?? (x.TotalAmount - (x.DiscountAmount ?? 0)),
                 PaymentStatus = x.PaymentStatus,
                 Status = x.Status,
                 ModuleCount = modules
@@ -124,9 +119,6 @@ public sealed class SystemBillingReadRepository : ISystemBillingReadRepository
                 TenantName = tenant.Name,
                 BillingDate = order.BillingDate,
                 TotalAmount = order.TotalAmount,
-                DiscountAmount = order.DiscountAmount ?? 0,
-                FinalAmount = order.FinalAmount
-                    ?? (order.TotalAmount - (order.DiscountAmount ?? 0)),
                 PaymentStatus = order.PaymentStatus,
                 Status = order.Status,
                 Notes = order.Notes,
@@ -243,9 +235,9 @@ public sealed class SystemBillingReadRepository : ISystemBillingReadRepository
             "createdat" => descending
                 ? query.OrderByDescending(x => x.CreatedAt)
                 : query.OrderBy(x => x.CreatedAt),
-            "finalamount" => descending
-                ? query.OrderByDescending(x => x.FinalAmount)
-                : query.OrderBy(x => x.FinalAmount),
+            "totalamount" => descending
+                ? query.OrderByDescending(x => x.TotalAmount)
+                : query.OrderBy(x => x.TotalAmount),
             "billingordernumber" => descending
                 ? query.OrderByDescending(x => x.BillingOrderNumber)
                 : query.OrderBy(x => x.BillingOrderNumber),
@@ -263,8 +255,6 @@ public sealed class SystemBillingReadRepository : ISystemBillingReadRepository
         public string TenantName { get; set; } = string.Empty;
         public DateTime BillingDate { get; set; }
         public decimal TotalAmount { get; set; }
-        public decimal? DiscountAmount { get; set; }
-        public decimal? FinalAmount { get; set; }
         public string PaymentStatus { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public DateTime? CreatedAt { get; set; }

@@ -22,8 +22,6 @@ public sealed class SystemBillingOrderListItemDto
     public string TenantName { get; set; } = string.Empty;
     public DateTime BillingDate { get; set; }
     public decimal TotalAmount { get; set; }
-    public decimal DiscountAmount { get; set; }
-    public decimal FinalAmount { get; set; }
     public string PaymentStatus { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
     public int ModuleCount { get; set; }
@@ -52,8 +50,6 @@ public sealed class SystemBillingOrderDetailDto
     public string TenantName { get; set; } = string.Empty;
     public DateTime BillingDate { get; set; }
     public decimal TotalAmount { get; set; }
-    public decimal DiscountAmount { get; set; }
-    public decimal FinalAmount { get; set; }
     public string PaymentStatus { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
     public string? Notes { get; set; }

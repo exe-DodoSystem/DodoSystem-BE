@@ -530,7 +530,7 @@ public sealed class SystemAnalyticsService : ISystemAnalyticsService
             }
 
             values[RevenueBucketBuilder.GetBucketStart(localDate, granularity)]
-                .InvoicedRevenue += order.FinalAmount;
+                .InvoicedRevenue += order.TotalAmount;
             dataThrough = MaxTimestamp(dataThrough, order.BillingDate);
         }
 
@@ -590,7 +590,7 @@ public sealed class SystemAnalyticsService : ISystemAnalyticsService
             }
 
             values[RevenueBucketBuilder.GetBucketStart(localDate, granularity)]
-                .OutstandingCreated += order.FinalAmount;
+                .OutstandingCreated += order.TotalAmount;
             dataThrough = MaxTimestamp(dataThrough, order.CreatedAt);
         }
 

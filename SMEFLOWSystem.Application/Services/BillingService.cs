@@ -80,8 +80,7 @@ namespace SMEFLOWSystem.Application.Services
             var modules = moduleIds.Length == 0 ? new() : await _moduleRepo.GetByIdsAsync(moduleIds);
 
             var vi = CultureInfo.GetCultureInfo("vi-VN");
-            var discount = order.DiscountAmount ?? 0m;
-            var payable = order.TotalAmount - discount;
+            var payable = order.TotalAmount;
 
             var linesHtml = new StringBuilder();
             if (orderLines.Count > 0)
@@ -166,8 +165,6 @@ namespace SMEFLOWSystem.Application.Services
                     <p><b>Thông tin đơn hàng (tuỳ chọn thanh toán)</b></p>
                     <p>Mã đơn: <b>{order.BillingOrderNumber}</b></p>
                     {linesHtml}
-                    <p>Tổng tiền: <b>{order.TotalAmount.ToString("N0", vi)} VND</b></p>
-                    <p>Giảm giá: <b>{discount.ToString("N0", vi)} VND</b></p>
                     <p>Cần thanh toán: <b>{payable.ToString("N0", vi)} VND</b></p>
                     <hr/>
                     {paymentActionHtml}";
@@ -183,8 +180,6 @@ namespace SMEFLOWSystem.Application.Services
                     <p><b>Thông tin đơn hàng mua thêm</b></p>
                     <p>Mã đơn: <b>{order.BillingOrderNumber}</b></p>
                     {linesHtml}
-                    <p>Tổng tiền: <b>{order.TotalAmount.ToString("N0", vi)} VND</b></p>
-                    <p>Giảm giá: <b>{discount.ToString("N0", vi)} VND</b></p>
                     <p>Cần thanh toán: <b>{payable.ToString("N0", vi)} VND</b></p>
                     <hr/>
                     {paymentActionHtml}";
@@ -199,8 +194,6 @@ namespace SMEFLOWSystem.Application.Services
                     <p><b>Thông tin đơn hàng gia hạn</b></p>
                     <p>Mã đơn: <b>{order.BillingOrderNumber}</b></p>
                     {linesHtml}
-                    <p>Tổng tiền: <b>{order.TotalAmount.ToString("N0", vi)} VND</b></p>
-                    <p>Giảm giá: <b>{discount.ToString("N0", vi)} VND</b></p>
                     <p>Cần thanh toán: <b>{payable.ToString("N0", vi)} VND</b></p>
                     <hr/>
                     {paymentActionHtml}";
@@ -215,8 +208,6 @@ namespace SMEFLOWSystem.Application.Services
                     <p><b>Thông tin đơn hàng</b></p>
                     <p>Mã đơn: <b>{order.BillingOrderNumber}</b></p>
                     {linesHtml}
-                    <p>Tổng tiền: <b>{order.TotalAmount.ToString("N0", vi)} VND</b></p>
-                    <p>Giảm giá: <b>{discount.ToString("N0", vi)} VND</b></p>
                     <p>Cần thanh toán: <b>{payable.ToString("N0", vi)} VND</b></p>
                     <hr/>
                     {paymentActionHtml}";

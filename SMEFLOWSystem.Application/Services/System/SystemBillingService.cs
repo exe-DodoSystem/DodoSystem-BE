@@ -9,7 +9,7 @@ namespace SMEFLOWSystem.Application.Services.System;
 public sealed class SystemBillingService : ISystemBillingService
 {
     private static readonly string[] BillingSortFields =
-        ["billingDate", "createdAt", "finalAmount", "billingOrderNumber"];
+        ["billingDate", "createdAt", "totalAmount", "billingOrderNumber"];
     private static readonly string[] PaymentStatuses =
         [StatusEnum.PaymentPending, StatusEnum.PaymentPaid, StatusEnum.PaymentFailed, StatusEnum.OrderCancelled];
     private static readonly string[] OrderStatuses =

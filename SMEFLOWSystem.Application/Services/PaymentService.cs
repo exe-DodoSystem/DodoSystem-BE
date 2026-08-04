@@ -136,8 +136,7 @@ namespace SMEFLOWSystem.Application.Services
             var amount = amountMinor / 100m;
 
             // Validate amount matches order payable amount
-            var discount = orderForTenant.DiscountAmount ?? 0m;
-            var expectedPayable = orderForTenant.TotalAmount - discount;
+            var expectedPayable = orderForTenant.TotalAmount;
             if (expectedPayable <= 0m)
                 throw new BusinessRuleException(
                     "Đơn thanh toán không hợp lệ (số tiền phải > 0)",
@@ -254,8 +253,7 @@ namespace SMEFLOWSystem.Application.Services
             if (order == null)
                 throw new KeyNotFoundException("Không tìm thấy đơn thanh toán");
 
-            var discount = order.DiscountAmount ?? 0m;
-            var payable = order.TotalAmount - discount;
+            var payable = order.TotalAmount;
             if (payable <= 0m)
                 throw new BusinessRuleException(
                     "Đơn thanh toán không hợp lệ (số tiền phải > 0)",
@@ -385,8 +383,7 @@ namespace SMEFLOWSystem.Application.Services
         {
             InitializeVnpay();
 
-            var discount = order.DiscountAmount ?? 0m;
-            var payable = order.TotalAmount - discount;
+            var payable = order.TotalAmount;
             if (payable <= 0m)
                 throw new BusinessRuleException(
                     "Đơn thanh toán không hợp lệ (số tiền phải > 0)",
@@ -446,8 +443,7 @@ namespace SMEFLOWSystem.Application.Services
                     "Missing config: Payment:SePay:BankCode");
             var prefix = _config["Payment:SePay:PaymentContentPrefix"] ?? "DODO";
 
-            var discount = order.DiscountAmount ?? 0m;
-            var payable = order.TotalAmount - discount;
+            var payable = order.TotalAmount;
             if (payable <= 0m)
                 throw new BusinessRuleException(
                     "Đơn thanh toán không hợp lệ (số tiền phải > 0)",
@@ -499,8 +495,7 @@ namespace SMEFLOWSystem.Application.Services
                 return false;
 
             // 5. Validate số tiền
-            var discount = order.DiscountAmount ?? 0m;
-            var expectedPayable = order.TotalAmount - discount;
+            var expectedPayable = order.TotalAmount;
             if (payload.TransferAmount < expectedPayable)
                 return false;  // Số tiền CK ít hơn cần thanh toán
 

@@ -96,9 +96,6 @@ public class BillingOrderService : IBillingOrderService
         }).ToList();
 
         var total = lines.Sum(l => l.LineTotal);
-        var discountPercent = isTrialOrder ? 0m : GetDiscountPercent(modules.Count);
-        var discountAmount = decimal.Floor(total * discountPercent);
-        var discountDecimal = discountAmount;
 
         var billingOrder = new BillingOrder
         {
@@ -110,8 +107,6 @@ public class BillingOrderService : IBillingOrderService
             Status = StatusEnum.OrderPending,
             PaymentStatus = StatusEnum.PaymentPending,
             TotalAmount = total,
-            DiscountAmount = discountDecimal,
-            FinalAmount = total - discountDecimal,
             Notes = isTrialOrder
                 ? "TRIAL"
                 : (prorateUntilUtc.HasValue ? $"PRORATE_UNTIL:{prorateUntilUtc.Value:yyyy-MM-dd}" : null),
@@ -127,15 +122,6 @@ public class BillingOrderService : IBillingOrderService
 
         await _billingOrderModuleRepo.AddRangeAsync(lines);
         return billingOrder;
-    }
-
-
-    private static decimal GetDiscountPercent(int moduleCount)
-    {
-        if (moduleCount >= 4) return 0.20m;
-        if (moduleCount >= 3) return 0.15m;
-        if (moduleCount >= 2) return 0.10m;
-        return 0m;
     }
 
     public async Task<IEnumerable<BillingOrderDto>> GetBillingOrdersAsync(Guid tenantId)

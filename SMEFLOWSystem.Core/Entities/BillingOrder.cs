@@ -18,8 +18,6 @@ public class BillingOrder : ITenantEntity
     public DateTime BillingDate { get; set; }
 
     public decimal TotalAmount { get; set; }
-    public decimal? DiscountAmount { get; set; }
-    public decimal? FinalAmount { get; set; }
 
     public string PaymentStatus { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;

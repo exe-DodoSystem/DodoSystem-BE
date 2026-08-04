@@ -12,8 +12,6 @@ public class BillingOrderConfiguration : IEntityTypeConfiguration<BillingOrder>
         entity.HasIndex(e => new { e.TenantId, e.BillingOrderNumber }, "UQ_BillingOrderNumber_Tenant").IsUnique();
         entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
         entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
-        entity.Property(e => e.DiscountAmount).HasDefaultValue(0m).HasColumnType("decimal(18, 2)");
-        entity.Property(e => e.FinalAmount).HasComputedColumnSql("\"TotalAmount\" - \"DiscountAmount\"", stored: true).HasColumnType("decimal(19, 2)");
         entity.Property(e => e.IsDeleted).HasDefaultValue(false);
         entity.Property(e => e.Notes).HasMaxLength(500);
         entity.Property(e => e.BillingDate).HasDefaultValueSql("CURRENT_TIMESTAMP");

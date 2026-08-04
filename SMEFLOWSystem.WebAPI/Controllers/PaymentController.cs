@@ -108,8 +108,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             if (order == null)
                 return NotFound(new { message = "Order not found" });
 
-            var discount = order.DiscountAmount ?? 0m;
-            var payable = order.TotalAmount - discount;
+            var payable = order.TotalAmount;
             var code = transactionCode ?? $"SIM-{DateTime.UtcNow.Ticks.ToString().Substring(10)}";
 
             var payload = new SePayWebhookPayload(

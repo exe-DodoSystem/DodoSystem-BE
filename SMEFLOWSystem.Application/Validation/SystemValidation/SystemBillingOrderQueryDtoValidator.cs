@@ -8,7 +8,7 @@ public sealed class SystemBillingOrderQueryDtoValidator
     : AbstractValidator<SystemBillingOrderQueryDto>
 {
     private static readonly string[] SortFields =
-        ["billingDate", "createdAt", "finalAmount", "billingOrderNumber"];
+        ["billingDate", "createdAt", "totalAmount", "billingOrderNumber"];
     private static readonly string[] PaymentStatuses =
         [StatusEnum.PaymentPending, StatusEnum.PaymentPaid, StatusEnum.PaymentFailed, StatusEnum.OrderCancelled];
     private static readonly string[] OrderStatuses =

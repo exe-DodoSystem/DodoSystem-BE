@@ -4,18 +4,10 @@ namespace SMEFLOWSystem.Application.Helpers.System;
 
 public static class AnalyticsMetricCalculator
 {
-    public static decimal CalculateFinalAmount(
-        decimal totalAmount,
-        decimal? discountAmount,
-        decimal? finalAmount)
-    {
-        return finalAmount ?? (totalAmount - (discountAmount ?? 0m));
-    }
-
     public static decimal SumInvoiced(IEnumerable<InvoicedOrderRow> orders)
     {
         ArgumentNullException.ThrowIfNull(orders);
-        return orders.Sum(order => order.FinalAmount);
+        return orders.Sum(order => order.TotalAmount);
     }
 
     public static decimal SumCollected(IEnumerable<CollectedPaymentRow> payments)

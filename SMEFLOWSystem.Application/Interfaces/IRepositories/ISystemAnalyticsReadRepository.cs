@@ -13,7 +13,7 @@ public sealed class InvoicedOrderRow
     public Guid OrderId { get; set; }
     public Guid TenantId { get; set; }
     public DateTime BillingDate { get; set; }
-    public decimal FinalAmount { get; set; }
+    public decimal TotalAmount { get; set; }
     public string PaymentStatus { get; set; } = string.Empty;
 }
 
@@ -35,7 +35,7 @@ public sealed class OutstandingOrderRow
     public Guid OrderId { get; set; }
     public Guid TenantId { get; set; }
     public DateTime CreatedAt { get; set; }
-    public decimal FinalAmount { get; set; }
+    public decimal TotalAmount { get; set; }
 }
 
 public sealed class BillingOrderModuleAllocationRow
@@ -45,8 +45,6 @@ public sealed class BillingOrderModuleAllocationRow
     public string ModuleCode { get; set; } = string.Empty;
     public string ModuleName { get; set; } = string.Empty;
     public decimal LineTotal { get; set; }
-    public decimal OrderFinalAmount { get; set; }
-    public decimal OrderDiscountAmount { get; set; }
     public string PaymentStatus { get; set; } = string.Empty;
     public Guid TenantId { get; set; }
 }

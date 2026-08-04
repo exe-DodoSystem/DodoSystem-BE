@@ -16,24 +16,24 @@ public sealed class SystemRevenueBreakdownTests
         new(2026, 7, 15, 5, 0, 0, DateTimeKind.Utc);
 
     [Fact]
-    public async Task ModuleDimension_AllocatesDiscountedMultiModuleOrderWithoutDoubleCount()
+    public async Task ModuleDimension_AllocatesMultiModuleOrderWithoutDoubleCount()
     {
         var repository = new FakeAnalyticsRepository();
         var orderId = Guid.NewGuid();
-        repository.Payments.Add(Payment(orderId, Guid.NewGuid(), "Tenant A", "VNPay", 90m));
+        repository.Payments.Add(Payment(orderId, Guid.NewGuid(), "Tenant A", "VNPay", 100m));
         repository.AllocationRows.AddRange(
         [
-            Allocation(orderId, 1, "ATTENDANCE", "Attendance", 60m, 90m, 10m),
-            Allocation(orderId, 2, "PAYROLL", "Payroll", 40m, 90m, 10m)
+            Allocation(orderId, 1, "ATTENDANCE", "Attendance", 60m),
+            Allocation(orderId, 2, "PAYROLL", "Payroll", 40m)
         ]);
 
         var result = await CreateService(repository).GetRevenueBreakdownAsync(
             Query(SystemAnalyticsDimension.Module));
 
-        Assert.Equal(90m, result.TotalCollectedRevenue);
-        Assert.Equal(90m, result.Items.Sum(item => item.CollectedRevenue));
-        Assert.Equal(54m, result.Items.Single(item => item.Id == "ATTENDANCE").CollectedRevenue);
-        Assert.Equal(36m, result.Items.Single(item => item.Id == "PAYROLL").CollectedRevenue);
+        Assert.Equal(100m, result.TotalCollectedRevenue);
+        Assert.Equal(100m, result.Items.Sum(item => item.CollectedRevenue));
+        Assert.Equal(60m, result.Items.Single(item => item.Id == "ATTENDANCE").CollectedRevenue);
+        Assert.Equal(40m, result.Items.Single(item => item.Id == "PAYROLL").CollectedRevenue);
         Assert.Null(result.Other);
     }
 
@@ -45,9 +45,9 @@ public sealed class SystemRevenueBreakdownTests
         repository.Payments.Add(Payment(orderId, Guid.NewGuid(), "Tenant A", "VNPay", 100m));
         repository.AllocationRows.AddRange(
         [
-            Allocation(orderId, 1, "A", "Module A", 1m, 100m),
-            Allocation(orderId, 2, "B", "Module B", 1m, 100m),
-            Allocation(orderId, 3, "C", "Module C", 1m, 100m)
+            Allocation(orderId, 1, "A", "Module A", 1m),
+            Allocation(orderId, 2, "B", "Module B", 1m),
+            Allocation(orderId, 3, "C", "Module C", 1m)
         ]);
 
         var result = await CreateService(repository).GetRevenueBreakdownAsync(
@@ -124,9 +124,9 @@ public sealed class SystemRevenueBreakdownTests
         ]);
         repository.AllocationRows.AddRange(
         [
-            Allocation(orderA, 1, "A", "Module A", 3m, 100m),
-            Allocation(orderA, 2, "B", "Module B", 1m, 100m),
-            Allocation(orderB, 2, "B", "Module B", 1m, 50m)
+            Allocation(orderA, 1, "A", "Module A", 3m),
+            Allocation(orderA, 2, "B", "Module B", 1m),
+            Allocation(orderB, 2, "B", "Module B", 1m)
         ]);
         var service = CreateService(repository);
         var series = await service.GetRevenueSeriesAsync(new SystemRevenueSeriesQueryDto
@@ -200,9 +200,7 @@ public sealed class SystemRevenueBreakdownTests
         int moduleId,
         string moduleCode,
         string moduleName,
-        decimal lineTotal,
-        decimal finalAmount,
-        decimal discountAmount = 0m)
+        decimal lineTotal)
     {
         return new BillingOrderModuleAllocationRow
         {
@@ -211,8 +209,6 @@ public sealed class SystemRevenueBreakdownTests
             ModuleCode = moduleCode,
             ModuleName = moduleName,
             LineTotal = lineTotal,
-            OrderFinalAmount = finalAmount,
-            OrderDiscountAmount = discountAmount,
             PaymentStatus = "Paid"
         };
     }

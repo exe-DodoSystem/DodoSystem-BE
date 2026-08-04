@@ -59,8 +59,7 @@ public sealed class SystemAnalyticsReadRepository : ISystemAnalyticsReadReposito
                 OrderId = order.Id,
                 TenantId = order.TenantId,
                 BillingDate = order.BillingDate,
-                FinalAmount = order.FinalAmount
-                    ?? (order.TotalAmount - (order.DiscountAmount ?? 0m)),
+                TotalAmount = order.TotalAmount,
                 PaymentStatus = order.PaymentStatus
             };
 
@@ -156,8 +155,7 @@ public sealed class SystemAnalyticsReadRepository : ISystemAnalyticsReadReposito
                 OrderId = order.Id,
                 TenantId = order.TenantId,
                 CreatedAt = order.CreatedAt!.Value,
-                FinalAmount = order.FinalAmount
-                    ?? (order.TotalAmount - (order.DiscountAmount ?? 0m))
+                TotalAmount = order.TotalAmount
             };
 
         return query.ToListAsync(ct);
@@ -277,9 +275,6 @@ public sealed class SystemAnalyticsReadRepository : ISystemAnalyticsReadReposito
                 ModuleCode = module.Code,
                 ModuleName = module.Name,
                 LineTotal = line.LineTotal,
-                OrderFinalAmount = order.FinalAmount
-                    ?? (order.TotalAmount - (order.DiscountAmount ?? 0m)),
-                OrderDiscountAmount = order.DiscountAmount ?? 0m,
                 PaymentStatus = order.PaymentStatus,
                 TenantId = order.TenantId
             };
@@ -499,8 +494,7 @@ public sealed class SystemAnalyticsReadRepository : ISystemAnalyticsReadReposito
                     line.BillingOrderId == order.Id
                     && line.TenantId == tenantId
                     && line.ModuleId == moduleId.Value)))
-            .Select(order => (decimal?)(order.FinalAmount
-                ?? (order.TotalAmount - (order.DiscountAmount ?? 0m))))
+            .Select(order => (decimal?)order.TotalAmount)
             .SumAsync(ct) ?? 0m;
 
         return new TenantFinancialAggregateRow

@@ -57,8 +57,6 @@ public class BillingOrderRepository : IBillingOrderRepository
         existing.CustomerId = billingOrder.CustomerId;
         existing.BillingDate = billingOrder.BillingDate;
         existing.TotalAmount = billingOrder.TotalAmount;
-        existing.DiscountAmount = billingOrder.DiscountAmount;
-        existing.FinalAmount = billingOrder.FinalAmount;
         existing.PaymentStatus = billingOrder.PaymentStatus;
         existing.Status = billingOrder.Status;
         existing.Notes = billingOrder.Notes;
@@ -80,8 +78,6 @@ public class BillingOrderRepository : IBillingOrderRepository
         existing.CustomerId = billingOrder.CustomerId;
         existing.BillingDate = billingOrder.BillingDate;
         existing.TotalAmount = billingOrder.TotalAmount;
-        existing.DiscountAmount = billingOrder.DiscountAmount;
-        existing.FinalAmount = billingOrder.FinalAmount;
         existing.PaymentStatus = billingOrder.PaymentStatus;
         existing.Status = billingOrder.Status;
         existing.Notes = billingOrder.Notes;

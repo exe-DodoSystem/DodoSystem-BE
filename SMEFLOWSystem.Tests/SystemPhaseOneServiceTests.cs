@@ -45,6 +45,24 @@ public sealed class SystemPhaseOneServiceTests
     }
 
     [Fact]
+    public async Task Billing_TotalAmountSort_IsAccepted()
+    {
+        var service = new SystemBillingService(new BillingRepositoryStub());
+
+        await service.GetBillingOrdersAsync(
+            new SystemBillingOrderQueryDto { SortBy = "totalAmount" });
+    }
+
+    [Fact]
+    public async Task Billing_LegacyFinalAmountSort_IsRejected()
+    {
+        var service = new SystemBillingService(new BillingRepositoryStub());
+
+        await Assert.ThrowsAsync<ArgumentException>(() => service.GetBillingOrdersAsync(
+            new SystemBillingOrderQueryDto { SortBy = "finalAmount" }));
+    }
+
+    [Fact]
     public async Task Payment_PageSizeOver100_IsRejected()
     {
         var service = new SystemBillingService(new BillingRepositoryStub());

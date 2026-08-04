@@ -24,15 +24,14 @@ public sealed class SystemAnalyticsReadRepositoryTests
         context.Tenants.AddRange(validTenant, systemTenant, deletedTenant);
 
         var inRange = new DateTime(2026, 7, 10, 0, 0, 0, DateTimeKind.Utc);
-        var validOrder = Order(validTenant.Id, inRange, 100m, 10m);
-        var systemOrder = Order(systemTenant.Id, inRange, 200m, 0m);
-        var deletedTenantOrder = Order(deletedTenant.Id, inRange, 300m, 0m);
-        var cancelledOrder = Order(validTenant.Id, inRange, 400m, 0m, status: "Cancelled");
+        var validOrder = Order(validTenant.Id, inRange, 100m);
+        var systemOrder = Order(systemTenant.Id, inRange, 200m);
+        var deletedTenantOrder = Order(deletedTenant.Id, inRange, 300m);
+        var cancelledOrder = Order(validTenant.Id, inRange, 400m, status: "Cancelled");
         var upperBoundaryOrder = Order(
             validTenant.Id,
             new DateTime(2026, 8, 1, 0, 0, 0, DateTimeKind.Utc),
-            500m,
-            0m);
+            500m);
         context.BillingOrders.AddRange(
             validOrder,
             systemOrder,
@@ -51,7 +50,7 @@ public sealed class SystemAnalyticsReadRepositoryTests
 
         var row = Assert.Single(rows);
         Assert.Equal(validOrder.Id, row.OrderId);
-        Assert.Equal(90m, row.FinalAmount);
+        Assert.Equal(100m, row.TotalAmount);
     }
 
     [Fact]
@@ -62,14 +61,16 @@ public sealed class SystemAnalyticsReadRepositoryTests
         var systemTenant = Tenant("SYSTEM");
         context.Tenants.AddRange(tenant, systemTenant);
         var processedAt = new DateTime(2026, 7, 10, 0, 0, 0, DateTimeKind.Utc);
-        var order = Order(tenant.Id, processedAt, 1000m, 0m);
-        var systemOrder = Order(systemTenant.Id, processedAt, 1000m, 0m);
+        var order = Order(tenant.Id, processedAt, 1000m);
+        var systemOrder = Order(systemTenant.Id, processedAt, 1000m);
         context.BillingOrders.AddRange(order, systemOrder);
+        var missingProcessedAt = Payment(tenant.Id, order.Id, "Success", null, 400m);
+        missingProcessedAt.CreatedAt = processedAt;
         context.PaymentTransactions.AddRange(
             Payment(tenant.Id, order.Id, "Success", processedAt, 100m, rawData: "secret-1"),
             Payment(tenant.Id, order.Id, "sEtTlEd", processedAt, 200m, rawData: "secret-2"),
             Payment(tenant.Id, order.Id, "Failed", processedAt, 300m),
-            Payment(tenant.Id, order.Id, "Success", null, 400m),
+            missingProcessedAt,
             Payment(systemTenant.Id, systemOrder.Id, "Success", processedAt, 500m));
         await context.SaveChangesAsync();
 
@@ -106,7 +107,7 @@ public sealed class SystemAnalyticsReadRepositoryTests
         await context.SaveChangesAsync();
 
         var processedAt = new DateTime(2026, 7, 10, 0, 0, 0, DateTimeKind.Utc);
-        var order = Order(tenant.Id, processedAt, 100m, 0m);
+        var order = Order(tenant.Id, processedAt, 100m);
         context.BillingOrders.Add(order);
         context.BillingOrderModules.Add(new BillingOrderModule
         {
@@ -162,13 +163,11 @@ public sealed class SystemAnalyticsReadRepositoryTests
         var requestedOrder = Order(
             tenant.Id,
             new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
-            100m,
-            10m);
+            100m);
         var unrelatedOrder = Order(
             tenant.Id,
             new DateTime(2026, 7, 10, 0, 0, 0, DateTimeKind.Utc),
-            200m,
-            0m);
+            200m);
         context.BillingOrders.AddRange(requestedOrder, unrelatedOrder);
         context.BillingOrderModules.AddRange(
             BillingLine(tenant.Id, requestedOrder.Id, module.Id, 100m),
@@ -183,8 +182,7 @@ public sealed class SystemAnalyticsReadRepositoryTests
         var row = Assert.Single(rows);
         Assert.Equal(requestedOrder.Id, row.OrderId);
         Assert.Equal("ATTENDANCE", row.ModuleCode);
-        Assert.Equal(90m, row.OrderFinalAmount);
-        Assert.Equal(10m, row.OrderDiscountAmount);
+        Assert.Equal(100m, row.LineTotal);
     }
 
     [Fact]
@@ -196,8 +194,7 @@ public sealed class SystemAnalyticsReadRepositoryTests
         context.BillingOrders.Add(Order(
             tenant.Id,
             new DateTime(2026, 7, 10, 0, 0, 0, DateTimeKind.Utc),
-            120m,
-            20m));
+            120m));
         await context.SaveChangesAsync();
 
         var repository = new SystemAnalyticsReadRepository(context);
@@ -211,7 +208,7 @@ public sealed class SystemAnalyticsReadRepositoryTests
         Assert.NotNull(result);
         Assert.Equal(0m, result.LifetimeCollectedRevenue);
         Assert.Equal(0m, result.CollectedRevenueInPeriod);
-        Assert.Equal(100m, result.OutstandingAmount);
+        Assert.Equal(120m, result.OutstandingAmount);
         Assert.Null(result.LastSuccessfulPaymentAt);
         Assert.Null(result.LastFailedPaymentAt);
         Assert.Empty(result.PaymentDelayDaysList);
@@ -231,32 +228,27 @@ public sealed class SystemAnalyticsReadRepositoryTests
         var paidInPeriodOrder = Order(
             tenant.Id,
             new DateTime(2026, 7, 10, 0, 0, 0, DateTimeKind.Utc),
-            100m,
-            10m);
+            100m);
         paidInPeriodOrder.PaymentStatus = "Paid";
         var paidOutsidePeriodOrder = Order(
             tenant.Id,
             new DateTime(2026, 6, 10, 0, 0, 0, DateTimeKind.Utc),
-            50m,
-            0m);
+            50m);
         paidOutsidePeriodOrder.PaymentStatus = "Paid";
         var negativeDelayOrder = Order(
             tenant.Id,
             new DateTime(2026, 7, 20, 0, 0, 0, DateTimeKind.Utc),
-            30m,
-            0m);
+            30m);
         negativeDelayOrder.PaymentStatus = "Paid";
         var failedOrder = Order(
             tenant.Id,
             new DateTime(2026, 7, 12, 0, 0, 0, DateTimeKind.Utc),
-            40m,
-            0m);
+            40m);
         failedOrder.PaymentStatus = "Failed";
         var pendingOrder = Order(
             tenant.Id,
             new DateTime(2026, 7, 15, 0, 0, 0, DateTimeKind.Utc),
-            120m,
-            20m);
+            120m);
         context.BillingOrders.AddRange(
             paidInPeriodOrder,
             paidOutsidePeriodOrder,
@@ -275,7 +267,7 @@ public sealed class SystemAnalyticsReadRepositoryTests
                 paidInPeriodOrder.Id,
                 "Success",
                 new DateTime(2026, 7, 12, 0, 0, 0, DateTimeKind.Utc),
-                90m),
+                100m),
             Payment(
                 tenant.Id,
                 paidOutsidePeriodOrder.Id,
@@ -313,9 +305,9 @@ public sealed class SystemAnalyticsReadRepositoryTests
             CancellationToken.None);
 
         Assert.NotNull(allModules);
-        Assert.Equal(170m, allModules.LifetimeCollectedRevenue);
-        Assert.Equal(120m, allModules.CollectedRevenueInPeriod);
-        Assert.Equal(100m, allModules.OutstandingAmount);
+        Assert.Equal(180m, allModules.LifetimeCollectedRevenue);
+        Assert.Equal(130m, allModules.CollectedRevenueInPeriod);
+        Assert.Equal(120m, allModules.OutstandingAmount);
         Assert.Equal(
             new DateTime(2026, 7, 19, 0, 0, 0, DateTimeKind.Utc),
             allModules.LastSuccessfulPaymentAt);
@@ -325,9 +317,9 @@ public sealed class SystemAnalyticsReadRepositoryTests
         Assert.Contains(-1m, allModules.PaymentDelayDaysList);
 
         Assert.NotNull(moduleAOnly);
-        Assert.Equal(120m, moduleAOnly.LifetimeCollectedRevenue);
-        Assert.Equal(120m, moduleAOnly.CollectedRevenueInPeriod);
-        Assert.Equal(100m, moduleAOnly.OutstandingAmount);
+        Assert.Equal(130m, moduleAOnly.LifetimeCollectedRevenue);
+        Assert.Equal(130m, moduleAOnly.CollectedRevenueInPeriod);
+        Assert.Equal(120m, moduleAOnly.OutstandingAmount);
     }
 
     [Fact]
@@ -423,8 +415,8 @@ public sealed class SystemAnalyticsReadRepositoryTests
         trialTenant.Status = "Trial";
         context.Tenants.AddRange(paidTenant, trialTenant);
         var billingDate = new DateTime(2026, 7, 10, 0, 0, 0, DateTimeKind.Utc);
-        var paidOrder = Order(paidTenant.Id, billingDate, 100m, 0m);
-        var trialOrder = Order(trialTenant.Id, billingDate, 200m, 0m);
+        var paidOrder = Order(paidTenant.Id, billingDate, 100m);
+        var trialOrder = Order(trialTenant.Id, billingDate, 200m);
         context.BillingOrders.AddRange(paidOrder, trialOrder);
         await context.SaveChangesAsync();
 
@@ -461,9 +453,9 @@ public sealed class SystemAnalyticsReadRepositoryTests
         await context.SaveChangesAsync();
 
         var processedAt = new DateTime(2026, 7, 15, 5, 0, 0, DateTimeKind.Utc);
-        var orderA = Order(tenantA.Id, processedAt, 100m, 10m);
-        var orderB = Order(tenantB.Id, processedAt.AddDays(1), 50m, 0m);
-        var systemOrder = Order(systemTenant.Id, processedAt, 500m, 0m);
+        var orderA = Order(tenantA.Id, processedAt, 100m);
+        var orderB = Order(tenantB.Id, processedAt.AddDays(1), 50m);
+        var systemOrder = Order(systemTenant.Id, processedAt, 500m);
         context.BillingOrders.AddRange(orderA, orderB, systemOrder);
         context.BillingOrderModules.AddRange(
             BillingLine(tenantA.Id, orderA.Id, moduleA.Id, 60m),
@@ -471,7 +463,7 @@ public sealed class SystemAnalyticsReadRepositoryTests
             BillingLine(tenantB.Id, orderB.Id, moduleB.Id, 50m),
             BillingLine(systemTenant.Id, systemOrder.Id, moduleA.Id, 500m));
         context.PaymentTransactions.AddRange(
-            Payment(tenantA.Id, orderA.Id, "Success", processedAt, 90m),
+            Payment(tenantA.Id, orderA.Id, "Success", processedAt, 100m),
             Payment(tenantB.Id, orderB.Id, "Settled", processedAt.AddDays(1), 50m),
             Payment(tenantA.Id, orderA.Id, "Failed", processedAt, 30m),
             Payment(systemTenant.Id, systemOrder.Id, "Paid", processedAt, 500m));
@@ -492,7 +484,7 @@ public sealed class SystemAnalyticsReadRepositoryTests
         });
         var seriesCollected = series.Points.Sum(point => point.CollectedRevenue);
 
-        Assert.Equal(140m, seriesCollected);
+        Assert.Equal(150m, seriesCollected);
         foreach (var dimension in new[]
                  {
                      SystemAnalyticsDimension.Module,
@@ -532,15 +524,14 @@ public sealed class SystemAnalyticsReadRepositoryTests
         await context.SaveChangesAsync();
 
         var now = new DateTime(2026, 7, 24, 12, 0, 0, DateTimeKind.Utc);
-        var failedBoundaryOrder = Order(tenant.Id, now, 100m, 0m);
-        var failedOutsideOrder = Order(tenant.Id, now, 100m, 0m);
-        var overdueBoundaryOrder = Order(tenant.Id, now.AddHours(-24), 100m, 0m);
+        var failedBoundaryOrder = Order(tenant.Id, now, 100m);
+        var failedOutsideOrder = Order(tenant.Id, now, 100m);
+        var overdueBoundaryOrder = Order(tenant.Id, now.AddHours(-24), 100m);
         var notOverdueOrder = Order(
             tenant.Id,
             now.AddHours(-24).AddSeconds(1),
-            100m,
-            0m);
-        var systemOrder = Order(systemTenant.Id, now, 100m, 0m);
+            100m);
+        var systemOrder = Order(systemTenant.Id, now, 100m);
         context.BillingOrders.AddRange(
             failedBoundaryOrder,
             failedOutsideOrder,
@@ -648,28 +639,23 @@ public sealed class SystemAnalyticsReadRepositoryTests
         var paidModuleAOrder = Order(
             paidTenant.Id,
             new DateTime(2026, 6, 30, 18, 0, 0, DateTimeKind.Utc),
-            100m,
-            0m);
+            100m);
         var paidModuleBOrder = Order(
             paidTenant.Id,
             new DateTime(2026, 7, 15, 0, 0, 0, DateTimeKind.Utc),
-            200m,
-            0m);
+            200m);
         var trialModuleAOrder = Order(
             trialTenant.Id,
             new DateTime(2026, 7, 15, 0, 0, 0, DateTimeKind.Utc),
-            300m,
-            0m);
+            300m);
         var systemOrder = Order(
             systemTenant.Id,
             new DateTime(2026, 7, 15, 0, 0, 0, DateTimeKind.Utc),
-            400m,
-            0m);
+            400m);
         var outsideOrder = Order(
             paidTenant.Id,
             new DateTime(2026, 7, 31, 18, 0, 0, DateTimeKind.Utc),
-            500m,
-            0m);
+            500m);
         context.BillingOrders.AddRange(
             paidModuleAOrder,
             paidModuleBOrder,
@@ -791,7 +777,6 @@ public sealed class SystemAnalyticsReadRepositoryTests
         Guid tenantId,
         DateTime billingDate,
         decimal total,
-        decimal discount,
         string status = "Pending")
     {
         return new BillingOrder
@@ -801,8 +786,6 @@ public sealed class SystemAnalyticsReadRepositoryTests
             BillingOrderNumber = $"BO-{Guid.NewGuid():N}",
             BillingDate = billingDate,
             TotalAmount = total,
-            DiscountAmount = discount,
-            FinalAmount = null,
             PaymentStatus = "Pending",
             Status = status,
             CreatedAt = billingDate,
