@@ -104,10 +104,10 @@ public static class WebApplicationExtensions
 
         if (db.Modules.Any()) return;
 
-        SeedModulesIfMissing(db, "HR", "HR", "Human Resource Management", "Module quản lý nhân sự", 150000m, true);
-        SeedModulesIfMissing(db, "ATTENDANCE", "ATT", "Attendance Management", "Module quản lý chấm công", 180000m, true);
-        SeedModulesIfMissing(db, "PAYROLL", "PAYROLL", "Payroll Management", "Module quản lý bảng lương", 180000m, true);
-        SeedModulesIfMissing(db, "DASHBOARD", "DASH", "Dashboard Management", "Module quản lý Dashboard & Báo cáo", 120000m, true);
+        SeedModulesIfMissing(db, "HR", "HR", "Human Resource Management", "Module quản lý nhân sự", 0m, true);
+        SeedModulesIfMissing(db, "ATTENDANCE", "ATT", "Attendance Management", "Module quản lý chấm công", 120000m, true);
+        SeedModulesIfMissing(db, "PAYROLL", "PAYROLL", "Payroll Management", "Module quản lý bảng lương", 120000m, true);
+        SeedModulesIfMissing(db, "DASHBOARD", "DASH", "Dashboard Management", "Module quản lý Dashboard & Báo cáo", 70000m, true);
         db.SaveChanges();
     }
 

@@ -136,6 +136,9 @@ public sealed class BillingOrderServiceTests
             => Task.FromResult(modules.Any(module =>
                 module.Code == code || module.ShortCode == shortCode));
 
+        public Task<bool> HasBillingOrderModulesAsync(int moduleId)
+            => Task.FromResult(false);
+
         public Task<Module?> GetByCodeAsync(string code)
             => Task.FromResult(modules.FirstOrDefault(module => module.Code == code));
 

@@ -82,6 +82,9 @@ public class ModuleService : IModuleService
         if (module == null)
             return null;
 
+        if (await _moduleRepository.HasBillingOrderModulesAsync(moduleId))
+            throw new InvalidOperationException("Cannot update a module that has been used in a billing order.");
+
         var description = dto.Description?.Trim() ?? string.Empty;
         if (string.Equals(module.Name, name, StringComparison.Ordinal)
             && string.Equals(module.Description, description, StringComparison.Ordinal)

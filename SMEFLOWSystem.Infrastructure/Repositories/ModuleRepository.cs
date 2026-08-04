@@ -40,6 +40,13 @@ public class ModuleRepository : IModuleRepository
         return _context.Modules.AnyAsync(m => m.Code == normalizedCode || m.ShortCode == normalizedShortCode);
     }
 
+    public Task<bool> HasBillingOrderModulesAsync(int moduleId)
+    {
+        return _context.BillingOrderModules
+            .IgnoreQueryFilters()
+            .AnyAsync(bom => bom.ModuleId == moduleId);
+    }
+
     public Task<Module?> GetByCodeAsync(string code)
     {
         var normalized = code.Trim();

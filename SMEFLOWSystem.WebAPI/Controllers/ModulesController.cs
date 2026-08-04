@@ -52,6 +52,10 @@ public class ModulesController : ControllerBase
         {
             return Problem(statusCode: 400, title: "Invalid module", detail: ex.Message);
         }
+        catch (InvalidOperationException ex)
+        {
+            return Problem(statusCode: 409, title: "Module cannot be updated", detail: ex.Message);
+        }
     }
 
     /// <summary>[SystemAdmin] Kích hoạt module</summary>

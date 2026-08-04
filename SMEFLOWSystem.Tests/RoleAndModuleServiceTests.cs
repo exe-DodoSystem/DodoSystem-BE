@@ -59,6 +59,29 @@ public sealed class RoleAndModuleServiceTests
         Assert.Equal(1, repository.UpdateCalls);
     }
 
+    [Fact]
+    public async Task UpdateModule_IsRejected_WhenBillingOrderModuleExists()
+    {
+        var repository = new ModuleRepositoryStub(new Module { Id = 1, Name = "HR" })
+        {
+            HasBillingOrderModules = true
+        };
+        var service = new ModuleService(null!, repository);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.UpdateAsync(
+                1,
+                new ModuleUpdateDto
+                {
+                    Name = "Human Resources",
+                    Description = "Updated",
+                    MonthlyPrice = 100_000
+                }));
+
+        Assert.Equal("Cannot update a module that has been used in a billing order.", exception.Message);
+        Assert.Equal(0, repository.UpdateCalls);
+    }
+
     private sealed class RoleRepositoryStub : IRoleRepository
     {
         private readonly Role _role;
@@ -95,9 +118,12 @@ public sealed class RoleAndModuleServiceTests
         public ModuleRepositoryStub(Module module) => Module = module;
         public Module Module { get; }
         public int UpdateCalls { get; private set; }
+        public bool HasBillingOrderModules { get; init; }
 
         public Task AddAsync(Module module) => Task.CompletedTask;
         public Task<bool> ExistsByCodeOrShortCodeAsync(string code, string shortCode) => Task.FromResult(false);
+        public Task<bool> HasBillingOrderModulesAsync(int moduleId)
+            => Task.FromResult(moduleId == Module.Id && HasBillingOrderModules);
         public Task<List<Module>> GetAllActiveAsync()
             => Task.FromResult(Module.IsActive ? new List<Module> { Module } : new List<Module>());
         public Task<List<Module>> GetAllAsync() => Task.FromResult(new List<Module> { Module });
