@@ -213,6 +213,16 @@ namespace SMEFLOWSystem.WebAPI.Controllers
 
             var payload = parseResult.Payload!;
 
+            // SePay Dashboard uses id=0 for "Gửi thử". Authentication and JSON schema
+            // have already been validated, so acknowledge it without touching business data.
+            if (payload.Id == "0")
+            {
+                _logger.LogInformation(
+                    "Accepted SePay test webhook. TraceId={TraceId}",
+                    HttpContext.TraceIdentifier);
+                return Ok(new { success = true });
+            }
+
             var result = await _billingService.ProcessSePayWebhookAsync(payload);
             if (!result.Succeeded)
             {

@@ -22,7 +22,7 @@ public static class SePayWebhookPayloadParser
             payloadObject.Properties().Select(property => property.Name).OrderBy(name => name));
 
         var transactionId = GetString(payloadObject, "id", "transaction_id", "transactionId");
-        if (string.IsNullOrWhiteSpace(transactionId) || transactionId == "0")
+        if (string.IsNullOrWhiteSpace(transactionId))
             return new SePayWebhookParseResult(null, detectedFields);
 
         var transferType = GetString(payloadObject, "transferType", "transfer_type") ?? string.Empty;

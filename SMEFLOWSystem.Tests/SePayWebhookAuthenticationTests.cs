@@ -41,6 +41,32 @@ public sealed class SePayWebhookAuthenticationTests
     }
 
     [Fact]
+    public void DashboardTestWebhookJson_AcceptsMockZeroTransactionId()
+    {
+        const string body = """
+            {
+              "id": 0,
+              "gateway": "MBBank",
+              "transactionDate": "2026-08-05 10:00:00",
+              "accountNumber": "0000000000",
+              "subAccount": "",
+              "code": null,
+              "content": "Webhook test payload",
+              "transferType": "in",
+              "transferAmount": 10000,
+              "accumulated": 0,
+              "referenceCode": "TEST"
+            }
+            """;
+
+        var result = SePayWebhookPayloadParser.Parse(body);
+
+        Assert.True(result.Succeeded);
+        var payload = Assert.IsType<SePayWebhookPayload>(result.Payload);
+        Assert.Equal("0", payload.Id);
+    }
+
+    [Fact]
     public void BankHubWebhookJson_NormalizesSnakeCasePayload()
     {
         const string body = """
