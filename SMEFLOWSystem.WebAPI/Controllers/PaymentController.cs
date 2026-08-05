@@ -12,6 +12,7 @@ using System.IO;
 using System.Text;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.WebAPI.Security;
+using SMEFLOWSystem.Application.Helpers;
 
 namespace SMEFLOWSystem.WebAPI.Controllers
 {
@@ -122,7 +123,9 @@ namespace SMEFLOWSystem.WebAPI.Controllers
                 TransferAmount: payable,
                 Accumulated: 99999999,
                 Code: code,
-                Content: $"DODO {order.BillingOrderNumber}",
+                Content: SePayPaymentContent.BuildTransferContent(
+                    _config["Payment:SePay:PaymentContentPrefix"] ?? "DODO",
+                    order.BillingOrderNumber),
                 ReferenceCode: code,
                 Description: "Simulated payment",
                 TransferType: "in"

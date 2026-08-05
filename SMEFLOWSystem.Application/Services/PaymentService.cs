@@ -453,8 +453,11 @@ namespace SMEFLOWSystem.Application.Services
                     "Đơn thanh toán không hợp lệ (số tiền phải > 0)",
                     "PAYMENT_INVALID_ORDER_AMOUNT");
 
-            // Nội dung CK: "DODO SUB-xxxxxxx" (dùng BillingOrderNumber)
-            var transferContent = $"{prefix} {order.BillingOrderNumber}";
+            // Use only letters/digits in the payment code because some banks remove punctuation.
+            // Example: DB order SUB-50908211 -> transfer content DODO SUB50908211.
+            var transferContent = SePayPaymentContent.BuildTransferContent(
+                prefix,
+                order.BillingOrderNumber);
 
             // QR Code URL qua vietqr.app (miễn phí, không cần API key)
             var encodedContent = Uri.EscapeDataString(transferContent);
@@ -522,12 +525,9 @@ namespace SMEFLOWSystem.Application.Services
                 return SePayWebhookProcessingResult.Success();
             }
 
-            var content = payload.Content?.Trim() ?? "";
-            var match = Regex.Match(
-                content,
-                @"(SUB|BO)-\d+",
-                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-            if (!match.Success)
+            if (!SePayPaymentContent.TryExtractBillingOrderNumber(
+                    payload.Content,
+                    out var billingOrderNumber))
             {
                 _logger.LogWarning(
                     "Ignored SePay webhook because no billing order number was found. SePayId={SePayId}",
@@ -536,8 +536,6 @@ namespace SMEFLOWSystem.Application.Services
                     "SEPAY_ORDER_NUMBER_NOT_FOUND",
                     "No billing order number was found in the transfer content.");
             }
-
-            var billingOrderNumber = match.Value.ToUpperInvariant();
 
             var order = await _billingOrderRepo.GetByOrderNumberIgnoreTenantAsync(billingOrderNumber);
             if (order == null)
