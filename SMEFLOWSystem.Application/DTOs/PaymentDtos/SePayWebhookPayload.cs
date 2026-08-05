@@ -9,7 +9,7 @@ namespace SMEFLOWSystem.Application.DTOs.PaymentDtos
         string? SubAccount,          // Tài khoản phụ
         decimal TransferAmount,      // Số tiền giao dịch
         decimal Accumulated,         // Số dư tích lũy
-        string Code,                 // Mã giao dịch trên SePay
+        string? Code,                // Mã thanh toán SePay trích xuất; có thể null
         string Content,              // Nội dung CK
         string? ReferenceCode,       // Mã tham chiếu ngân hàng
         string? Description,         // Mô tả giao dịch

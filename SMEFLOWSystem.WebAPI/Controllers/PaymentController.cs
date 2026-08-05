@@ -10,9 +10,9 @@ using Microsoft.AspNetCore.Authorization;
 using SMEFLOWSystem.Application.DTOs.PaymentDtos;
 using System.IO;
 using System.Text;
-using System.Security.Cryptography;
 using Newtonsoft.Json;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
+using SMEFLOWSystem.WebAPI.Security;
 
 namespace SMEFLOWSystem.WebAPI.Controllers
 {
@@ -23,15 +23,18 @@ namespace SMEFLOWSystem.WebAPI.Controllers
         private readonly IBillingService _billingService;
         private readonly IConfiguration _config;
         private readonly IWebHostEnvironment _env;
+        private readonly ILogger<PaymentController> _logger;
 
         public PaymentController(
             IBillingService billingService,
             IConfiguration config,
-            IWebHostEnvironment env)
+            IWebHostEnvironment env,
+            ILogger<PaymentController> logger)
         {
             _billingService = billingService;
             _config = config;
             _env = env;
+            _logger = logger;
         }
 
         /// <summary>Tạo URL thanh toán VNPay cho đơn hàng</summary>
@@ -139,59 +142,58 @@ namespace SMEFLOWSystem.WebAPI.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> SePayWebhook()
         {
-            var signatureHeader = Request.Headers["x-sepay-signature"].ToString();
-            
             Request.EnableBuffering();
-            string rawBody;
-            using (var reader = new StreamReader(Request.Body, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, bufferSize: 1024, leaveOpen: true))
+            byte[] rawBodyBytes;
+            using (var buffer = new MemoryStream())
             {
-                rawBody = await reader.ReadToEndAsync();
+                await Request.Body.CopyToAsync(buffer, HttpContext.RequestAborted);
+                rawBodyBytes = buffer.ToArray();
                 Request.Body.Position = 0;
             }
 
-            // Verify API Key
-            var expectedApiKey = _config["Payment:SePay:ApiKey"];
-            if (!string.IsNullOrEmpty(expectedApiKey))
-            {
-                var authHeader = Request.Headers["Authorization"].ToString();
-                var providedKey = authHeader
-                    .Replace("Sepay ", "", StringComparison.OrdinalIgnoreCase)
-                    .Replace("Bearer ", "", StringComparison.OrdinalIgnoreCase)
-                    .Trim();
+            var authentication = SePayWebhookAuthentication.Authenticate(
+                Request.Headers,
+                rawBodyBytes,
+                _config["Payment:SePay:ApiKey"],
+                _config["Payment:SePay:WebhookSecret"],
+                DateTimeOffset.UtcNow);
 
-                if (providedKey != expectedApiKey)
-                    return Unauthorized(new { success = false, message = "Invalid API Key" });
+            if (!authentication.Succeeded)
+            {
+                _logger.LogWarning(
+                    "Rejected SePay webhook authentication. Reason={Reason}, TraceId={TraceId}",
+                    authentication.ErrorCode,
+                    HttpContext.TraceIdentifier);
+                return Unauthorized(new { success = false, message = authentication.ErrorCode });
             }
 
-            // Verify Signature
-            var expectedSecret = _config["Payment:SePay:WebhookSecret"];
-            if (!string.IsNullOrEmpty(expectedSecret))
+            var rawBody = Encoding.UTF8.GetString(rawBodyBytes);
+            SePayWebhookPayload? payload;
+            try
             {
-                if (string.IsNullOrEmpty(signatureHeader))
-                {
-                    return Unauthorized(new { success = false, message = "Missing signature header" });
-                }
-
-                var keyBytes = Encoding.UTF8.GetBytes(expectedSecret);
-                var payloadBytes = Encoding.UTF8.GetBytes(rawBody);
-
-                using var hmac = new HMACSHA256(keyBytes);
-                var hashBytes = hmac.ComputeHash(payloadBytes);
-                var computedSignature = Convert.ToHexString(hashBytes).ToLower();
-
-                if (!string.Equals(signatureHeader.Trim(), computedSignature, StringComparison.OrdinalIgnoreCase))
-                {
-                    return Unauthorized(new { success = false, message = "Invalid Signature" });
-                }
+                payload = JsonConvert.DeserializeObject<SePayWebhookPayload>(rawBody);
+            }
+            catch (JsonException exception)
+            {
+                _logger.LogWarning(
+                    exception,
+                    "Rejected malformed SePay webhook JSON. TraceId={TraceId}",
+                    HttpContext.TraceIdentifier);
+                return BadRequest(new { success = false, message = "SEPAY_INVALID_JSON" });
             }
 
-            var payload = JsonConvert.DeserializeObject<SePayWebhookPayload>(rawBody);
             if (payload == null)
-            {
-                return BadRequest(new { success = false, message = "Invalid JSON payload" });
-            }
+                return BadRequest(new { success = false, message = "SEPAY_INVALID_JSON" });
 
             var result = await _billingService.ProcessSePayWebhookAsync(payload);
+            if (!result)
+            {
+                _logger.LogWarning(
+                    "SePay webhook was authenticated but not matched. SePayId={SePayId}, TraceId={TraceId}",
+                    payload.Id,
+                    HttpContext.TraceIdentifier);
+            }
+
             return Ok(new { success = result });
         }
     }

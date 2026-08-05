@@ -331,8 +331,13 @@ public static class DependencyInjection
         }
         if ((paymentMode == "Sandbox" || paymentMode == "Production") && paymentGateway == "SePay")
         {
-            _ = GetRequiredConfig(configuration, "Payment:SePay:ApiKey");
-            _ = GetRequiredConfig(configuration, "Payment:SePay:WebhookSecret");
+            var apiKey = configuration["Payment:SePay:ApiKey"];
+            var webhookSecret = configuration["Payment:SePay:WebhookSecret"];
+            if (string.IsNullOrWhiteSpace(apiKey) && string.IsNullOrWhiteSpace(webhookSecret))
+            {
+                throw new InvalidOperationException(
+                    "Missing SePay webhook authentication config: configure Payment:SePay:ApiKey or Payment:SePay:WebhookSecret");
+            }
             _ = GetRequiredConfig(configuration, "Payment:SePay:BankAccountNumber");
             _ = GetRequiredConfig(configuration, "Payment:SePay:BankAccountName");
             _ = GetRequiredConfig(configuration, "Payment:SePay:BankCode");

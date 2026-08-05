@@ -18,6 +18,7 @@ using SMEFLOWSystem.Application.Events.Notification;
 using SMEFLOWSystem.Application.DTOs.PaymentDtos;
 using SMEFLOWSystem.Application.Exceptions;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
 
 namespace SMEFLOWSystem.Application.Services
 {
@@ -38,6 +39,7 @@ namespace SMEFLOWSystem.Application.Services
         private readonly IOutboxMessageRepository _outboxMessageRepo;
         private readonly IConfiguration _config;
         private readonly IVnpay _vnpay;
+        private readonly ILogger<PaymentService> _logger;
 
         public PaymentService(
             IBillingOrderRepository billingOrderRepo,
@@ -51,7 +53,8 @@ namespace SMEFLOWSystem.Application.Services
             IConfiguration configuration,
             IUserRepository userRepo,
             IOutboxMessageRepository outboxMessageRepo,
-            IVnpay vnpay)
+            IVnpay vnpay,
+            ILogger<PaymentService> logger)
         {
             _billingOrderRepo = billingOrderRepo;
             _tenantRepo = tenantRepo;
@@ -65,6 +68,7 @@ namespace SMEFLOWSystem.Application.Services
             _userRepo = userRepo;
             _outboxMessageRepo = outboxMessageRepo;
             _vnpay = vnpay;
+            _logger = logger;
         }
 
         public async Task<string> CreatePaymentUrlAsync(Guid orderId, string? clientIp = null)
@@ -472,49 +476,119 @@ namespace SMEFLOWSystem.Application.Services
 
         public async Task<bool> ProcessSePayWebhookAsync(SePayWebhookPayload payload)
         {
-            // 1. Chỉ xử lý tiền VÀO
-            if (payload.TransferType != "in")
+            if (!string.Equals(payload.TransferType, "in", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning(
+                    "Ignored SePay webhook because it is not an incoming transfer. SePayId={SePayId}, TransferType={TransferType}",
+                    payload.Id,
+                    payload.TransferType);
                 return false;
+            }
 
-            // 2. Parse nội dung CK để tìm BillingOrderNumber
+            if (payload.Id <= 0)
+            {
+                _logger.LogWarning("Ignored SePay webhook with invalid transaction id. SePayId={SePayId}", payload.Id);
+                return false;
+            }
+
+            // SePay documents `id` as the stable transaction identifier used for retries/replays.
+            var gatewayTransactionId = payload.Id.ToString(CultureInfo.InvariantCulture);
+
+            var existing = await _paymentTransactionRepo.GetByGatewayTransactionIdAsync(
+                gateway: GatewaySePay,
+                gatewayTransactionId: gatewayTransactionId,
+                ignoreTenantFilter: true);
+
+            // Backward compatibility for rows created by the old implementation,
+            // which incorrectly used the nullable payment code as transaction id.
+            if (existing == null && !string.IsNullOrWhiteSpace(payload.Code))
+            {
+                existing = await _paymentTransactionRepo.GetByGatewayTransactionIdAsync(
+                    gateway: GatewaySePay,
+                    gatewayTransactionId: payload.Code,
+                    ignoreTenantFilter: true);
+            }
+
+            if (existing != null)
+            {
+                _logger.LogInformation(
+                    "Acknowledged duplicate SePay webhook. SePayId={SePayId}, BillingOrderId={BillingOrderId}",
+                    payload.Id,
+                    existing.BillingOrderId);
+                return true;
+            }
+
             var content = payload.Content?.Trim() ?? "";
-
-            // Tìm BillingOrderNumber trong nội dung CK (dạng SUB-xxxxxxx hoặc BO-xxxxxxx)
-            var match = Regex.Match(content, @"(SUB|BO)-\d+", RegexOptions.IgnoreCase);
+            var match = Regex.Match(
+                content,
+                @"(SUB|BO)-\d+",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
             if (!match.Success)
+            {
+                _logger.LogWarning(
+                    "Ignored SePay webhook because no billing order number was found. SePayId={SePayId}",
+                    payload.Id);
                 return false;
+            }
 
-            var billingOrderNumber = match.Value.ToUpper();
+            var billingOrderNumber = match.Value.ToUpperInvariant();
 
-            // 3. Tìm đơn hàng
             var order = await _billingOrderRepo.GetByOrderNumberIgnoreTenantAsync(billingOrderNumber);
-            if (order == null) return false;
-
-            // 4. Validate đơn hàng đang ở trạng thái chờ thanh toán
-            if (!string.Equals(order.PaymentStatus, StatusEnum.PaymentPending, StringComparison.OrdinalIgnoreCase))
+            if (order == null)
+            {
+                _logger.LogWarning(
+                    "Ignored SePay webhook because billing order was not found. SePayId={SePayId}, BillingOrderNumber={BillingOrderNumber}",
+                    payload.Id,
+                    billingOrderNumber);
                 return false;
+            }
 
-            // 5. Validate số tiền
+            if (!string.Equals(order.PaymentStatus, StatusEnum.PaymentPending, StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning(
+                    "Ignored SePay webhook because billing order is not pending. SePayId={SePayId}, BillingOrderId={BillingOrderId}, PaymentStatus={PaymentStatus}",
+                    payload.Id,
+                    order.Id,
+                    order.PaymentStatus);
+                return false;
+            }
+
             var expectedPayable = order.TotalAmount;
             if (payload.TransferAmount < expectedPayable)
-                return false;  // Số tiền CK ít hơn cần thanh toán
+            {
+                _logger.LogWarning(
+                    "Ignored SePay webhook because transferred amount is insufficient. SePayId={SePayId}, BillingOrderId={BillingOrderId}, TransferredAmount={TransferredAmount}, ExpectedAmount={ExpectedAmount}",
+                    payload.Id,
+                    order.Id,
+                    payload.TransferAmount,
+                    expectedPayable);
+                return false;
+            }
 
-            var gatewayTransactionId = payload.Code;
-
-            // 6. Xử lý trong transaction
+            var processed = false;
             await _transaction.ExecuteAsync(async () =>
             {
-                // Idempotency check
-                var existing = await _paymentTransactionRepo.GetByGatewayTransactionIdAsync(
+                processed = false;
+
+                var existingInside = await _paymentTransactionRepo.GetByGatewayTransactionIdAsync(
                     gateway: GatewaySePay,
                     gatewayTransactionId: gatewayTransactionId,
                     ignoreTenantFilter: true);
-                if (existing != null) return;
+                if (existingInside != null)
+                {
+                    processed = true;
+                    return;
+                }
 
                 var freshOrder = await _billingOrderRepo.GetByIdIgnoreTenantAsync(order.Id);
                 if (freshOrder == null) return;
 
-                // Tạo PaymentTransaction record
+                if (!BillingStateMachine.CanSetPaymentToPaid(freshOrder.PaymentStatus)
+                    || !BillingStateMachine.CanSetOrderToCompleted(freshOrder.Status))
+                {
+                    return;
+                }
+
                 var paymentTransaction = new PaymentTransaction
                 {
                     Id = Guid.NewGuid(),
@@ -532,53 +606,48 @@ namespace SMEFLOWSystem.Application.Services
 
                 await _paymentTransactionRepo.AddAsync(paymentTransaction);
 
-                // Cập nhật trạng thái đơn hàng
-                if (BillingStateMachine.CanSetPaymentToPaid(freshOrder.PaymentStatus)
-                    && BillingStateMachine.CanSetOrderToCompleted(freshOrder.Status))
+                freshOrder.PaymentStatus = StatusEnum.PaymentPaid;
+                freshOrder.Status = StatusEnum.OrderCompleted;
+
+                var paymentSucceededEvent = new PaymentSucceededEvent
                 {
-                    freshOrder.PaymentStatus = StatusEnum.PaymentPaid;
-                    freshOrder.Status = StatusEnum.OrderCompleted;
+                    BillingOrderId = freshOrder.Id,
+                    TenantId = freshOrder.TenantId,
+                    Gateway = GatewaySePay,
+                    GatewayTransactionId = gatewayTransactionId,
+                    Amount = payload.TransferAmount,
+                    Currency = "VND",
+                    CorrelationId = freshOrder.Id.ToString()
+                };
 
-                    // Publish PaymentSucceededEvent
-                    var paymentSucceededEvent = new PaymentSucceededEvent
-                    {
-                        BillingOrderId = freshOrder.Id,
-                        TenantId = freshOrder.TenantId,
-                        Gateway = GatewaySePay,
-                        GatewayTransactionId = gatewayTransactionId,
-                        Amount = payload.TransferAmount,
-                        Currency = "VND",
-                        CorrelationId = freshOrder.Id.ToString()
-                    };
+                var exchange = _config["RabbitMQ:Exchange"] ?? "smeflow.exchange";
+                var routingKey = _config["RabbitMQ:RoutingKeys:PaymentSucceeded"]
+                    ?? "payment.succeeded";
 
-                    var exchange = _config["RabbitMQ:Exchange"] ?? "smeflow.exchange";
-                    var routingKey = _config["RabbitMQ:RoutingKeys:PaymentSucceeded"]
-                        ?? "payment.succeeded";
+                var outboxMessage = new OutboxMessage
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = freshOrder.TenantId,
+                    EventId = paymentSucceededEvent.EventId,
+                    EventType = nameof(PaymentSucceededEvent),
+                    Exchange = exchange,
+                    RoutingKey = routingKey,
+                    Payload = JsonConvert.SerializeObject(paymentSucceededEvent),
+                    CorrelationId = paymentSucceededEvent.CorrelationId,
+                    Status = StatusEnum.OutboxPending,
+                    RetryCount = 0,
+                    OccurredOnUtc = DateTime.UtcNow,
+                    NextAttemptOnUtc = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow
+                };
 
-                    var outboxMessage = new OutboxMessage
-                    {
-                        Id = Guid.NewGuid(),
-                        TenantId = freshOrder.TenantId,
-                        EventId = paymentSucceededEvent.EventId,
-                        EventType = nameof(PaymentSucceededEvent),
-                        Exchange = exchange,
-                        RoutingKey = routingKey,
-                        Payload = JsonConvert.SerializeObject(paymentSucceededEvent),
-                        CorrelationId = paymentSucceededEvent.CorrelationId,
-                        Status = StatusEnum.OutboxPending,
-                        RetryCount = 0,
-                        OccurredOnUtc = DateTime.UtcNow,
-                        NextAttemptOnUtc = DateTime.UtcNow,
-                        CreatedAt = DateTime.UtcNow
-                    };
-
-                    await _outboxMessageRepo.AddAsync(outboxMessage);
-                }
+                await _outboxMessageRepo.AddAsync(outboxMessage);
 
                 await _billingOrderRepo.UpdateIgnoreTenantAsync(freshOrder);
+                processed = true;
             });
 
-            return true;
+            return processed;
         }
     }
 }
