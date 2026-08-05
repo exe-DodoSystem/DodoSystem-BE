@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http;
+using SMEFLOWSystem.Application.DTOs.PaymentDtos;
 using SMEFLOWSystem.WebAPI.Security;
 using System.Globalization;
 using System.Security.Cryptography;
@@ -9,6 +10,89 @@ namespace SMEFLOWSystem.Tests;
 public sealed class SePayWebhookAuthenticationTests
 {
     private static readonly DateTimeOffset Now = DateTimeOffset.FromUnixTimeSeconds(1_786_000_000);
+
+    [Fact]
+    public void OfficialWebhookJson_DeserializesTransactionId()
+    {
+        const string body = """
+            {
+              "id": 92704,
+              "gateway": "Vietcombank",
+              "transactionDate": "2024-07-02 11:08:33",
+              "accountNumber": "1017588888",
+              "subAccount": "",
+              "code": null,
+              "content": "DODO SUB-12345678",
+              "transferType": "in",
+              "description": "NGUYEN VAN A chuyen tien",
+              "transferAmount": 5000000,
+              "accumulated": 105000000,
+              "referenceCode": "FT24012345678"
+            }
+            """;
+
+        var result = SePayWebhookPayloadParser.Parse(body);
+
+        Assert.True(result.Succeeded);
+        var payload = Assert.IsType<SePayWebhookPayload>(result.Payload);
+        Assert.Equal("92704", payload.Id);
+        Assert.Equal("DODO SUB-12345678", payload.Content);
+        Assert.Equal(5_000_000m, payload.TransferAmount);
+    }
+
+    [Fact]
+    public void BankHubWebhookJson_NormalizesSnakeCasePayload()
+    {
+        const string body = """
+            {
+              "gateway": "MBBank",
+              "transaction_date": "2026-08-05 10:00:00",
+              "account_number": "123456789",
+              "va": null,
+              "payment_code": null,
+              "content": "DODO SUB-12345678",
+              "transfer_type": "credit",
+              "amount": 250000,
+              "reference_code": "FT260805123",
+              "accumulated": 1000000,
+              "transaction_id": "a47b6ab2-8f8b-11f0-b21a-a6006ab65aca"
+            }
+            """;
+
+        var result = SePayWebhookPayloadParser.Parse(body);
+
+        Assert.True(result.Succeeded);
+        var payload = Assert.IsType<SePayWebhookPayload>(result.Payload);
+        Assert.Equal("a47b6ab2-8f8b-11f0-b21a-a6006ab65aca", payload.Id);
+        Assert.Equal("in", payload.TransferType);
+        Assert.Equal(250_000m, payload.TransferAmount);
+        Assert.Equal("DODO SUB-12345678", payload.Content);
+    }
+
+    [Fact]
+    public void WrappedWebhookJson_ReadsPayloadFromDataObject()
+    {
+        const string body = """
+            {
+              "status": "success",
+              "data": {
+                "id": "transaction-123",
+                "gateway": "MBBank",
+                "transaction_content": "DODO SUB-12345678",
+                "transfer_type": "in",
+                "amount_in": 300000
+              }
+            }
+            """;
+
+        var result = SePayWebhookPayloadParser.Parse(body);
+
+        Assert.True(result.Succeeded);
+        var payload = Assert.IsType<SePayWebhookPayload>(result.Payload);
+        Assert.Equal("transaction-123", payload.Id);
+        Assert.Equal("DODO SUB-12345678", payload.Content);
+        Assert.Equal(300_000m, payload.TransferAmount);
+    }
 
     [Fact]
     public void Authenticate_AcceptsStandardApiKeyHeader()

@@ -474,7 +474,7 @@ namespace SMEFLOWSystem.Application.Services
             return JsonConvert.SerializeObject(paymentInfo);
         }
 
-        public async Task<bool> ProcessSePayWebhookAsync(SePayWebhookPayload payload)
+        public async Task<SePayWebhookProcessingResult> ProcessSePayWebhookAsync(SePayWebhookPayload payload)
         {
             if (!string.Equals(payload.TransferType, "in", StringComparison.OrdinalIgnoreCase))
             {
@@ -482,17 +482,21 @@ namespace SMEFLOWSystem.Application.Services
                     "Ignored SePay webhook because it is not an incoming transfer. SePayId={SePayId}, TransferType={TransferType}",
                     payload.Id,
                     payload.TransferType);
-                return false;
+                return SePayWebhookProcessingResult.Failure(
+                    "SEPAY_NOT_INCOMING_TRANSFER",
+                    "The transaction is not an incoming transfer.");
             }
 
-            if (payload.Id <= 0)
+            if (string.IsNullOrWhiteSpace(payload.Id) || payload.Id == "0")
             {
                 _logger.LogWarning("Ignored SePay webhook with invalid transaction id. SePayId={SePayId}", payload.Id);
-                return false;
+                return SePayWebhookProcessingResult.Failure(
+                    "SEPAY_INVALID_TRANSACTION_ID",
+                    "The transaction id is missing or invalid.");
             }
 
             // SePay documents `id` as the stable transaction identifier used for retries/replays.
-            var gatewayTransactionId = payload.Id.ToString(CultureInfo.InvariantCulture);
+            var gatewayTransactionId = payload.Id.Trim();
 
             var existing = await _paymentTransactionRepo.GetByGatewayTransactionIdAsync(
                 gateway: GatewaySePay,
@@ -515,7 +519,7 @@ namespace SMEFLOWSystem.Application.Services
                     "Acknowledged duplicate SePay webhook. SePayId={SePayId}, BillingOrderId={BillingOrderId}",
                     payload.Id,
                     existing.BillingOrderId);
-                return true;
+                return SePayWebhookProcessingResult.Success();
             }
 
             var content = payload.Content?.Trim() ?? "";
@@ -528,7 +532,9 @@ namespace SMEFLOWSystem.Application.Services
                 _logger.LogWarning(
                     "Ignored SePay webhook because no billing order number was found. SePayId={SePayId}",
                     payload.Id);
-                return false;
+                return SePayWebhookProcessingResult.Failure(
+                    "SEPAY_ORDER_NUMBER_NOT_FOUND",
+                    "No billing order number was found in the transfer content.");
             }
 
             var billingOrderNumber = match.Value.ToUpperInvariant();
@@ -540,7 +546,9 @@ namespace SMEFLOWSystem.Application.Services
                     "Ignored SePay webhook because billing order was not found. SePayId={SePayId}, BillingOrderNumber={BillingOrderNumber}",
                     payload.Id,
                     billingOrderNumber);
-                return false;
+                return SePayWebhookProcessingResult.Failure(
+                    "SEPAY_ORDER_NOT_FOUND",
+                    $"Billing order {billingOrderNumber} was not found.");
             }
 
             if (!string.Equals(order.PaymentStatus, StatusEnum.PaymentPending, StringComparison.OrdinalIgnoreCase))
@@ -550,7 +558,9 @@ namespace SMEFLOWSystem.Application.Services
                     payload.Id,
                     order.Id,
                     order.PaymentStatus);
-                return false;
+                return SePayWebhookProcessingResult.Failure(
+                    "SEPAY_ORDER_NOT_PENDING",
+                    $"Billing order {billingOrderNumber} is not pending payment.");
             }
 
             var expectedPayable = order.TotalAmount;
@@ -562,13 +572,19 @@ namespace SMEFLOWSystem.Application.Services
                     order.Id,
                     payload.TransferAmount,
                     expectedPayable);
-                return false;
+                return SePayWebhookProcessingResult.Failure(
+                    "SEPAY_AMOUNT_INSUFFICIENT",
+                    $"Transferred amount is less than the amount required for billing order {billingOrderNumber}.");
             }
 
-            var processed = false;
+            var processingResult = SePayWebhookProcessingResult.Failure(
+                "SEPAY_PROCESSING_CONFLICT",
+                "The billing order could not be changed to paid.");
             await _transaction.ExecuteAsync(async () =>
             {
-                processed = false;
+                processingResult = SePayWebhookProcessingResult.Failure(
+                    "SEPAY_PROCESSING_CONFLICT",
+                    "The billing order could not be changed to paid.");
 
                 var existingInside = await _paymentTransactionRepo.GetByGatewayTransactionIdAsync(
                     gateway: GatewaySePay,
@@ -576,7 +592,7 @@ namespace SMEFLOWSystem.Application.Services
                     ignoreTenantFilter: true);
                 if (existingInside != null)
                 {
-                    processed = true;
+                    processingResult = SePayWebhookProcessingResult.Success();
                     return;
                 }
 
@@ -644,10 +660,10 @@ namespace SMEFLOWSystem.Application.Services
                 await _outboxMessageRepo.AddAsync(outboxMessage);
 
                 await _billingOrderRepo.UpdateIgnoreTenantAsync(freshOrder);
-                processed = true;
+                processingResult = SePayWebhookProcessingResult.Success();
             });
 
-            return processed;
+            return processingResult;
         }
     }
 }

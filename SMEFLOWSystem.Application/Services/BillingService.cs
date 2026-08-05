@@ -64,7 +64,7 @@ namespace SMEFLOWSystem.Application.Services
         public Task<string> BuildSimulatedVNPaySuccessQueryStringAsync(Guid orderId, string? gatewayTransactionId = null)
             => _paymentService.BuildSimulatedVNPaySuccessQueryStringAsync(orderId, gatewayTransactionId);
 
-        public Task<bool> ProcessSePayWebhookAsync(SePayWebhookPayload payload)
+        public Task<SePayWebhookProcessingResult> ProcessSePayWebhookAsync(SePayWebhookPayload payload)
             => _paymentService.ProcessSePayWebhookAsync(payload);
 
         public async Task EnqueuePaymentLinkEmailAsync(Guid orderId, string adminEmail, string companyName, string? clientIp = null, string emailType = StatusEnum.EmailTypeNew)

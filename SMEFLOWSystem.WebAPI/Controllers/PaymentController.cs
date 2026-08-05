@@ -10,7 +10,6 @@ using Microsoft.AspNetCore.Authorization;
 using SMEFLOWSystem.Application.DTOs.PaymentDtos;
 using System.IO;
 using System.Text;
-using Newtonsoft.Json;
 using SMEFLOWSystem.Application.Interfaces.IRepositories;
 using SMEFLOWSystem.WebAPI.Security;
 
@@ -115,7 +114,7 @@ namespace SMEFLOWSystem.WebAPI.Controllers
             var code = transactionCode ?? $"SIM-{DateTime.UtcNow.Ticks.ToString().Substring(10)}";
 
             var payload = new SePayWebhookPayload(
-                Id: DateTime.UtcNow.Ticks % 10000000,
+                Id: (DateTime.UtcNow.Ticks % 10000000).ToString(),
                 Gateway: "MBBank",
                 TransactionDate: DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
                 AccountNumber: "123456789",
@@ -129,10 +128,12 @@ namespace SMEFLOWSystem.WebAPI.Controllers
                 TransferType: "in"
             );
 
-            var success = await _billingService.ProcessSePayWebhookAsync(payload);
+            var result = await _billingService.ProcessSePayWebhookAsync(payload);
             return Ok(new
             {
-                Success = success,
+                Success = result.Succeeded,
+                result.ErrorCode,
+                result.Message,
                 Payload = payload
             });
         }
@@ -164,37 +165,73 @@ namespace SMEFLOWSystem.WebAPI.Controllers
                     "Rejected SePay webhook authentication. Reason={Reason}, TraceId={TraceId}",
                     authentication.ErrorCode,
                     HttpContext.TraceIdentifier);
-                return Unauthorized(new { success = false, message = authentication.ErrorCode });
+                return Unauthorized(new
+                {
+                    success = false,
+                    code = authentication.ErrorCode,
+                    message = "Webhook authentication failed.",
+                    traceId = HttpContext.TraceIdentifier
+                });
             }
 
             var rawBody = Encoding.UTF8.GetString(rawBodyBytes);
-            SePayWebhookPayload? payload;
+            SePayWebhookParseResult parseResult;
             try
             {
-                payload = JsonConvert.DeserializeObject<SePayWebhookPayload>(rawBody);
+                parseResult = SePayWebhookPayloadParser.Parse(rawBody);
             }
-            catch (JsonException exception)
+            catch (Newtonsoft.Json.JsonException exception)
             {
                 _logger.LogWarning(
                     exception,
                     "Rejected malformed SePay webhook JSON. TraceId={TraceId}",
                     HttpContext.TraceIdentifier);
-                return BadRequest(new { success = false, message = "SEPAY_INVALID_JSON" });
+                return BadRequest(new
+                {
+                    success = false,
+                    code = "SEPAY_INVALID_JSON",
+                    message = "Webhook body is not valid JSON.",
+                    traceId = HttpContext.TraceIdentifier
+                });
             }
 
-            if (payload == null)
-                return BadRequest(new { success = false, message = "SEPAY_INVALID_JSON" });
-
-            var result = await _billingService.ProcessSePayWebhookAsync(payload);
-            if (!result)
+            if (!parseResult.Succeeded)
             {
                 _logger.LogWarning(
-                    "SePay webhook was authenticated but not matched. SePayId={SePayId}, TraceId={TraceId}",
-                    payload.Id,
+                    "Rejected unsupported SePay webhook payload. Fields={Fields}, TraceId={TraceId}",
+                    parseResult.DetectedFields,
                     HttpContext.TraceIdentifier);
+                return BadRequest(new
+                {
+                    success = false,
+                    code = "SEPAY_UNSUPPORTED_PAYLOAD",
+                    message = "Webhook payload schema is not supported.",
+                    fields = parseResult.DetectedFields,
+                    traceId = HttpContext.TraceIdentifier
+                });
             }
 
-            return Ok(new { success = result });
+            var payload = parseResult.Payload!;
+
+            var result = await _billingService.ProcessSePayWebhookAsync(payload);
+            if (!result.Succeeded)
+            {
+                _logger.LogWarning(
+                    "SePay webhook was authenticated but not matched. SePayId={SePayId}, ErrorCode={ErrorCode}, TraceId={TraceId}",
+                    payload.Id,
+                    result.ErrorCode,
+                    HttpContext.TraceIdentifier);
+
+                return Ok(new
+                {
+                    success = false,
+                    code = result.ErrorCode,
+                    message = result.Message,
+                    traceId = HttpContext.TraceIdentifier
+                });
+            }
+
+            return Ok(new { success = true });
         }
     }
 }

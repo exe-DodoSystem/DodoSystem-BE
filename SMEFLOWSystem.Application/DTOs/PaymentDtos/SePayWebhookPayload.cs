@@ -2,7 +2,7 @@ namespace SMEFLOWSystem.Application.DTOs.PaymentDtos
 {
     /// <summary>Payload SePay gửi qua webhook khi có giao dịch thành công</summary>
     public record SePayWebhookPayload(
-        long Id,                     // Transaction ID trên SePay
+        string Id,                   // Transaction ID ổn định trên SePay/Bank Hub
         string? Gateway,             // Tên ngân hàng (vd: "MBBank")
         string? TransactionDate,     // Thời gian giao dịch (vd: "2026-07-01 13:00:00")
         string? AccountNumber,       // STK nhận tiền
